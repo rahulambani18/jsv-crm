@@ -1,0 +1,86 @@
+:root {
+  /* ---- Palette ---- */
+  /* Deep lab-navy — sidebar, headers, ink */
+  --navy-950: #0a1730;
+  --navy-900: #0f1e3d;
+  --navy-800: #16294f;
+  --navy-700: #233a66;
+  --navy-400: #6b81a8;
+  --navy-200: #c2cce0;
+
+  /* Workspace surfaces — paper, not white */
+  --paper-0: #fafaf8;
+  --paper-50: #f4f3ef;
+  --paper-100: #ebe9e2;
+  --paper-200: #ddd9cd;
+
+  /* Signal colors — borrowed from lab/COA documents */
+  --amber-600: #b45309;   /* attention / pending / hot */
+  --amber-500: #d97706;
+  --amber-100: #fef3e0;
+
+  --teal-700: #0f766e;    /* positive / converted / paid */
+  --teal-600: #0d9488;
+  --teal-100: #e1f5f1;
+
+  --red-600: #b42318;     /* overdue / blocked */
+  --red-100: #fbe9e7;
+
+  --ink-900: #14181f;
+  --ink-700: #3c4452;
+  --ink-500: #6b7280;
+  --ink-300: #a3a9b3;
+
+  /* ---- Type ---- */
+  --font-display: 'Archivo', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+
+  /* ---- Layout ---- */
+  --sidebar-w: 248px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --shadow-card: 0 1px 2px rgba(15, 30, 61, 0.06), 0 1px 1px rgba(15, 30, 61, 0.04);
+  --shadow-pop: 0 8px 24px rgba(15, 30, 61, 0.14), 0 2px 6px rgba(15, 30, 61, 0.08);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-body);
+  color: var(--ink-900);
+  background: var(--paper-0);
+  -webkit-font-smoothing: antialiased;
+}
+
+#root { height: 100%; }
+
+a { color: inherit; text-decoration: none; }
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--navy-700);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* scrollbar, subtle */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: var(--paper-200); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: var(--navy-200); }
+
+.mono { font-family: var(--font-mono); letter-spacing: -0.01em; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
