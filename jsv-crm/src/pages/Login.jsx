@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext.jsx'
 import { isMock } from '../lib/api.js'
+import jsvMark from '../assets/jsv-mark.png'
 import '../styles/components.css'
 
 export default function Login() {
@@ -31,7 +32,7 @@ export default function Login() {
     <div className="login-screen">
       <div className="login-card">
         <div className="login-brand">
-          <div className="brand-mark" style={{ width: 40, height: 40 }}>JSV</div>
+          <img src={jsvMark} alt="JSV Ingredient" style={{ height: 44, width: 'auto' }} />
           <div>
             <h2 style={{ margin: 0 }}>JSV CRM</h2>
             <p className="sub" style={{ margin: 0 }}>Food Additives &amp; Chemicals</p>

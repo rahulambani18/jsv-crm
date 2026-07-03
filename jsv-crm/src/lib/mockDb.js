@@ -4,7 +4,7 @@
 
 import {
   seedProducts, seedLeads, seedCustomers, seedSamples,
-  seedQuotations, seedOrders, seedFollowUps,
+  seedQuotations, seedOrders, seedFollowUps, seedRoles, seedUsers,
 } from '../data/seed.js'
 
 const store = {
@@ -15,6 +15,8 @@ const store = {
   quotations: [...seedQuotations],
   orders: [...seedOrders],
   followUps: [...seedFollowUps],
+  roles: [...seedRoles],
+  users: [...seedUsers],
 }
 
 const delay = (ms = 150) => new Promise((res) => setTimeout(res, ms))
@@ -60,10 +62,27 @@ export const mockDb = {
   quotations: table('quotations'),
   orders: table('orders'),
   followUps: table('followUps'),
+  roles: table('roles'),
+  users: table('users'),
 }
 
-// Simple demo auth — accepts any email/password, persists "session" in memory.
+// Simple demo auth — accepts any email/password, signs in as the
+// first seeded Admin user so the Users & Roles screen has real data
+// to show immediately. Session lives in memory for this tab/session.
 let currentUser = null
+
+function resolveUserWithRole(userRecord) {
+  if (!userRecord) return null
+  const role = store.roles.find((r) => r.id === userRecord.roleId)
+  return {
+    id: userRecord.id,
+    email: userRecord.email,
+    name: userRecord.name,
+    title: role?.name || 'Sales Executive',
+    role: role?.name || 'Sales Executive',
+    permissions: role?.permissions || {},
+  }
+}
 
 export const mockAuth = {
   async getUser() {
@@ -72,8 +91,20 @@ export const mockAuth = {
   },
   async signIn(email, _password) {
     await delay(300)
-    currentUser = { id: 'u1', email, name: 'Rahul', role: 'Admin', title: 'Sales Executive' }
+    // Match an existing seeded user by email if present, otherwise sign
+    // in as the Admin (u1) so the demo always has full access.
+    const match = store.users.find((u) => u.email.toLowerCase() === email.toLowerCase()) || store.users[0]
+    currentUser = resolveUserWithRole(match)
     return currentUser
+  },
+  async signUp(email, _password, fullName) {
+    await delay(300)
+    // In demo mode there's no real invite flow — just add a row to the
+    // in-memory users table with the default Sales Executive role.
+    const execRole = store.roles.find((r) => r.name === 'Sales Executive')
+    const row = { id: makeId('us'), name: fullName || email.split('@')[0], email, roleId: execRole?.id, status: 'Active', lastActive: new Date().toISOString().slice(0, 10) }
+    store.users = [row, ...store.users]
+    return row
   },
   async signOut() {
     await delay(150)

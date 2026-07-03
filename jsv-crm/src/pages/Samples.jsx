@@ -1,19 +1,25 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../lib/api.js'
+import { COURIERS } from '../data/seed.js'
 import PageHeader from '../components/PageHeader.jsx'
 import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
+import MultiComboField from '../components/MultiComboField.jsx'
 import { IconPlus, IconSearch } from '../components/Icons.jsx'
+import { useAuth } from '../lib/AuthContext.jsx'
 import '../styles/components.css'
 
 const STATUSES = ['All statuses', 'Preparing', 'In Transit', 'Delivered']
 
 function emptyForm() {
-  return { company: '', contact: '', products: '', qty: '', sent: '', tracking: '', status: 'Preparing' }
+  return { company: '', contact: '', phone: '', email: '', products: [], qty: '', sent: '', courier: '', tracking: '', status: 'Preparing' }
 }
 
 export default function Samples() {
+  const { can } = useAuth()
+  const canEdit = can('samples', 'edit')
   const [samples, setSamples] = useState([])
+  const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All statuses')
@@ -25,8 +31,12 @@ export default function Samples() {
 
   function refresh() {
     setLoading(true)
-    api.samples.list().then((data) => { setSamples(data); setLoading(false) })
+    Promise.all([api.samples.list(), api.products.list()]).then(([s, p]) => {
+      setSamples(s); setProducts(p); setLoading(false)
+    })
   }
+
+  const productOptions = useMemo(() => products.map((p) => p.name), [products])
 
   const filtered = useMemo(() => samples.filter((s) => {
     const matchesSearch = !search || [s.company, s.tracking, ...(s.products || [])].some((v) => (v || '').toLowerCase().includes(search.toLowerCase()))
@@ -37,11 +47,7 @@ export default function Samples() {
   async function handleCreate(e) {
     e.preventDefault()
     setSaving(true)
-    const record = {
-      ...form,
-      code: `SMP-${1040 + samples.length + 1}`,
-      products: form.products.split(',').map((s) => s.trim()).filter(Boolean),
-    }
+    const record = { ...form, code: `SMP-${1040 + samples.length + 1}` }
     await api.samples.insert(record)
     setSaving(false)
     setShowModal(false)
@@ -55,9 +61,11 @@ export default function Samples() {
         title="Samples"
         subtitle={`${samples.length} sample${samples.length === 1 ? '' : 's'}`}
         actions={
-          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-            <IconPlus width={15} height={15} /> New Sample
-          </button>
+          canEdit && (
+            <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+              <IconPlus width={15} height={15} /> New Sample
+            </button>
+          )
         }
       />
 
@@ -74,21 +82,22 @@ export default function Samples() {
       <div className="table-wrap">
         <table className="data-table">
           <thead>
-            <tr><th>Code</th><th>Company</th><th>Contact</th><th>Products</th><th>Qty</th><th>Sent</th><th>Tracking</th><th>Status</th></tr>
+            <tr><th>Code</th><th>Company</th><th>Contact</th><th>Products</th><th>Qty</th><th>Sent</th><th>Courier</th><th>Tracking</th><th>Status</th></tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={8}>Loading samples…</td></tr>
+              <tr className="empty-row"><td colSpan={9}>Loading samples…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={8}>{samples.length === 0 ? 'No samples yet.' : 'No samples match your filters.'}</td></tr>
+              <tr className="empty-row"><td colSpan={9}>{samples.length === 0 ? 'No samples yet.' : 'No samples match your filters.'}</td></tr>
             ) : filtered.map((s) => (
               <tr key={s.id}>
                 <td className="cell-mono">{s.code}</td>
                 <td className="cell-strong">{s.company}</td>
-                <td>{s.contact}</td>
+                <td>{s.contact}<br /><span className="cell-mono cell-muted" style={{ fontSize: 11.5 }}>{s.phone}</span></td>
                 <td>{(s.products || []).join(', ')}</td>
                 <td className="cell-mono">{s.qty}</td>
                 <td className="cell-mono">{s.sent}</td>
+                <td>{s.courier}</td>
                 <td className="cell-mono" style={{ fontSize: 11.5 }}>{s.tracking}</td>
                 <td><Pill>{s.status}</Pill></td>
               </tr>
@@ -117,13 +126,23 @@ export default function Samples() {
                 <input required value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} />
               </div>
               <div className="field">
-                <label>Contact</label>
+                <label>Contact person</label>
                 <input value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} />
               </div>
             </div>
+            <div className="field-row">
+              <div className="field">
+                <label>Phone number</label>
+                <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+91 90000 00000" />
+              </div>
+              <div className="field">
+                <label>Email</label>
+                <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+              </div>
+            </div>
             <div className="field">
-              <label>Products (comma separated)</label>
-              <input value={form.products} onChange={(e) => setForm({ ...form, products: e.target.value })} />
+              <label>Products</label>
+              <MultiComboField options={productOptions} value={form.products} onChange={(v) => setForm({ ...form, products: v })} placeholder="Select a product…" />
             </div>
             <div className="field-row">
               <div className="field">
@@ -137,15 +156,22 @@ export default function Samples() {
             </div>
             <div className="field-row">
               <div className="field">
+                <label>Courier name</label>
+                <select value={form.courier} onChange={(e) => setForm({ ...form, courier: e.target.value })}>
+                  <option value="" disabled>Select courier…</option>
+                  {COURIERS.map((c) => <option key={c}>{c}</option>)}
+                </select>
+              </div>
+              <div className="field">
                 <label>Tracking number</label>
                 <input value={form.tracking} onChange={(e) => setForm({ ...form, tracking: e.target.value })} />
               </div>
-              <div className="field">
-                <label>Status</label>
-                <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                  <option>Preparing</option><option>In Transit</option><option>Delivered</option>
-                </select>
-              </div>
+            </div>
+            <div className="field">
+              <label>Status</label>
+              <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                <option>Preparing</option><option>In Transit</option><option>Delivered</option>
+              </select>
             </div>
           </form>
         </Modal>

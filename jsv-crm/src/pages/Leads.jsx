@@ -1,20 +1,26 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../lib/api.js'
-import { PIPELINE_STAGES } from '../data/seed.js'
+import { PIPELINE_STAGES, INDUSTRY_OPTIONS } from '../data/seed.js'
 import PageHeader from '../components/PageHeader.jsx'
 import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
+import ComboField from '../components/ComboField.jsx'
+import MultiComboField from '../components/MultiComboField.jsx'
 import { IconPlus, IconSearch } from '../components/Icons.jsx'
+import { useAuth } from '../lib/AuthContext.jsx'
 import '../styles/components.css'
 
 const STATUSES = ['All statuses', ...PIPELINE_STAGES]
 
 function emptyForm() {
-  return { company: '', contact: '', phone: '', city: '', priority: 'Medium', status: 'New Lead', estValue: '', nextFollowUp: '', industry: '', products: '' }
+  return { company: '', contact: '', phone: '', city: '', priority: 'Medium', status: 'New Lead', estValue: '', nextFollowUp: '', industry: '', products: [] }
 }
 
 export default function Leads() {
+  const { can } = useAuth()
+  const canEdit = can('leads', 'edit')
   const [leads, setLeads] = useState([])
+  const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All statuses')
@@ -26,8 +32,12 @@ export default function Leads() {
 
   function refresh() {
     setLoading(true)
-    api.leads.list().then((data) => { setLeads(data); setLoading(false) })
+    Promise.all([api.leads.list(), api.products.list()]).then(([l, p]) => {
+      setLeads(l); setProducts(p); setLoading(false)
+    })
   }
+
+  const productOptions = useMemo(() => products.map((p) => p.name), [products])
 
   const filtered = useMemo(() => {
     return leads.filter((l) => {
@@ -40,11 +50,7 @@ export default function Leads() {
   async function handleCreate(e) {
     e.preventDefault()
     setSaving(true)
-    const record = {
-      ...form,
-      estValue: Number(form.estValue) || 0,
-      products: form.products.split(',').map((s) => s.trim()).filter(Boolean),
-    }
+    const record = { ...form, estValue: Number(form.estValue) || 0 }
     await api.leads.insert(record)
     setSaving(false)
     setShowModal(false)
@@ -58,9 +64,11 @@ export default function Leads() {
         title="Leads"
         subtitle={`${leads.length} lead${leads.length === 1 ? '' : 's'}`}
         actions={
-          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-            <IconPlus width={15} height={15} /> New Lead
-          </button>
+          canEdit && (
+            <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+              <IconPlus width={15} height={15} /> New Lead
+            </button>
+          )
         }
       />
 
@@ -138,7 +146,12 @@ export default function Leads() {
               </div>
               <div className="field">
                 <label>Industry</label>
-                <input value={form.industry} onChange={(e) => setForm({ ...form, industry: e.target.value })} placeholder="e.g. Beverages" />
+                <ComboField
+                  options={INDUSTRY_OPTIONS}
+                  value={form.industry}
+                  onChange={(v) => setForm({ ...form, industry: v })}
+                  placeholder="Select industry…"
+                />
               </div>
             </div>
             <div className="field-row">
@@ -166,8 +179,13 @@ export default function Leads() {
               </div>
             </div>
             <div className="field">
-              <label>Products of interest (comma separated)</label>
-              <input value={form.products} onChange={(e) => setForm({ ...form, products: e.target.value })} placeholder="Citric Acid, Guar Gum" />
+              <label>Products of interest</label>
+              <MultiComboField
+                options={productOptions}
+                value={form.products}
+                onChange={(v) => setForm({ ...form, products: v })}
+                placeholder="Select a product…"
+              />
             </div>
           </form>
         </Modal>

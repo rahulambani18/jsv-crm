@@ -1,31 +1,47 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../lib/api.js'
+import { INDUSTRY_OPTIONS, INDIAN_STATES } from '../data/seed.js'
 import PageHeader from '../components/PageHeader.jsx'
 import Modal from '../components/Modal.jsx'
+import ComboField from '../components/ComboField.jsx'
+import MultiComboField from '../components/MultiComboField.jsx'
 import { IconPlus, IconSearch } from '../components/Icons.jsx'
+import { useAuth } from '../lib/AuthContext.jsx'
 import '../styles/components.css'
 
 function emptyForm() {
-  return { code: '', company: '', contact: '', city: '', gst: '', industry: '', application: '', products: '', qty: '' }
+  return {
+    company: '', contact: '', mobile: '', email: '', gst: '',
+    industry: '', application: '', products: [], qty: '',
+    city: '', state: '', billingAddress: '', shippingAddress: '',
+  }
 }
 
 export default function Customers() {
+  const { can } = useAuth()
+  const canEdit = can('customers', 'edit')
   const [customers, setCustomers] = useState([])
+  const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(emptyForm())
+  const [sameAsBilling, setSameAsBilling] = useState(true)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => { refresh() }, [])
 
   function refresh() {
     setLoading(true)
-    api.customers.list().then((data) => { setCustomers(data); setLoading(false) })
+    Promise.all([api.customers.list(), api.products.list()]).then(([c, p]) => {
+      setCustomers(c); setProducts(p); setLoading(false)
+    })
   }
 
+  const productOptions = useMemo(() => products.map((p) => p.name), [products])
+
   const filtered = useMemo(() => {
-    return customers.filter((c) => !search || [c.company, c.contact, c.city, c.gst].some((v) => (v || '').toLowerCase().includes(search.toLowerCase())))
+    return customers.filter((c) => !search || [c.company, c.contact, c.mobile, c.gst, c.city].some((v) => (v || '').toLowerCase().includes(search.toLowerCase())))
   }, [customers, search])
 
   async function handleCreate(e) {
@@ -33,14 +49,15 @@ export default function Customers() {
     setSaving(true)
     const record = {
       ...form,
-      code: form.code || `CUST-${String(customers.length + 1).padStart(4, '0')}`,
-      products: form.products.split(',').map((s) => s.trim()).filter(Boolean),
+      code: `CUST-${String(customers.length + 1).padStart(4, '0')}`,
+      shippingAddress: sameAsBilling ? form.billingAddress : form.shippingAddress,
       added: new Date().toISOString().slice(0, 10),
     }
     await api.customers.insert(record)
     setSaving(false)
     setShowModal(false)
     setForm(emptyForm())
+    setSameAsBilling(true)
     refresh()
   }
 
@@ -50,13 +67,15 @@ export default function Customers() {
         title="Customers"
         subtitle={`${customers.length} customer${customers.length === 1 ? '' : 's'}`}
         actions={
-          <>
-            <button className="btn btn-secondary">Template</button>
-            <button className="btn btn-secondary">Import Excel/CSV</button>
-            <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-              <IconPlus width={15} height={15} /> New Customer
-            </button>
-          </>
+          canEdit && (
+            <>
+              <button className="btn btn-secondary">Template</button>
+              <button className="btn btn-secondary">Import Excel/CSV</button>
+              <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+                <IconPlus width={15} height={15} /> New Customer
+              </button>
+            </>
+          )
         }
       />
 
@@ -84,7 +103,7 @@ export default function Customers() {
               <tr key={c.id}>
                 <td className="cell-mono">{c.code}</td>
                 <td className="cell-strong">{c.company}</td>
-                <td>{c.contact}</td>
+                <td>{c.contact}<br /><span className="cell-mono cell-muted" style={{ fontSize: 11.5 }}>{c.mobile}</span></td>
                 <td>{c.city}</td>
                 <td className="cell-mono" style={{ fontSize: 11.5 }}>{c.gst}</td>
                 <td>{c.industry}</td>
@@ -119,37 +138,70 @@ export default function Customers() {
             <div className="field-row">
               <div className="field">
                 <label>Contact person</label>
-                <input value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} />
+                <input required value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>Mobile</label>
+                <input value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value })} placeholder="+91 90000 00000" />
+              </div>
+            </div>
+            <div className="field-row">
+              <div className="field">
+                <label>Email</label>
+                <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>GST number</label>
+                <input value={form.gst} onChange={(e) => setForm({ ...form, gst: e.target.value })} />
+              </div>
+            </div>
+            <div className="field-row">
+              <div className="field">
+                <label>Industry</label>
+                <ComboField options={INDUSTRY_OPTIONS} value={form.industry} onChange={(v) => setForm({ ...form, industry: v })} placeholder="Select industry…" />
+              </div>
+              <div className="field">
+                <label>Application</label>
+                <input value={form.application} onChange={(e) => setForm({ ...form, application: e.target.value })} placeholder="e.g. Flavoured Milk" />
+              </div>
+            </div>
+            <div className="field">
+              <label>Product interest</label>
+              <MultiComboField options={productOptions} value={form.products} onChange={(v) => setForm({ ...form, products: v })} placeholder="Select a product…" />
+            </div>
+            <div className="field-row">
+              <div className="field">
+                <label>Monthly quantity</label>
+                <input value={form.qty} onChange={(e) => setForm({ ...form, qty: e.target.value })} placeholder="e.g. 2.4 MT/mo" />
               </div>
               <div className="field">
                 <label>City</label>
                 <input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
               </div>
             </div>
-            <div className="field-row">
-              <div className="field">
-                <label>GST number</label>
-                <input value={form.gst} onChange={(e) => setForm({ ...form, gst: e.target.value })} />
-              </div>
-              <div className="field">
-                <label>Industry</label>
-                <input value={form.industry} onChange={(e) => setForm({ ...form, industry: e.target.value })} />
-              </div>
-            </div>
-            <div className="field-row">
-              <div className="field">
-                <label>Application</label>
-                <input value={form.application} onChange={(e) => setForm({ ...form, application: e.target.value })} />
-              </div>
-              <div className="field">
-                <label>Monthly qty</label>
-                <input value={form.qty} onChange={(e) => setForm({ ...form, qty: e.target.value })} placeholder="e.g. 2.4 MT/mo" />
-              </div>
+            <div className="field">
+              <label>State</label>
+              <select value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })}>
+                <option value="" disabled>Select state…</option>
+                {INDIAN_STATES.map((s) => <option key={s}>{s}</option>)}
+              </select>
             </div>
             <div className="field">
-              <label>Products (comma separated)</label>
-              <input value={form.products} onChange={(e) => setForm({ ...form, products: e.target.value })} />
+              <label>Billing address</label>
+              <textarea rows={2} value={form.billingAddress} onChange={(e) => setForm({ ...form, billingAddress: e.target.value })} />
             </div>
+            <div className="field">
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input type="checkbox" checked={sameAsBilling} onChange={(e) => setSameAsBilling(e.target.checked)} style={{ width: 'auto' }} />
+                Shipping address same as billing
+              </label>
+            </div>
+            {!sameAsBilling && (
+              <div className="field">
+                <label>Shipping address</label>
+                <textarea rows={2} value={form.shippingAddress} onChange={(e) => setForm({ ...form, shippingAddress: e.target.value })} />
+              </div>
+            )}
           </form>
         </Modal>
       )}

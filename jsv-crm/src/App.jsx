@@ -11,6 +11,7 @@ import Quotations from './pages/Quotations.jsx'
 import Orders from './pages/Orders.jsx'
 import Products from './pages/Products.jsx'
 import Reports from './pages/Reports.jsx'
+import UsersAndRoles from './pages/UsersAndRoles.jsx'
 import './styles/components.css'
 
 function Protected({ children }) {
@@ -40,6 +41,7 @@ function AppRoutes() {
       <Route path="/orders" element={<Protected><Orders /></Protected>} />
       <Route path="/products" element={<Protected><Products /></Protected>} />
       <Route path="/reports" element={<Protected><Reports /></Protected>} />
+      <Route path="/users" element={<Protected><UsersAndRoles /></Protected>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

@@ -3,26 +3,26 @@
 // Swap or extend freely; this is what ships when running on the mock data layer.
 
 export const seedProducts = [
-  { id: 'p1', name: 'Acesulfame-K', category: 'Sweeteners', supplier: 'Vivion Inc.', origin: 'Germany', moq: '25 kg', docs: 'COA, MSDS', status: 'Active' },
-  { id: 'p2', name: 'Acetic Acid', category: 'Acidity Regulators / Anti Oxidants', supplier: 'Celanese', origin: 'China', moq: '200 kg', docs: 'COA', status: 'Active' },
-  { id: 'p3', name: 'Ascorbic Acid', category: 'Acidity Regulators / Anti Oxidants', supplier: 'DSM', origin: 'China', moq: '50 kg', docs: 'COA, MSDS, Halal', status: 'Active' },
-  { id: 'p4', name: 'Aspartame', category: 'Sweeteners', supplier: 'Ajinomoto', origin: 'Japan', moq: '25 kg', docs: 'COA, Kosher', status: 'Active' },
-  { id: 'p5', name: 'Benzoic Acid', category: 'Preservatives', supplier: 'Emerald Kalama', origin: 'USA', moq: '50 kg', docs: 'COA', status: 'Active' },
-  { id: 'p6', name: 'Buffered Lactic Acid', category: 'Lactic Acid & Lactates', supplier: 'Corbion', origin: 'Netherlands', moq: '200 kg', docs: 'COA, MSDS', status: 'Active' },
-  { id: 'p7', name: 'Calcium Lactate', category: 'Lactic Acid & Lactates', supplier: 'Jungbunzlauer', origin: 'Austria', moq: '25 kg', docs: 'COA', status: 'Active' },
-  { id: 'p8', name: 'Calcium Stearate', category: 'Harihar Organics', supplier: 'Harihar Organics', origin: 'India', moq: '25 kg', docs: '—', status: 'Active' },
-  { id: 'p9', name: 'Carrageenan', category: 'Thickener and Stabilizer', supplier: 'CP Kelco', origin: 'Philippines', moq: '25 kg', docs: 'COA, Halal', status: 'Active' },
-  { id: 'p10', name: 'Citric Acid', category: 'Acidity Regulators / Anti Oxidants', supplier: 'RZBC', origin: 'China', moq: '500 kg', docs: 'COA, MSDS', status: 'Active' },
-  { id: 'p11', name: 'CLM (Citric / Lactic / Malic)', category: 'Lactic Acid & Lactates', supplier: 'Jungbunzlauer', origin: 'Austria', moq: '50 kg', docs: 'COA', status: 'Active' },
-  { id: 'p12', name: 'Di Propylene Glycol (D.P.G.)', category: 'Humectant', supplier: 'Dow', origin: 'Singapore', moq: '200 kg', docs: 'COA, MSDS', status: 'Active' },
-  { id: 'p13', name: 'DL+ Malic Acid', category: 'Acidity Regulators / Anti Oxidants', supplier: 'Bartek', origin: 'Canada', moq: '50 kg', docs: 'COA', status: 'Active' },
-  { id: 'p14', name: 'DL+ Tartaric Acid', category: 'Acidity Regulators / Anti Oxidants', supplier: 'Caviro', origin: 'Italy', moq: '50 kg', docs: 'COA', status: 'Active' },
-  { id: 'p15', name: 'Ethyl Vanillin', category: 'Flavour Enhancer', supplier: 'Solvay', origin: 'France', moq: '5 kg', docs: 'COA, Kosher', status: 'Active' },
-  { id: 'p16', name: 'Guar Gum', category: 'Thickener and Stabilizer', supplier: 'Vikas WSP', origin: 'India', moq: '25 kg', docs: 'COA', status: 'Active' },
-  { id: 'p17', name: 'Potassium Sorbate', category: 'Preservatives', supplier: 'Niacet', origin: 'Netherlands', moq: '25 kg', docs: 'COA, Halal', status: 'Active' },
-  { id: 'p18', name: 'Sodium Benzoate', category: 'Preservatives', supplier: 'Emerald Kalama', origin: 'USA', moq: '50 kg', docs: 'COA', status: 'Active' },
-  { id: 'p19', name: 'Xanthan Gum', category: 'Thickener and Stabilizer', supplier: 'CP Kelco', origin: 'China', moq: '25 kg', docs: 'COA, Halal, Kosher', status: 'Active' },
-  { id: 'p20', name: 'Sodium Citrate', category: 'Acidity Regulators / Anti Oxidants', supplier: 'Jungbunzlauer', origin: 'Austria', moq: '50 kg', docs: 'COA', status: 'Active' },
+  { id: 'p1', name: 'Acesulfame-K', category: 'Sweeteners', supplier: 'Vivion Inc.', origin: 'Germany', moq: '25 kg', docs: 'COA, MSDS', unitPrice: 850, status: 'Active' },
+  { id: 'p2', name: 'Acetic Acid', category: 'Acidity Regulators / Anti Oxidants', supplier: 'Celanese', origin: 'China', moq: '200 kg', docs: 'COA', unitPrice: 95, status: 'Active' },
+  { id: 'p3', name: 'Ascorbic Acid', category: 'Acidity Regulators / Anti Oxidants', supplier: 'DSM', origin: 'China', moq: '50 kg', docs: 'COA, MSDS, Halal', unitPrice: 410, status: 'Active' },
+  { id: 'p4', name: 'Aspartame', category: 'Sweeteners', supplier: 'Ajinomoto', origin: 'Japan', moq: '25 kg', docs: 'COA, Kosher', unitPrice: 720, status: 'Active' },
+  { id: 'p5', name: 'Benzoic Acid', category: 'Preservatives', supplier: 'Emerald Kalama', origin: 'USA', moq: '50 kg', docs: 'COA', unitPrice: 260, status: 'Active' },
+  { id: 'p6', name: 'Buffered Lactic Acid', category: 'Lactic Acid & Lactates', supplier: 'Corbion', origin: 'Netherlands', moq: '200 kg', docs: 'COA, MSDS', unitPrice: 180, status: 'Active' },
+  { id: 'p7', name: 'Calcium Lactate', category: 'Lactic Acid & Lactates', supplier: 'Jungbunzlauer', origin: 'Austria', moq: '25 kg', docs: 'COA', unitPrice: 320, status: 'Active' },
+  { id: 'p8', name: 'Calcium Stearate', category: 'Harihar Organics', supplier: 'Harihar Organics', origin: 'India', moq: '25 kg', docs: '—', unitPrice: 150, status: 'Active' },
+  { id: 'p9', name: 'Carrageenan', category: 'Thickener and Stabilizer', supplier: 'CP Kelco', origin: 'Philippines', moq: '25 kg', docs: 'COA, Halal', unitPrice: 950, status: 'Active' },
+  { id: 'p10', name: 'Citric Acid', category: 'Acidity Regulators / Anti Oxidants', supplier: 'RZBC', origin: 'China', moq: '500 kg', docs: 'COA, MSDS', unitPrice: 220, status: 'Active' },
+  { id: 'p11', name: 'CLM (Citric / Lactic / Malic)', category: 'Lactic Acid & Lactates', supplier: 'Jungbunzlauer', origin: 'Austria', moq: '50 kg', docs: 'COA', unitPrice: 240, status: 'Active' },
+  { id: 'p12', name: 'Di Propylene Glycol (D.P.G.)', category: 'Humectant', supplier: 'Dow', origin: 'Singapore', moq: '200 kg', docs: 'COA, MSDS', unitPrice: 310, status: 'Active' },
+  { id: 'p13', name: 'DL+ Malic Acid', category: 'Acidity Regulators / Anti Oxidants', supplier: 'Bartek', origin: 'Canada', moq: '50 kg', docs: 'COA', unitPrice: 280, status: 'Active' },
+  { id: 'p14', name: 'DL+ Tartaric Acid', category: 'Acidity Regulators / Anti Oxidants', supplier: 'Caviro', origin: 'Italy', moq: '50 kg', docs: 'COA', unitPrice: 300, status: 'Active' },
+  { id: 'p15', name: 'Ethyl Vanillin', category: 'Flavour Enhancer', supplier: 'Solvay', origin: 'France', moq: '5 kg', docs: 'COA, Kosher', unitPrice: 2400, status: 'Active' },
+  { id: 'p16', name: 'Guar Gum', category: 'Thickener and Stabilizer', supplier: 'Vikas WSP', origin: 'India', moq: '25 kg', docs: 'COA', unitPrice: 410, status: 'Active' },
+  { id: 'p17', name: 'Potassium Sorbate', category: 'Preservatives', supplier: 'Niacet', origin: 'Netherlands', moq: '25 kg', docs: 'COA, Halal', unitPrice: 480, status: 'Active' },
+  { id: 'p18', name: 'Sodium Benzoate', category: 'Preservatives', supplier: 'Emerald Kalama', origin: 'USA', moq: '50 kg', docs: 'COA', unitPrice: 580, status: 'Active' },
+  { id: 'p19', name: 'Xanthan Gum', category: 'Thickener and Stabilizer', supplier: 'CP Kelco', origin: 'China', moq: '25 kg', docs: 'COA, Halal, Kosher', unitPrice: 890, status: 'Active' },
+  { id: 'p20', name: 'Sodium Citrate', category: 'Acidity Regulators / Anti Oxidants', supplier: 'Jungbunzlauer', origin: 'Austria', moq: '50 kg', docs: 'COA', unitPrice: 260, status: 'Active' },
 ]
 
 export const PIPELINE_STAGES = [
@@ -33,6 +33,48 @@ export const PIPELINE_STAGES = [
   'Negotiation',
   'Converted Customer',
 ]
+
+// Shared dropdown option lists, used across Leads / Customers / Samples forms.
+// "Type manually" is handled in the UI by adding a free-text option when
+// the user picks "Other" — see ComboField component.
+export const INDUSTRY_OPTIONS = [
+  'Bakery & Confectionery',
+  'Beverages',
+  'Dairy',
+  'Snacks',
+  'Pharma Excipients',
+  'Organic Foods',
+  'Spices & Seasoning',
+  'Meat & Seafood Processing',
+  'Nutraceuticals',
+  'Animal Feed',
+]
+
+export const INDIAN_STATES = [
+  'Andhra Pradesh', 'Bihar', 'Chhattisgarh', 'Delhi', 'Gujarat', 'Haryana',
+  'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Punjab',
+  'Rajasthan', 'Tamil Nadu', 'Telangana', 'Uttar Pradesh', 'West Bengal',
+]
+
+export const WAREHOUSES = [
+  'Mumbai – Bhiwandi',
+  'Delhi – Bhiwadi',
+  'Chennai – Sriperumbudur',
+]
+
+export const COURIERS = [
+  'Blue Dart', 'DTDC', 'Delhivery', 'India Post', 'FedEx', 'Professional Courier',
+]
+
+export const GST_RATE = 18
+
+export function calcOrderTotals(lineItems, gstRate = GST_RATE) {
+  const subtotal = lineItems.reduce((sum, li) => sum + (Number(li.qty) || 0) * (Number(li.unitPrice) || 0), 0)
+  const gstAmount = Math.round(subtotal * (gstRate / 100) * 100) / 100
+  const total = Math.round((subtotal + gstAmount) * 100) / 100
+  return { subtotal: Math.round(subtotal * 100) / 100, gstAmount, total }
+}
+
 
 export const seedLeads = [
   { id: 'l1', company: 'Devansh Foods Pvt Ltd', contact: 'Anand Mehta', phone: '+91 98200 11234', city: 'Ahmedabad', priority: 'High', status: 'Negotiation', estValue: 480000, nextFollowUp: '2026-06-29', industry: 'Bakery & Confectionery', products: ['Citric Acid', 'Guar Gum'] },
@@ -46,15 +88,15 @@ export const seedLeads = [
 ]
 
 export const seedCustomers = [
-  { id: 'c1', code: 'CUST-0001', company: 'Patel Agro Industries', contact: 'Bhavesh Patel', city: 'Rajkot', gst: '24AABCP1234F1Z5', industry: 'Snacks', application: 'Extruded Snacks', products: ['Citric Acid', 'Sodium Benzoate'], qty: '2.4 MT/mo', added: '2026-03-12' },
-  { id: 'c2', code: 'CUST-0002', company: 'Himalaya Dairy Co.', contact: 'Neha Thakur', city: 'Chandigarh', gst: '04AACFH5678G1Z2', industry: 'Dairy', application: 'Flavoured Milk', products: ['Carrageenan', 'Calcium Lactate'], qty: '1.1 MT/mo', added: '2026-04-02' },
-  { id: 'c3', code: 'CUST-0003', company: 'Vitalia Beverages Ltd', contact: 'Arjun Khanna', city: 'Gurugram', gst: '06AADCV4321H1Z9', industry: 'Beverages', application: 'Diet Soda', products: ['Acesulfame-K', 'Aspartame'], qty: '3.0 MT/mo', added: '2026-04-20' },
+  { id: 'c1', code: 'CUST-0001', company: 'Patel Agro Industries', contact: 'Bhavesh Patel', mobile: '+91 98250 11122', email: 'bhavesh@patelagro.com', city: 'Rajkot', state: 'Gujarat', gst: '24AABCP1234F1Z5', industry: 'Snacks', application: 'Extruded Snacks', products: ['Citric Acid', 'Sodium Benzoate'], qty: '2.4 MT/mo', billingAddress: 'Plot 14, GIDC Industrial Estate, Rajkot, Gujarat 360003', shippingAddress: 'Plot 14, GIDC Industrial Estate, Rajkot, Gujarat 360003', added: '2026-03-12' },
+  { id: 'c2', code: 'CUST-0002', company: 'Himalaya Dairy Co.', contact: 'Neha Thakur', mobile: '+91 98140 22334', email: 'neha@himalayadairy.in', city: 'Chandigarh', state: 'Punjab', gst: '04AACFH5678G1Z2', industry: 'Dairy', application: 'Flavoured Milk', products: ['Carrageenan', 'Calcium Lactate'], qty: '1.1 MT/mo', billingAddress: 'Industrial Area Phase 2, Chandigarh 160002', shippingAddress: 'Industrial Area Phase 2, Chandigarh 160002', added: '2026-04-02' },
+  { id: 'c3', code: 'CUST-0003', company: 'Vitalia Beverages Ltd', contact: 'Arjun Khanna', mobile: '+91 98990 33445', email: 'arjun@vitaliabev.com', city: 'Gurugram', state: 'Haryana', gst: '06AADCV4321H1Z9', industry: 'Beverages', application: 'Diet Soda', products: ['Acesulfame-K', 'Aspartame'], qty: '3.0 MT/mo', billingAddress: 'Udyog Vihar Phase 4, Gurugram, Haryana 122016', shippingAddress: 'Udyog Vihar Phase 4, Gurugram, Haryana 122016', added: '2026-04-20' },
 ]
 
 export const seedSamples = [
-  { id: 's1', code: 'SMP-1042', company: 'Greenleaf Organics', contact: 'Tara Bose', products: ['Xanthan Gum'], qty: '500 g', sent: '2026-06-20', tracking: 'BLR4471829IN', status: 'Delivered' },
-  { id: 's2', code: 'SMP-1043', company: 'Vedant Dairy Solutions', contact: 'Rajiv Suri', products: ['Calcium Lactate', 'Carrageenan'], qty: '1 kg', sent: '2026-06-22', tracking: 'BLR4471955IN', status: 'In Transit' },
-  { id: 's3', code: 'SMP-1044', company: 'Sunrise Beverages', contact: 'Komal Iyer', products: ['Sodium Citrate'], qty: '250 g', sent: '2026-06-24', tracking: '—', status: 'Preparing' },
+  { id: 's1', code: 'SMP-1042', company: 'Greenleaf Organics', contact: 'Tara Bose', phone: '+91 94320 87765', email: 'tara@greenleaforganics.in', products: ['Xanthan Gum'], qty: '500 g', sent: '2026-06-20', courier: 'Blue Dart', tracking: 'BLR4471829IN', status: 'Delivered' },
+  { id: 's2', code: 'SMP-1043', company: 'Vedant Dairy Solutions', contact: 'Rajiv Suri', phone: '+91 88500 22341', email: 'rajiv@vedantdairy.com', products: ['Calcium Lactate', 'Carrageenan'], qty: '1 kg', sent: '2026-06-22', courier: 'Delhivery', tracking: 'BLR4471955IN', status: 'In Transit' },
+  { id: 's3', code: 'SMP-1044', company: 'Sunrise Beverages', contact: 'Komal Iyer', phone: '+91 90040 55678', email: 'komal@sunrisebev.com', products: ['Sodium Citrate'], qty: '250 g', sent: '2026-06-24', courier: 'DTDC', tracking: '—', status: 'Preparing' },
 ]
 
 export const seedQuotations = [
@@ -63,8 +105,26 @@ export const seedQuotations = [
 ]
 
 export const seedOrders = [
-  { id: 'o1', orderNo: 'ORD-2026-0301', company: 'Patel Agro Industries', warehouse: 'Mumbai – Bhiwandi', orderDate: '2026-06-10', delivery: '2026-06-18', total: 186500, status: 'Delivered', payment: 'Paid' },
-  { id: 'o2', orderNo: 'ORD-2026-0302', company: 'Himalaya Dairy Co.', warehouse: 'Delhi – Bhiwadi', orderDate: '2026-06-21', delivery: '2026-06-29', total: 94200, status: 'Dispatched', payment: 'Pending' },
+  {
+    id: 'o1', orderNo: 'ORD-2026-0301', customerId: 'c1', company: 'Patel Agro Industries', warehouse: 'Mumbai – Bhiwandi',
+    orderDate: '2026-06-10', delivery: '2026-06-18',
+    lineItems: [
+      { product: 'Citric Acid', qty: 500, unit: 'kg', unitPrice: 220, lineTotal: 110000 },
+      { product: 'Sodium Benzoate', qty: 100, unit: 'kg', unitPrice: 580, lineTotal: 58000 },
+    ],
+    subtotal: 158000, gstRate: 18, gstAmount: 28440, total: 186440,
+    status: 'Delivered', payment: 'Paid',
+  },
+  {
+    id: 'o2', orderNo: 'ORD-2026-0302', customerId: 'c2', company: 'Himalaya Dairy Co.', warehouse: 'Delhi – Bhiwadi',
+    orderDate: '2026-06-21', delivery: '2026-06-29',
+    lineItems: [
+      { product: 'Carrageenan', qty: 80, unit: 'kg', unitPrice: 950, lineTotal: 76000 },
+      { product: 'Calcium Lactate', qty: 25, unit: 'kg', unitPrice: 320, lineTotal: 8000 },
+    ],
+    subtotal: 84000, gstRate: 18, gstAmount: 15120, total: 99120,
+    status: 'Dispatched', payment: 'Pending',
+  },
 ]
 
 export const seedFollowUps = [
@@ -73,3 +133,56 @@ export const seedFollowUps = [
   { id: 'f3', date: '2026-06-25', type: 'Email', lead: 'Northern Spice Co.', contact: 'Harpreet Saini', notes: 'Sent product catalogue + MOQ sheet', status: 'Completed' },
   { id: 'f4', date: '2026-06-24', type: 'Call', lead: 'Madhuram Snacks', contact: 'Priya Nambiar', notes: 'No answer, retry tomorrow', status: 'Overdue' },
 ]
+
+// ---------- Users & Roles ----------
+// Every page in the sidebar is a "module" here. A role grants view/edit
+// per module — this is what the admin's Users & Roles screen edits.
+export const MODULES = [
+  { key: 'dashboard', label: 'Dashboard' },
+  { key: 'leads', label: 'Leads' },
+  { key: 'follow_ups', label: 'Follow-ups' },
+  { key: 'customers', label: 'Customers' },
+  { key: 'samples', label: 'Samples' },
+  { key: 'quotations', label: 'Quotations' },
+  { key: 'orders', label: 'Orders' },
+  { key: 'products', label: 'Products' },
+  { key: 'reports', label: 'Reports' },
+  { key: 'users', label: 'Users & Roles' },
+]
+
+function fullAccess() {
+  return Object.fromEntries(MODULES.map((m) => [m.key, { view: true, edit: true }]))
+}
+
+export const seedRoles = [
+  {
+    id: 'r1',
+    name: 'Admin',
+    isSystem: true,
+    permissions: fullAccess(),
+  },
+  {
+    id: 'r2',
+    name: 'Sales Executive',
+    isSystem: true,
+    permissions: {
+      dashboard: { view: true, edit: false },
+      leads: { view: true, edit: true },
+      follow_ups: { view: true, edit: true },
+      customers: { view: true, edit: true },
+      samples: { view: true, edit: true },
+      quotations: { view: true, edit: true },
+      orders: { view: true, edit: true },
+      products: { view: true, edit: false },
+      reports: { view: true, edit: false },
+      users: { view: false, edit: false },
+    },
+  },
+]
+
+export const seedUsers = [
+  { id: 'u1', name: 'Rahul', email: 'rahul@jsvchem.com', roleId: 'r1', status: 'Active', lastActive: '2026-06-29' },
+  { id: 'u2', name: 'Priya Shah', email: 'priya@jsvchem.com', roleId: 'r2', status: 'Active', lastActive: '2026-06-27' },
+  { id: 'u3', name: 'Karan Mehta', email: 'karan@jsvchem.com', roleId: 'r2', status: 'Active', lastActive: '2026-06-24' },
+]
+

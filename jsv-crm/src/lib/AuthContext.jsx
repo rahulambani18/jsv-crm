@@ -25,8 +25,18 @@ export function AuthProvider({ children }) {
     setUser(null)
   }
 
+  // Admins implicitly get full access even if permissions weren't
+  // loaded yet (e.g. brand-new workspace with no role_permissions rows).
+  function can(moduleKey, action = 'view') {
+    if (!user) return false
+    if (user.role === 'Admin') return true
+    const perm = user.permissions?.[moduleKey]
+    if (!perm) return false
+    return action === 'edit' ? !!perm.edit : !!perm.view
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signIn, signOut, can }}>
       {children}
     </AuthContext.Provider>
   )

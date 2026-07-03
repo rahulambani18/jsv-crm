@@ -3,20 +3,25 @@ import { NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext.jsx'
 import {
   IconGrid, IconUsers, IconClock, IconUserCheck, IconFlask,
-  IconFile, IconCart, IconBox, IconChart, IconLogout, IconPanel,
+  IconFile, IconCart, IconBox, IconChart, IconLogout, IconPanel, IconShield,
 } from './Icons.jsx'
+import jsvMark from '../assets/jsv-mark.png'
 import '../styles/shell.css'
 
 const NAV = [
-  { to: '/', label: 'Dashboard', icon: IconGrid },
-  { to: '/leads', label: 'Leads', icon: IconUsers },
-  { to: '/follow-ups', label: 'Follow-ups', icon: IconClock },
-  { to: '/customers', label: 'Customers', icon: IconUserCheck },
-  { to: '/samples', label: 'Samples', icon: IconFlask },
-  { to: '/quotations', label: 'Quotations', icon: IconFile },
-  { to: '/orders', label: 'Orders', icon: IconCart },
-  { to: '/products', label: 'Products', icon: IconBox },
-  { to: '/reports', label: 'Reports', icon: IconChart },
+  { to: '/', label: 'Dashboard', icon: IconGrid, key: 'dashboard' },
+  { to: '/leads', label: 'Leads', icon: IconUsers, key: 'leads' },
+  { to: '/follow-ups', label: 'Follow-ups', icon: IconClock, key: 'follow_ups' },
+  { to: '/customers', label: 'Customers', icon: IconUserCheck, key: 'customers' },
+  { to: '/samples', label: 'Samples', icon: IconFlask, key: 'samples' },
+  { to: '/quotations', label: 'Quotations', icon: IconFile, key: 'quotations' },
+  { to: '/orders', label: 'Orders', icon: IconCart, key: 'orders' },
+  { to: '/products', label: 'Products', icon: IconBox, key: 'products' },
+  { to: '/reports', label: 'Reports', icon: IconChart, key: 'reports' },
+]
+
+const ADMIN_NAV = [
+  { to: '/users', label: 'Users & Roles', icon: IconShield, key: 'users' },
 ]
 
 const PAGE_TITLES = {
@@ -29,19 +34,23 @@ const PAGE_TITLES = {
   '/orders': 'Orders',
   '/products': 'Products',
   '/reports': 'Reports',
+  '/users': 'Users & Roles',
 }
 
 export default function Shell({ children }) {
-  const { user, signOut } = useAuth()
+  const { user, signOut, can } = useAuth()
   const [navOpen, setNavOpen] = useState(false)
   const location = useLocation()
   const title = PAGE_TITLES[location.pathname] || 'JSV CRM'
+
+  const visibleNav = NAV.filter((item) => can(item.key, 'view'))
+  const visibleAdminNav = ADMIN_NAV.filter((item) => can(item.key, 'view'))
 
   return (
     <div className="shell">
       <aside className={`sidebar ${navOpen ? 'open' : ''}`}>
         <div className="sidebar-brand">
-          <div className="brand-mark">JSV</div>
+          <img src={jsvMark} alt="JSV" style={{ height: 30, width: 'auto', flexShrink: 0 }} />
           <div className="brand-text">
             <h1>JSV CRM</h1>
             <p>Food Additives &amp; Chemicals</p>
@@ -52,7 +61,7 @@ export default function Shell({ children }) {
           <div className="sidebar-label">Workspace</div>
         </div>
         <nav className="sidebar-nav">
-          {NAV.map(({ to, label, icon: Icon }) => (
+          {visibleNav.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
@@ -64,13 +73,30 @@ export default function Shell({ children }) {
               {label}
             </NavLink>
           ))}
+
+          {visibleAdminNav.length > 0 && (
+            <>
+              <div className="sidebar-label" style={{ marginTop: 14 }}>Administration</div>
+              {visibleAdminNav.map(({ to, label, icon: Icon }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                  onClick={() => setNavOpen(false)}
+                >
+                  <Icon />
+                  {label}
+                </NavLink>
+              ))}
+            </>
+          )}
         </nav>
 
         <div className="sidebar-footer">
           <span className="iso-pill"><span className="dot" /> ISO 9001:2015 Certified</span>
           <div className="user-row">
-            <span className="name">{user?.name || user?.full_name || 'Rahul'} (Admin)</span>
-            <span className="role">{user?.title || 'Sales Executive'}</span>
+            <span className="name">{user?.name || 'User'} {user?.role ? `(${user.role})` : ''}</span>
+            <span className="role">{user?.title || user?.role || ''}</span>
           </div>
           <button className="signout-btn" onClick={signOut}>
             <IconLogout /> Sign out

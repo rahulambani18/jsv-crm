@@ -69,3 +69,15 @@ export const IconEdit = (p) => (
 export const IconTrash = (p) => (
   <svg {...base} {...p}><path d="M3 6h18"/><path d="M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2"/><path d="M19 6l-1 14a1 1 0 01-1 1H7a1 1 0 01-1-1L5 6"/></svg>
 )
+export const IconShield = (p) => (
+  <svg {...base} {...p}><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/></svg>
+)
+export const IconChevronRight = (p) => (
+  <svg {...base} {...p}><path d="M9 6l6 6-6 6"/></svg>
+)
+export const IconUpload = (p) => (
+  <svg {...base} {...p}><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 002 2h12a2 2 0 002-2v-3"/></svg>
+)
+export const IconKey = (p) => (
+  <svg {...base} {...p}><circle cx="8" cy="14" r="4"/><path d="M11 11l9-9"/><path d="M16 6l2.5 2.5"/><path d="M13 9l2 2"/></svg>
+)
