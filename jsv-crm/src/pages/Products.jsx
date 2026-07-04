@@ -19,7 +19,7 @@ const PRODUCT_FIELD_MAP = {
 }
 
 function emptyForm() {
-  return { name: '', category: '', supplier: '', origin: '', moq: '', docs: '', unitPrice: '', status: 'Active' }
+  return { name: '', category: '', supplier: '', origin: '', moq: '', docs: '', docUrl: '', unitPrice: '', status: 'Active' }
 }
 
 export default function Products() {
@@ -63,7 +63,7 @@ export default function Products() {
     setForm({
       name: product.name || '', category: product.category || '', supplier: product.supplier || '',
       origin: product.origin || '', moq: product.moq || '', docs: product.docs || '',
-      unitPrice: product.unitPrice ?? '', status: product.status || 'Active',
+      docUrl: product.docUrl || '', unitPrice: product.unitPrice ?? '', status: product.status || 'Active',
     })
     setShowModal(true)
   }
@@ -166,13 +166,13 @@ export default function Products() {
       <div className="table-wrap">
         <table className="data-table">
           <thead>
-            <tr><th>Product</th><th>Category</th><th>Supplier</th><th>Origin</th><th>MOQ</th><th>Unit Price</th><th>Status</th>{canEdit && <th>Actions</th>}</tr>
+            <tr><th>Product</th><th>Category</th><th>Supplier</th><th>Origin</th><th>MOQ</th><th>Unit Price</th><th>Docs</th><th>Status</th>{canEdit && <th>Actions</th>}</tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={canEdit ? 8 : 7}>Loading products…</td></tr>
+              <tr className="empty-row"><td colSpan={canEdit ? 9 : 8}>Loading products…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={canEdit ? 8 : 7}>No products match.</td></tr>
+              <tr className="empty-row"><td colSpan={canEdit ? 9 : 8}>No products match.</td></tr>
             ) : filtered.map((p) => (
               <tr key={p.id} style={{ opacity: p.status === 'Inactive' ? 0.55 : 1 }}>
                 <td className="cell-strong">{p.name}</td>
@@ -181,6 +181,15 @@ export default function Products() {
                 <td className="cell-muted">{p.origin || '—'}</td>
                 <td className="cell-mono">{p.moq || '—'}</td>
                 <td className="cell-mono">{p.unitPrice ? `₹${Number(p.unitPrice).toLocaleString('en-IN')}/kg` : '—'}</td>
+                <td>
+                  {p.docUrl ? (
+                    <a href={p.docUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm" style={{ color: 'var(--teal-600)', textDecoration: 'none' }}>
+                      📄 View
+                    </a>
+                  ) : (
+                    <span className="cell-muted">{p.docs || '—'}</span>
+                  )}
+                </td>
                 <td><Pill>{p.status}</Pill></td>
                 {canEdit && (
                   <td>
@@ -250,8 +259,19 @@ export default function Products() {
               </div>
             </div>
             <div className="field">
-              <label>Docs available</label>
-              <input value={form.docs} onChange={(e) => setForm({ ...form, docs: e.target.value })} placeholder="COA, MSDS, Halal" />
+              <label>Docs available (text list)</label>
+              <input value={form.docs} onChange={(e) => setForm({ ...form, docs: e.target.value })} placeholder="COA, MSDS, Halal, Kosher…" />
+            </div>
+            <div className="field">
+              <label>Document link (COA / MSDS / TDS)</label>
+              <input
+                value={form.docUrl || ''}
+                onChange={(e) => setForm({ ...form, docUrl: e.target.value })}
+                placeholder="Paste Google Drive / Dropbox share link for COA, MSDS, etc."
+              />
+              <p style={{ fontSize: 11.5, color: 'var(--ink-400)', margin: '4px 0 0' }}>
+                Upload the document to Google Drive, copy the share link, and paste it here.
+              </p>
             </div>
           </form>
         </Modal>

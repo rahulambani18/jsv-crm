@@ -136,14 +136,23 @@ export default function UsersAndRoles() {
           <div className="table-wrap">
             <table className="data-table">
               <thead>
-                <tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last Active</th></tr>
+                <tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last Active</th>{canEdit && <th>Actions</th>}</tr>
               </thead>
               <tbody>
                 {users.length === 0 ? (
-                  <tr className="empty-row"><td colSpan={5}>No users yet.</td></tr>
+                  <tr className="empty-row"><td colSpan={canEdit ? 6 : 5}>No users yet.</td></tr>
                 ) : users.map((u) => (
                   <tr key={u.id}>
-                    <td className="cell-strong">{u.name}</td>
+                    <td className="cell-strong">
+                      {canEdit ? (
+                        <input
+                          defaultValue={u.name}
+                          onBlur={(e) => { if (e.target.value !== u.name) api.users.update(u.id, { name: e.target.value }).then(refresh) }}
+                          style={{ border: 'none', background: 'transparent', fontWeight: 600, fontSize: 13.5, width: '100%', outline: 'none', cursor: 'text' }}
+                          title="Click to edit name"
+                        />
+                      ) : u.name}
+                    </td>
                     <td className="cell-mono" style={{ fontSize: 12.5 }}>{u.email}</td>
                     <td>
                       {canEdit ? (
@@ -160,6 +169,20 @@ export default function UsersAndRoles() {
                     </td>
                     <td><Pill tone="teal">{u.status || 'Active'}</Pill></td>
                     <td className="cell-mono">{u.lastActive || '—'}</td>
+                    {canEdit && (
+                      <td>
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          style={{ fontSize: 11.5 }}
+                          onClick={() => {
+                            const newPass = window.prompt(`Set new password for ${u.name || u.email}:\n\n⚠️ Note: For security, password changes require the user to reset via Supabase's "Forgot password" flow on the login page. Share the login URL with them: ${window.location.origin}/login`)
+                            if (newPass) alert('Ask the user to use "Forgot password" on the login page to reset their password securely.')
+                          }}
+                        >
+                          Reset password
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

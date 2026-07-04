@@ -4,7 +4,6 @@ import { INDUSTRY_OPTIONS, INDIAN_STATES } from '../data/seed.js'
 import PageHeader from '../components/PageHeader.jsx'
 import Modal from '../components/Modal.jsx'
 import ComboField from '../components/ComboField.jsx'
-import MultiComboField from '../components/MultiComboField.jsx'
 import { IconPlus, IconSearch } from '../components/Icons.jsx'
 import { useAuth } from '../lib/AuthContext.jsx'
 import '../styles/components.css'
@@ -12,7 +11,7 @@ import '../styles/components.css'
 function emptyForm() {
   return {
     company: '', contact: '', mobile: '', email: '', gst: '',
-    industry: '', application: '', products: [], qty: '',
+    industry: '', application: '',
     city: '', state: '', billingAddress: '', shippingAddress: '',
   }
 }
@@ -21,7 +20,6 @@ export default function Customers() {
   const { can } = useAuth()
   const canEdit = can('customers', 'edit')
   const [customers, setCustomers] = useState([])
-  const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
@@ -33,12 +31,8 @@ export default function Customers() {
 
   function refresh() {
     setLoading(true)
-    Promise.all([api.customers.list(), api.products.list()]).then(([c, p]) => {
-      setCustomers(c); setProducts(p); setLoading(false)
-    })
+    api.customers.list().then((c) => { setCustomers(c); setLoading(false) })
   }
-
-  const productOptions = useMemo(() => products.map((p) => p.name), [products])
 
   const filtered = useMemo(() => {
     return customers.filter((c) => !search || [c.company, c.contact, c.mobile, c.gst, c.city].some((v) => (v || '').toLowerCase().includes(search.toLowerCase())))
@@ -91,14 +85,14 @@ export default function Customers() {
           <thead>
             <tr>
               <th>Code</th><th>Company</th><th>Contact</th><th>City</th><th>GST</th>
-              <th>Industry</th><th>Application</th><th>Products</th><th>Qty</th><th>Added</th>
+              <th>Industry</th><th>Application</th><th>Added</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={10}>Loading customers…</td></tr>
+              <tr className="empty-row"><td colSpan={8}>Loading customers…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={10}>{customers.length === 0 ? 'No customers yet.' : 'No customers match your search.'}</td></tr>
+              <tr className="empty-row"><td colSpan={8}>{customers.length === 0 ? 'No customers yet.' : 'No customers match your search.'}</td></tr>
             ) : filtered.map((c) => (
               <tr key={c.id}>
                 <td className="cell-mono">{c.code}</td>
@@ -108,8 +102,6 @@ export default function Customers() {
                 <td className="cell-mono" style={{ fontSize: 11.5 }}>{c.gst}</td>
                 <td>{c.industry}</td>
                 <td>{c.application}</td>
-                <td>{(c.products || []).join(', ')}</td>
-                <td className="cell-mono">{c.qty}</td>
                 <td className="cell-mono">{c.added}</td>
               </tr>
             ))}
@@ -165,26 +157,18 @@ export default function Customers() {
                 <input value={form.application} onChange={(e) => setForm({ ...form, application: e.target.value })} placeholder="e.g. Flavoured Milk" />
               </div>
             </div>
-            <div className="field">
-              <label>Product interest</label>
-              <MultiComboField options={productOptions} value={form.products} onChange={(v) => setForm({ ...form, products: v })} placeholder="Select a product…" />
-            </div>
             <div className="field-row">
-              <div className="field">
-                <label>Monthly quantity</label>
-                <input value={form.qty} onChange={(e) => setForm({ ...form, qty: e.target.value })} placeholder="e.g. 2.4 MT/mo" />
-              </div>
               <div className="field">
                 <label>City</label>
                 <input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
               </div>
-            </div>
-            <div className="field">
-              <label>State</label>
-              <select value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })}>
-                <option value="" disabled>Select state…</option>
-                {INDIAN_STATES.map((s) => <option key={s}>{s}</option>)}
-              </select>
+              <div className="field">
+                <label>State</label>
+                <select value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })}>
+                  <option value="" disabled>Select state…</option>
+                  {INDIAN_STATES.map((s) => <option key={s}>{s}</option>)}
+                </select>
+              </div>
             </div>
             <div className="field">
               <label>Billing address</label>

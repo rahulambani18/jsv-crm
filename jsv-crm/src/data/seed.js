@@ -58,6 +58,7 @@ export const INDIAN_STATES = [
 
 export const WAREHOUSES = [
   'Mumbai – Bhiwandi',
+  'Delhi – Siraspur',
   'Delhi – Bhiwadi',
   'Chennai – Sriperumbudur',
 ]
