@@ -4,6 +4,7 @@ import { useAuth } from '../lib/AuthContext.jsx'
 import {
   IconGrid, IconUsers, IconClock, IconUserCheck, IconFlask,
   IconFile, IconCart, IconBox, IconChart, IconLogout, IconPanel, IconShield,
+  IconCheckSquare, IconCalendar, IconFolder,
 } from './Icons.jsx'
 import { api } from '../lib/api.js'
 import jsvMark from '../assets/jsv-mark.png'
@@ -19,6 +20,9 @@ const NAV = [
   { to: '/orders', label: 'Orders', icon: IconCart, key: 'orders' },
   { to: '/products', label: 'Products', icon: IconBox, key: 'products' },
   { to: '/reports', label: 'Reports', icon: IconChart, key: 'reports' },
+  { to: '/tasks', label: 'Tasks', icon: IconCheckSquare, key: 'tasks' },
+  { to: '/meetings', label: 'Meetings', icon: IconCalendar, key: 'meetings' },
+  { to: '/documents', label: 'Documents', icon: IconFolder, key: 'documents' },
 ]
 
 const ADMIN_NAV = [

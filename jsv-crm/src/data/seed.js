@@ -148,7 +148,31 @@ export const MODULES = [
   { key: 'orders', label: 'Orders' },
   { key: 'products', label: 'Products' },
   { key: 'reports', label: 'Reports' },
+  { key: 'tasks', label: 'Tasks' },
+  { key: 'meetings', label: 'Meetings' },
+  { key: 'documents', label: 'Documents' },
   { key: 'users', label: 'Users & Roles' },
+]
+
+export const seedTasks = [
+  { id: 't1', title: 'Follow up on Citric Acid quotation', description: 'Call Devansh Foods re: QT-2026-0119 — they asked for 5% discount', assignedTo: 'Rahul', relatedTo: 'Devansh Foods Pvt Ltd', type: 'Call', priority: 'High', dueDate: '2026-07-02', status: 'Pending' },
+  { id: 't2', title: 'Send COA for Xanthan Gum to Greenleaf', description: 'They need batch COA before placing order', assignedTo: 'Rahul', relatedTo: 'Greenleaf Organics', type: 'Document', priority: 'High', dueDate: '2026-06-30', status: 'Pending' },
+  { id: 't3', title: 'Arrange freight quote for Delhi delivery', description: 'Himalaya Dairy order — compare Blue Dart vs Delhivery rates', assignedTo: 'Priya Shah', relatedTo: 'Himalaya Dairy Co.', type: 'Internal', priority: 'Medium', dueDate: '2026-07-01', status: 'In Progress' },
+  { id: 't4', title: 'Update price list for Q3', description: 'Revise unit prices for Citric Acid, Sodium Benzoate, Xanthan Gum based on new landed costs', assignedTo: 'Rahul', relatedTo: '', type: 'Internal', priority: 'Medium', dueDate: '2026-07-05', status: 'Pending' },
+  { id: 't5', title: 'Collect GST certificate from Vitalia Beverages', description: 'Needed for account opening formalities', assignedTo: 'Karan Mehta', relatedTo: 'Vitalia Beverages Ltd', type: 'Document', priority: 'Low', dueDate: '2026-07-08', status: 'Completed' },
+]
+
+export const seedMeetings = [
+  { id: 'm1', title: 'Site visit — Devansh Foods', company: 'Devansh Foods Pvt Ltd', contact: 'Anand Mehta', date: '2026-06-29', time: '11:00', location: 'Ahmedabad Plant', type: 'Site Visit', agenda: 'Final price negotiation on Citric Acid + Guar Gum. Discuss annual contract possibility.', status: 'Scheduled', notes: '' },
+  { id: 'm2', title: 'Intro call — Northern Spice Co.', company: 'Northern Spice Co.', contact: 'Harpreet Saini', date: '2026-07-03', time: '14:30', location: 'Video Call (Google Meet)', type: 'Video Call', agenda: 'Understand their preservative requirements, share our catalogue and pricing.', status: 'Scheduled', notes: '' },
+  { id: 'm3', title: 'Sample review — Greenleaf Organics', company: 'Greenleaf Organics', contact: 'Tara Bose', date: '2026-06-27', time: '10:00', location: 'Phone', type: 'Call', agenda: 'Review Xanthan Gum sample test results. Discuss purity specs.', status: 'Completed', notes: 'Customer happy with viscosity. Will send PO by next week.' },
+]
+
+export const seedDocuments = [
+  { id: 'd1', name: 'Citric Acid — COA Batch #CIT2604', type: 'COA', relatedProduct: 'Citric Acid', uploadedBy: 'Rahul', date: '2026-06-15', url: '', tags: ['COA', 'Food Grade'] },
+  { id: 'd2', name: 'Xanthan Gum — MSDS', type: 'MSDS', relatedProduct: 'Xanthan Gum', uploadedBy: 'Rahul', date: '2026-06-10', url: '', tags: ['MSDS', 'Halal'] },
+  { id: 'd3', name: 'Harihar Organics — ISO Certificate 2025', type: 'Certificate', relatedProduct: '', uploadedBy: 'Rahul', date: '2026-05-20', url: '', tags: ['ISO', 'Certificate'] },
+  { id: 'd4', name: 'Vitalia Beverages — Sales Contract 2026', type: 'Contract', relatedProduct: '', uploadedBy: 'Rahul', date: '2026-04-01', url: '', tags: ['Contract'] },
 ]
 
 function fullAccess() {
@@ -176,6 +200,9 @@ export const seedRoles = [
       orders: { view: true, edit: true },
       products: { view: true, edit: false },
       reports: { view: true, edit: false },
+      tasks: { view: true, edit: true },
+      meetings: { view: true, edit: true },
+      documents: { view: true, edit: true },
       users: { view: false, edit: false },
     },
   },

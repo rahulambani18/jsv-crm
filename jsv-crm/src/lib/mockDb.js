@@ -5,6 +5,7 @@
 import {
   seedProducts, seedLeads, seedCustomers, seedSamples,
   seedQuotations, seedOrders, seedFollowUps, seedRoles, seedUsers,
+  seedTasks, seedMeetings, seedDocuments,
 } from '../data/seed.js'
 
 const store = {
@@ -17,6 +18,9 @@ const store = {
   followUps: [...seedFollowUps],
   roles: [...seedRoles],
   users: [...seedUsers],
+  tasks: [...seedTasks],
+  meetings: [...seedMeetings],
+  documents: [...seedDocuments],
 }
 
 const delay = (ms = 150) => new Promise((res) => setTimeout(res, ms))
@@ -64,6 +68,9 @@ export const mockDb = {
   followUps: table('followUps'),
   roles: table('roles'),
   users: table('users'),
+  tasks: table('tasks'),
+  meetings: table('meetings'),
+  documents: table('documents'),
 }
 
 // Simple demo auth — accepts any email/password, signs in as the

@@ -5,7 +5,7 @@
 import { supabase, isMock, db as mock } from './supabaseClient.js'
 import { mockAuth } from './mockDb.js'
 
-const TABLES = ['products', 'leads', 'customers', 'samples', 'quotations', 'orders', 'followUps', 'roles', 'users']
+const TABLES = ['products', 'leads', 'customers', 'samples', 'quotations', 'orders', 'followUps', 'roles', 'users', 'tasks', 'meetings', 'documents']
 const SQL_TABLE_NAME = {
   products: 'products',
   leads: 'leads',
@@ -16,6 +16,9 @@ const SQL_TABLE_NAME = {
   followUps: 'follow_ups',
   roles: 'roles',
   users: 'profiles',
+  tasks: 'tasks',
+  meetings: 'meetings',
+  documents: 'documents',
 }
 
 // Pages write/read plain camelCase fields (estValue, nextFollowUp,
