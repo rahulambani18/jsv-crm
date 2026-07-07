@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from '../lib/api.js'
 import { PIPELINE_STAGES, INDUSTRY_OPTIONS } from '../data/seed.js'
 import PageHeader from '../components/PageHeader.jsx'
+import ExportBar from '../components/ExportBar.jsx'
 import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
 import ComboField from '../components/ComboField.jsx'
@@ -64,11 +65,19 @@ export default function Leads() {
         title="Leads"
         subtitle={`${leads.length} lead${leads.length === 1 ? '' : 's'}`}
         actions={
-          canEdit && (
-            <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-              <IconPlus width={15} height={15} /> New Lead
-            </button>
-          )
+          <div style={{ display: 'flex', gap: 10 }}>
+            <ExportBar
+              title="Leads"
+              headers={['Company', 'Contact', 'Phone', 'City', 'Priority', 'Status', 'Est. Value', 'Next Follow-up', 'Industry']}
+              rows={filtered.map((l) => [l.company, l.contact, l.phone, l.city, l.priority, l.status, l.estValue, l.nextFollowUp, l.industry])}
+              count={filtered.length}
+            />
+            {canEdit && (
+              <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+                <IconPlus width={15} height={15} /> New Lead
+              </button>
+            )}
+          </div>
         }
       />
 

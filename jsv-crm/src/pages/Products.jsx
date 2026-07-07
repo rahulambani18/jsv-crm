@@ -5,7 +5,7 @@ import PageHeader from '../components/PageHeader.jsx'
 import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
 import { IconPlus, IconSearch, IconUpload, IconEdit, IconTrash } from '../components/Icons.jsx'
-import { useAuth } from '../lib/AuthContext.jsx'
+import ExportBar from '../components/ExportBar.jsx'
 import '../styles/components.css'
 
 const PRODUCT_FIELD_MAP = {
@@ -71,17 +71,26 @@ export default function Products() {
   async function handleSave(e) {
     e.preventDefault()
     setSaving(true)
-    const record = { ...form, unitPrice: Number(form.unitPrice) || 0 }
-    if (editingId) {
-      await api.products.update(editingId, record)
-    } else {
-      await api.products.insert(record)
+    try {
+      const record = {
+        ...form,
+        unitPrice: Number(form.unitPrice) || 0,
+        workspaceId: '00000000-0000-0000-0000-000000000001',
+      }
+      if (editingId) {
+        await api.products.update(editingId, record)
+      } else {
+        await api.products.insert(record)
+      }
+      setShowModal(false)
+      setForm(emptyForm())
+      setEditingId(null)
+      refresh()
+    } catch (err) {
+      alert('Could not save product: ' + (err.message || 'Unknown error'))
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
-    setShowModal(false)
-    setForm(emptyForm())
-    setEditingId(null)
-    refresh()
   }
 
   async function toggleStatus(product) {
@@ -139,6 +148,12 @@ export default function Products() {
               <button className="btn btn-secondary" onClick={() => fileInputRef.current?.click()} disabled={importBusy}>
                 <IconUpload width={15} height={15} /> {importBusy ? 'Importing…' : 'Import Excel/CSV'}
               </button>
+              <ExportBar
+                title="Products"
+                headers={['Product', 'Category', 'Supplier', 'Origin', 'MOQ', 'Unit Price', 'Status']}
+                rows={filtered.map((p) => [p.name, p.category, p.supplier, p.origin, p.moq, p.unitPrice ? `₹${Number(p.unitPrice).toLocaleString('en-IN')}` : '', p.status])}
+                count={filtered.length}
+              />
               <button className="btn btn-primary" onClick={openCreate}>
                 <IconPlus width={15} height={15} /> New Product
               </button>

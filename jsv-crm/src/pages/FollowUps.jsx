@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../lib/api.js'
 import PageHeader from '../components/PageHeader.jsx'
+import ExportBar from '../components/ExportBar.jsx'
 import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
 import { IconPlus } from '../components/Icons.jsx'
@@ -51,9 +52,17 @@ export default function FollowUps() {
         title="Follow-ups"
         subtitle="Track calls, emails, meetings and sample dispatches."
         actions={
-          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-            <IconPlus width={15} height={15} /> Schedule Follow-up
-          </button>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <ExportBar
+              title="Follow-ups"
+              headers={['Date', 'Type', 'Lead', 'Contact', 'Notes', 'Status']}
+              rows={filtered.map((f) => [f.date, f.type, f.lead, f.contact, f.notes, f.status])}
+              count={filtered.length}
+            />
+            <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+              <IconPlus width={15} height={15} /> Schedule Follow-up
+            </button>
+          </div>
         }
       />
 

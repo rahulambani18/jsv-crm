@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../lib/api.js'
 import PageHeader from '../components/PageHeader.jsx'
+import ExportBar from '../components/ExportBar.jsx'
 import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
 import { IconPlus, IconTrash } from '../components/Icons.jsx'
@@ -78,9 +79,17 @@ export default function Quotations() {
         title="Quotations"
         subtitle={`${quotations.length} quote${quotations.length === 1 ? '' : 's'}`}
         actions={
-          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-            <IconPlus width={15} height={15} /> New Quotation
-          </button>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <ExportBar
+              title="Quotations"
+              headers={['Quote #', 'Company', 'Items', 'Total', 'Valid Until', 'Status']}
+              rows={quotations.map((q) => [q.quoteNo, q.company, q.items, `₹${Number(q.total).toLocaleString('en-IN')}`, q.validUntil, q.status])}
+              count={quotations.length}
+            />
+            <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+              <IconPlus width={15} height={15} /> New Quotation
+            </button>
+          </div>
         }
       />
 

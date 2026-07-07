@@ -19,6 +19,7 @@
   border-bottom-color: var(--navy-900);
 }
 
+/* ---------- Permissions grid — CSS Grid, equal heights ---------- */
 .perm-grid {
   display: grid;
   grid-template-columns: 1fr 90px 90px;
@@ -27,29 +28,66 @@
   overflow: hidden;
   background: #fff;
 }
-.perm-grid-header, .perm-grid-row {
-  display: grid;
-  grid-template-columns: 1fr 90px 90px;
-  align-items: center;
-}
+
+/* Header row */
 .perm-grid-header {
+  display: contents; /* lets children participate in the parent grid */
+}
+.perm-grid-header > div {
   background: var(--paper-0);
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   color: var(--ink-500);
   padding: 12px 16px;
+  border-bottom: 1px solid var(--paper-200);
+  display: flex;
+  align-items: center;
 }
-.perm-grid-header > div:not(:first-child) { text-align: center; }
+.perm-grid-header > div:not(:first-child) {
+  justify-content: center;
+}
+
+/* Module rows — use display:contents so each div is a real grid cell */
 .perm-grid-row {
-  padding: 11px 16px;
-  border-top: 1px solid var(--paper-100);
+  display: contents;
+}
+.perm-grid-row > div {
+  /* Equal height via grid row — text length won't shift anything */
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  min-height: 44px;
   font-size: 13.5px;
   color: var(--ink-700);
+  border-top: 1px solid var(--paper-100);
+  /* Prevent wrap — module names stay on one line */
+  white-space: nowrap;
 }
-.perm-grid-row > div:not(:first-child) { text-align: center; }
-.perm-grid-row.module-name { font-weight: 600; color: var(--ink-900); }
+.perm-grid-row > div:not(:first-child) {
+  justify-content: center;
+}
+/* Hover highlight across the full row */
+.perm-grid-row:hover > div {
+  background: var(--paper-0);
+}
+.perm-grid-row.module-name > div:first-child {
+  font-weight: 600;
+  color: var(--ink-900);
+}
+
+/* Checkbox styling */
+.perm-grid input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--navy-900);
+  cursor: pointer;
+}
+.perm-grid input[type="checkbox"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 .role-pill-row {
   display: flex;
@@ -60,7 +98,9 @@
   border: 1px solid var(--paper-200);
   border-radius: var(--radius-md);
   margin-bottom: 8px;
+  transition: border-color 0.12s;
 }
+.role-pill-row:hover { border-color: var(--navy-400); }
 .role-pill-row .role-meta {
   display: flex;
   align-items: center;
@@ -72,4 +112,26 @@
   background: var(--paper-0);
   display: flex; align-items: center; justify-content: center;
   color: var(--navy-700);
+}
+
+/* ---------- Audit log ---------- */
+.audit-row {
+  display: grid;
+  grid-template-columns: 140px 100px 1fr 160px;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--paper-100);
+  font-size: 13px;
+}
+.audit-row:last-child { border-bottom: none; }
+.audit-row:hover { background: var(--paper-0); }
+.audit-header {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-500);
+  background: var(--paper-0);
+  border-bottom: 1px solid var(--paper-200);
 }

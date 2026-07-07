@@ -46,6 +46,13 @@ export default function Shell({ children }) {
   const { user, signOut, can } = useAuth()
   const [navOpen, setNavOpen] = useState(false)
   const location = useLocation()
+
+  // Dark mode — persists across sessions
+  const [dark, setDark] = useState(() => localStorage.getItem('jsv_theme') === 'dark')
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
+    localStorage.setItem('jsv_theme', dark ? 'dark' : 'light')
+  }, [dark])
   const title = PAGE_TITLES[location.pathname] || 'JSV CRM'
 
   const visibleNav = NAV.filter((item) => can(item.key, 'view'))
@@ -142,7 +149,14 @@ export default function Shell({ children }) {
             JSV CRM
           </div>
           <div className="topbar-right" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {/* Notification bell */}
+            {/* Dark mode toggle */}
+              <button
+                onClick={() => setDark((v) => !v)}
+                title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+                style={{ background: 'transparent', border: '1px solid var(--paper-200)', borderRadius: 'var(--radius-sm)', padding: '6px 10px', cursor: 'pointer', fontSize: 15, color: 'var(--ink-500)' }}
+              >
+                {dark ? '☀️' : '🌙'}
+              </button>
             <div ref={notifRef} style={{ position: 'relative' }}>
               <button
                 onClick={() => setShowNotifs((v) => !v)}

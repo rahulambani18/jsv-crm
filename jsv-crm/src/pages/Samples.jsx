@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from '../lib/api.js'
 import { COURIERS } from '../data/seed.js'
 import PageHeader from '../components/PageHeader.jsx'
+import ExportBar from '../components/ExportBar.jsx'
 import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
 import MultiComboField from '../components/MultiComboField.jsx'
@@ -61,11 +62,19 @@ export default function Samples() {
         title="Samples"
         subtitle={`${samples.length} sample${samples.length === 1 ? '' : 's'}`}
         actions={
-          canEdit && (
-            <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-              <IconPlus width={15} height={15} /> New Sample
-            </button>
-          )
+          <div style={{ display: 'flex', gap: 10 }}>
+            <ExportBar
+              title="Samples"
+              headers={['Code', 'Company', 'Contact', 'Products', 'Qty', 'Sent', 'Courier', 'Tracking', 'Status']}
+              rows={filtered.map((s) => [s.code, s.company, s.contact, (s.products||[]).join(', '), s.qty, s.sent, s.courier, s.tracking, s.status])}
+              count={filtered.length}
+            />
+            {canEdit && (
+              <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+                <IconPlus width={15} height={15} /> New Sample
+              </button>
+            )}
+          </div>
         }
       />
 

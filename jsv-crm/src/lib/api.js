@@ -43,6 +43,8 @@ function fromDbShape(obj) {
   return Object.fromEntries(Object.entries(obj).map(([k, v]) => [snakeToCamel(k), v]))
 }
 
+const DEFAULT_WORKSPACE = '00000000-0000-0000-0000-000000000001'
+
 function makeRealTable(name) {
   const tableName = SQL_TABLE_NAME[name]
   return {
@@ -57,7 +59,9 @@ function makeRealTable(name) {
       return fromDbShape(data)
     },
     async insert(record) {
-      const { data, error } = await supabase.from(tableName).insert(toDbShape(record)).select().single()
+      // Always inject workspace_id so records are properly scoped
+      const withWorkspace = { workspaceId: DEFAULT_WORKSPACE, ...record }
+      const { data, error } = await supabase.from(tableName).insert(toDbShape(withWorkspace)).select().single()
       if (error) throw error
       return fromDbShape(data)
     },

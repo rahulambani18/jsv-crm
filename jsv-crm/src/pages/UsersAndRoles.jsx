@@ -49,6 +49,48 @@ export default function UsersAndRoles() {
   const roleById = useMemo(() => Object.fromEntries(roles.map((r) => [r.id, r])), [roles])
   const activeRole = roleById[activeRoleId]
 
+  // Audit log — stored in localStorage as mock, real version uses a DB table
+  const [auditLog] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('jsv_audit') || '[]') } catch { return [] }
+  })
+
+  function logAudit(action, detail) {
+    const entry = { ts: new Date().toISOString(), action, detail, user: 'Rahul' }
+    try {
+      const log = JSON.parse(localStorage.getItem('jsv_audit') || '[]')
+      log.unshift(entry)
+      localStorage.setItem('jsv_audit', JSON.stringify(log.slice(0, 200)))
+    } catch {}
+  }
+
+  async function handleDeleteRole(roleId) {
+    const role = roleById[roleId]
+    if (!role) return
+    if (!window.confirm(`Delete role "${role.name}"? Users with this role will lose their assigned role.`)) return
+    try {
+      await api.roles.remove(roleId)
+      logAudit('Role deleted', role.name)
+      refresh()
+    } catch (err) {
+      alert('Could not delete role: ' + (err.message || 'Unknown error'))
+    }
+  }
+
+  function exportPermissions() {
+    if (!activeRole) return
+    const rows = [['Module', 'View', 'Edit']]
+    MODULES.forEach((m) => {
+      const p = activeRole.permissions?.[m.key] || { view: false, edit: false }
+      rows.push([m.label, p.view ? 'Yes' : 'No', p.edit ? 'Yes' : 'No'])
+    })
+    const csv = rows.map((r) => r.join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `${activeRole.name}_permissions.csv`
+    a.click()
+  }
+
   async function handleCreateUser(e) {
     e.preventDefault()
     setSavingUser(true)
@@ -117,6 +159,9 @@ export default function UsersAndRoles() {
         </button>
         <button className={`roles-tab ${tab === 'roles' ? 'active' : ''}`} onClick={() => setTab('roles')}>
           <IconShield width={14} height={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Roles &amp; Permissions
+        </button>
+        <button className={`roles-tab ${tab === 'audit' ? 'active' : ''}`} onClick={() => setTab('audit')}>
+          📋 Audit Log
         </button>
       </div>
 
@@ -229,6 +274,13 @@ export default function UsersAndRoles() {
                     ? 'Admins always have full view and edit access to every module.'
                     : 'Toggle what this role can view and edit, module by module.'}
                 </p>
+                {activeRole && canEdit && (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+                    <button className="btn btn-secondary btn-sm" onClick={exportPermissions}>
+                      📥 Export Permissions CSV
+                    </button>
+                  </div>
+                )}
                 <div className="perm-grid">
                   <div className="perm-grid-header">
                     <div>Module</div><div>View</div><div>Edit</div>
@@ -238,7 +290,7 @@ export default function UsersAndRoles() {
                     const locked = activeRole.name === 'Admin'
                     return (
                       <div className="perm-grid-row module-name" key={m.key}>
-                        <div>{m.label}</div>
+                        <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.label}</div>
                         <div>
                           <input
                             type="checkbox"
@@ -258,10 +310,41 @@ export default function UsersAndRoles() {
                       </div>
                     )
                   })}
+                  {canEdit && !activeRole?.isSystem && (
+                    <div className="perm-grid-row" style={{ display: 'flex', padding: '10px 16px' }}>
+                      <button
+                        className="btn btn-ghost btn-sm btn-danger"
+                        style={{ fontSize: 12 }}
+                        onClick={() => handleDeleteRole(activeRole.id)}
+                      >
+                        🗑 Delete this role
+                      </button>
+                    </div>
+                  )}
                 </div>
               </>
             )}
           </div>
+        </div>
+      )}
+
+      {tab === 'audit' && (
+        <div className="table-wrap">
+          <div className="audit-row audit-header">
+            <div>Time</div><div>User</div><div>Action</div><div>Detail</div>
+          </div>
+          {auditLog.length === 0 ? (
+            <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--ink-300)', fontSize: 13 }}>
+              No audit events yet. Role changes and deletions will appear here.
+            </div>
+          ) : auditLog.map((entry, i) => (
+            <div key={i} className="audit-row">
+              <div className="cell-mono" style={{ fontSize: 12 }}>{new Date(entry.ts).toLocaleString('en-IN')}</div>
+              <div style={{ fontWeight: 600 }}>{entry.user}</div>
+              <div><span className="pill pill-navy" style={{ fontSize: 11 }}>{entry.action}</span></div>
+              <div style={{ color: 'var(--ink-500)', fontSize: 12.5 }}>{entry.detail}</div>
+            </div>
+          ))}
         </div>
       )}
 

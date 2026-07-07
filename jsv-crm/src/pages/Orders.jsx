@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from '../lib/api.js'
 import { WAREHOUSES, calcOrderTotals, GST_RATE } from '../data/seed.js'
 import PageHeader from '../components/PageHeader.jsx'
+import ExportBar from '../components/ExportBar.jsx'
 import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
 import { IconPlus, IconTrash } from '../components/Icons.jsx'
@@ -109,11 +110,19 @@ export default function Orders() {
         title="Orders"
         subtitle={`${orders.length} order${orders.length === 1 ? '' : 's'}`}
         actions={
-          canEdit && (
-            <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-              <IconPlus width={15} height={15} /> New Order
-            </button>
-          )
+          <div style={{ display: 'flex', gap: 10 }}>
+            <ExportBar
+              title="Orders"
+              headers={['Order #', 'Company', 'Warehouse', 'Order Date', 'Delivery', 'Total', 'Status', 'Payment']}
+              rows={filtered.map((o) => [o.orderNo, o.company, o.warehouse, o.orderDate, o.delivery, `₹${Number(o.total).toLocaleString('en-IN')}`, o.status, o.payment])}
+              count={filtered.length}
+            />
+            {canEdit && (
+              <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+                <IconPlus width={15} height={15} /> New Order
+              </button>
+            )}
+          </div>
         }
       />
 

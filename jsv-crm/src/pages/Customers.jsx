@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from '../lib/api.js'
 import { INDUSTRY_OPTIONS, INDIAN_STATES } from '../data/seed.js'
 import PageHeader from '../components/PageHeader.jsx'
+import ExportBar from '../components/ExportBar.jsx'
 import Modal from '../components/Modal.jsx'
 import ComboField from '../components/ComboField.jsx'
 import { IconPlus, IconSearch } from '../components/Icons.jsx'
@@ -63,8 +64,12 @@ export default function Customers() {
         actions={
           canEdit && (
             <>
-              <button className="btn btn-secondary">Template</button>
-              <button className="btn btn-secondary">Import Excel/CSV</button>
+              <ExportBar
+                title="Customers"
+                headers={['Code', 'Company', 'Contact', 'Mobile', 'Email', 'City', 'State', 'GST', 'Industry', 'Application']}
+                rows={filtered.map((c) => [c.code, c.company, c.contact, c.mobile, c.email, c.city, c.state, c.gst, c.industry, c.application])}
+                count={filtered.length}
+              />
               <button className="btn btn-primary" onClick={() => setShowModal(true)}>
                 <IconPlus width={15} height={15} /> New Customer
               </button>
