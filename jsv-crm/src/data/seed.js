@@ -214,3 +214,16 @@ export const seedUsers = [
   { id: 'u3', name: 'Karan Mehta', email: 'karan@jsvchem.com', roleId: 'r2', status: 'Active', lastActive: '2026-06-24' },
 ]
 
+export const seedInvoices = [
+  { id: 'inv1', invoiceNo: 'INV-2026-0041', orderId: 'o1', company: 'Patel Agro Industries', issueDate: '2026-06-10', dueDate: '2026-07-10', subtotal: 158051, cgst: 14225, sgst: 14225, igst: 0, total: 186501, status: 'Paid', paymentMode: 'NEFT' },
+  { id: 'inv2', invoiceNo: 'INV-2026-0042', orderId: 'o2', company: 'Himalaya Dairy Co.', issueDate: '2026-06-21', dueDate: '2026-07-21', subtotal: 79831, cgst: 7186, sgst: 7186, igst: 0, total: 94203, status: 'Unpaid', paymentMode: '' },
+]
+
+export const seedPayments = [
+  { id: 'pay1', paymentNo: 'PAY-2026-0021', invoiceId: 'inv1', company: 'Patel Agro Industries', amount: 186501, date: '2026-06-18', mode: 'NEFT', reference: 'NEFT2026061800123', notes: 'Full payment received', status: 'Completed' },
+]
+
+export const seedExpenses = [
+  { id: 'exp1', expenseNo: 'EXP-2026-0011', category: 'Freight', description: 'Courier charges - Blue Dart June batch', amount: 8500, date: '2026-06-15', paidBy: 'Rahul', paymentMode: 'UPI', receipt: '', status: 'Approved' },
+  { id: 'exp2', expenseNo: 'EXP-2026-0012', category: 'Office', description: 'Stationery and printing', amount: 2200, date: '2026-06-20', paidBy: 'Rahul', paymentMode: 'Cash', receipt: '', status: 'Approved' },
+]

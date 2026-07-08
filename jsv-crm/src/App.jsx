@@ -15,6 +15,9 @@ import UsersAndRoles from './pages/UsersAndRoles.jsx'
 import Tasks from './pages/Tasks.jsx'
 import Meetings from './pages/Meetings.jsx'
 import Documents from './pages/Documents.jsx'
+import Invoices from './pages/Invoices.jsx'
+import Payments from './pages/Payments.jsx'
+import Expenses from './pages/Expenses.jsx'
 import './styles/components.css'
 
 function Protected({ children }) {
@@ -47,6 +50,9 @@ function AppRoutes() {
       <Route path="/tasks" element={<Protected><Tasks /></Protected>} />
       <Route path="/meetings" element={<Protected><Meetings /></Protected>} />
       <Route path="/documents" element={<Protected><Documents /></Protected>} />
+      <Route path="/invoices" element={<Protected><Invoices /></Protected>} />
+      <Route path="/payments" element={<Protected><Payments /></Protected>} />
+      <Route path="/expenses" element={<Protected><Expenses /></Protected>} />
       <Route path="/users" element={<Protected><UsersAndRoles /></Protected>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
