@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../lib/api.js'
+import { useAuth } from '../lib/AuthContext.jsx'
 import { readSpreadsheetFile, normalizeRow } from '../lib/fileImport.js'
 import PageHeader from '../components/PageHeader.jsx'
 import Pill from '../components/Pill.jsx'
