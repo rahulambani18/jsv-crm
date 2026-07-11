@@ -152,26 +152,27 @@ if (!isMock) {
 // which backend is active.
 async function loadProfileWithRole(authUser) {
   if (!authUser) return null
+
+  // Two separate queries — avoids FK join naming issues in Supabase
   const { data: profile, error } = await supabase
     .from('profiles')
-    .select('id, full_name, title, role_id, roles ( id, name )')
+    .select('id, full_name, title, role_id')
     .eq('id', authUser.id)
     .single()
 
-  // If no profile exists yet, create one automatically with default Sales Executive role
+  // Auto-create profile if missing
   if (error || !profile) {
     try {
       await supabase.from('profiles').insert({
         id: authUser.id,
         workspace_id: '00000000-0000-0000-0000-000000000001',
         full_name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'User',
-        role_id: '00000000-0000-0000-0000-000000000003', // Sales Executive by default
+        role_id: '00000000-0000-0000-0000-000000000003',
       })
     } catch {}
-    // Re-fetch after creating
     const { data: newProfile } = await supabase
       .from('profiles')
-      .select('id, full_name, title, role_id, roles ( id, name )')
+      .select('id, full_name, title, role_id')
       .eq('id', authUser.id)
       .single()
     return buildUserObject(authUser, newProfile)
@@ -181,11 +182,20 @@ async function loadProfileWithRole(authUser) {
 }
 
 async function buildUserObject(authUser, profile) {
-  let permissions = {}
   const roleId = profile?.role_id
-  const roleName = profile?.roles?.name || null
+  let roleName = 'Sales Executive'
+  let permissions = {}
 
   if (roleId) {
+    // Fetch role name separately
+    const { data: roleRow } = await supabase
+      .from('roles')
+      .select('name')
+      .eq('id', roleId)
+      .single()
+    if (roleRow?.name) roleName = roleRow.name
+
+    // Fetch permissions
     const { data: perms } = await supabase
       .from('role_permissions')
       .select('module_key, can_view, can_edit')
@@ -195,10 +205,9 @@ async function buildUserObject(authUser, profile) {
     )
   }
 
-  // Admin always gets full permissions regardless of DB state
-  const isAdmin = roleName === 'Admin'
+  // Admin always gets full access regardless of permission rows
   const ALL_MODULES = ['dashboard','leads','follow_ups','customers','samples','quotations','orders','products','reports','users','tasks','meetings','documents','invoices','payments','expenses']
-  if (isAdmin) {
+  if (roleName === 'Admin') {
     ALL_MODULES.forEach((m) => { permissions[m] = { view: true, edit: true } })
   }
 
@@ -206,8 +215,8 @@ async function buildUserObject(authUser, profile) {
     id: authUser.id,
     email: authUser.email,
     name: profile?.full_name || authUser.email?.split('@')[0] || 'User',
-    title: roleName || 'Sales Executive',   // shows in sidebar footer
-    role: roleName || 'Sales Executive',    // used for permission checks
+    title: roleName,
+    role: roleName,
     permissions,
   }
 }
