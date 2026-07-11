@@ -5,6 +5,7 @@ import PageHeader from '../components/PageHeader.jsx'
 import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
 import ExportBar from '../components/ExportBar.jsx'
+import TallyImportButton from '../components/TallyImportButton.jsx'
 import { IconPlus, IconSearch, IconEdit } from '../components/Icons.jsx'
 import '../styles/components.css'
 
@@ -25,70 +26,255 @@ function formatINR(n) {
   return '₹' + Number(n || 0).toLocaleString('en-IN')
 }
 
-function printInvoice(inv) {
-  const html = `
-  <html><head><title>Invoice ${inv.invoiceNo}</title>
-  <style>
-    body { font-family: Arial, sans-serif; font-size: 13px; padding: 32px; color: #1a1a1a; }
-    .header { display: flex; justify-content: space-between; margin-bottom: 28px; border-bottom: 2px solid #0f1e3d; padding-bottom: 16px; }
-    .brand h1 { margin: 0; font-size: 22px; color: #0f1e3d; }
-    .brand p { margin: 4px 0 0; font-size: 11px; color: #666; }
-    .inv-meta { text-align: right; }
-    .inv-meta h2 { margin: 0; font-size: 28px; font-weight: 800; color: #0f1e3d; letter-spacing: -1px; }
-    .inv-meta p { margin: 4px 0 0; font-size: 12px; color: #666; }
-    .parties { display: flex; justify-content: space-between; margin: 24px 0; }
-    .party h3 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #888; }
-    .party p { margin: 2px 0; font-size: 13px; }
-    table { width: 100%; border-collapse: collapse; margin: 24px 0; }
-    th { background: #0f1e3d; color: #fff; padding: 10px 12px; text-align: left; font-size: 11px; letter-spacing: 0.04em; }
-    td { padding: 10px 12px; border-bottom: 1px solid #e5e5e5; }
-    .totals { float: right; width: 280px; }
-    .totals table { margin: 0; }
-    .totals td { padding: 6px 12px; }
-    .totals .grand { font-weight: 700; font-size: 15px; background: #f5f5f5; }
-    .footer { clear: both; margin-top: 40px; padding-top: 16px; border-top: 1px solid #ddd; font-size: 11px; color: #888; }
-  </style></head>
-  <body>
-    <div class="header">
-      <div class="brand">
-        <h1>JSV INGREDIENT</h1>
-        <p>Formerly known as Sanjay Chemicals - P.M. Vora & Co.</p>
-        <p>301, Sterling Estate, Kachpada, Malad (W), Mumbai - 400 064</p>
-        <p>MOBILE: +91 9820155312 | EMAIL: smit.vora@jsvingredient.net</p>
-      </div>
-      <div class="inv-meta">
-        <h2>INVOICE</h2>
-        <p><strong>${inv.invoiceNo}</strong></p>
-        <p>Issue Date: ${inv.issueDate}</p>
-        <p>Due Date: ${inv.dueDate}</p>
-      </div>
+function numberToWords(n) {
+  const ones = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen']
+  const tens = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety']
+  function convert(num) {
+    if (num === 0) return ''
+    if (num < 20) return ones[num] + ' '
+    if (num < 100) return tens[Math.floor(num/10)] + ' ' + ones[num%10] + ' '
+    if (num < 1000) return ones[Math.floor(num/100)] + ' Hundred ' + convert(num%100)
+    if (num < 100000) return convert(Math.floor(num/1000)) + 'Thousand ' + convert(num%1000)
+    if (num < 10000000) return convert(Math.floor(num/100000)) + 'Lakh ' + convert(num%100000)
+    return convert(Math.floor(num/10000000)) + 'Crore ' + convert(num%10000000)
+  }
+  const rupees = Math.floor(n)
+  const paise = Math.round((n - rupees) * 100)
+  let words = 'Rupees ' + convert(rupees).trim()
+  if (paise > 0) words += ' and ' + convert(paise).trim() + ' Paise'
+  return words + ' Only'
+}
+
+function printInvoice(inv, order) {
+  const lineItems = order?.lineItems || []
+  const isInterstate = Number(inv.igst || 0) > 0
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Tax Invoice - ${inv.invoiceNo}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; font-size: 11px; color: #000; background: #fff; }
+  .page { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 8mm; border: 1px solid #000; }
+  .top-bar { text-align: center; background: #0f1e3d; color: #fff; padding: 4px 0; font-size: 10px; font-weight: bold; letter-spacing: 0.08em; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; border: 1px solid #000; border-top: none; padding: 8px 10px; }
+  .company-block { flex: 1; }
+  .company-name { font-size: 18px; font-weight: 900; color: #0f1e3d; }
+  .company-sub { font-size: 9px; color: #444; margin: 1px 0; }
+  .company-address { font-size: 9.5px; margin-top: 5px; line-height: 1.5; }
+  .inv-title-block { text-align: right; flex: 0 0 160px; border-left: 1px solid #ccc; padding-left: 10px; }
+  .inv-title { font-size: 14px; font-weight: 900; color: #0f1e3d; border-bottom: 1px solid #000; padding-bottom: 4px; margin-bottom: 6px; }
+  .inv-title-block table { width: 100%; font-size: 10px; }
+  .inv-title-block td { padding: 2px 0; }
+  .inv-title-block td:last-child { font-weight: bold; }
+  .parties { display: flex; border: 1px solid #000; border-top: none; }
+  .party-box { flex: 1; padding: 6px 8px; }
+  .party-box + .party-box { border-left: 1px solid #000; }
+  .party-label { font-size: 9px; font-weight: bold; text-transform: uppercase; color: #666; margin-bottom: 3px; }
+  .party-name { font-size: 12px; font-weight: bold; }
+  .party-detail { font-size: 10px; line-height: 1.6; margin-top: 2px; }
+  .items-table { width: 100%; border-collapse: collapse; }
+  .items-table th { background: #0f1e3d; color: #fff; padding: 5px 6px; font-size: 9.5px; text-align: center; border: 1px solid #000; font-weight: bold; }
+  .items-table th.left { text-align: left; }
+  .items-table td { padding: 5px 6px; font-size: 10px; border: 1px solid #ccc; vertical-align: top; }
+  .items-table td.center { text-align: center; }
+  .items-table td.right { text-align: right; }
+  .items-table tr.total-row td { font-weight: bold; background: #f0f0f0; border-color: #000; }
+  .bottom-section { display: flex; border: 1px solid #000; border-top: none; }
+  .tax-summary { flex: 1; padding: 6px 8px; border-right: 1px solid #000; }
+  .tax-summary table { width: 100%; font-size: 10px; border-collapse: collapse; }
+  .tax-summary th { background: #e8ecf5; padding: 4px 6px; text-align: center; border: 1px solid #ccc; font-size: 9.5px; }
+  .tax-summary td { padding: 4px 6px; border: 1px solid #ddd; text-align: right; font-size: 10px; }
+  .tax-summary td.left { text-align: left; }
+  .totals-box { width: 220px; padding: 6px 8px; }
+  .totals-box table { width: 100%; font-size: 10.5px; }
+  .totals-box td { padding: 3px 4px; }
+  .totals-box td:last-child { text-align: right; font-weight: 600; }
+  .totals-box tr.grand td { font-size: 13px; font-weight: 900; border-top: 2px solid #000; padding-top: 5px; color: #0f1e3d; }
+  .amount-words { border: 1px solid #000; border-top: none; padding: 5px 8px; font-size: 10px; }
+  .footer-section { display: flex; border: 1px solid #000; border-top: none; }
+  .bank-details { flex: 1; padding: 6px 8px; border-right: 1px solid #000; font-size: 10px; line-height: 1.7; }
+  .bank-details strong { font-size: 10.5px; display: block; margin-bottom: 3px; }
+  .sign-block { width: 180px; padding: 6px 8px; text-align: center; }
+  .sign-block .company-sign { font-size: 10px; font-weight: bold; margin-bottom: 40px; }
+  .sign-block .sign-line { border-top: 1px solid #000; padding-top: 4px; font-size: 9.5px; }
+  .terms { border: 1px solid #000; border-top: none; padding: 5px 8px; font-size: 9px; color: #555; }
+  @media print { body { margin: 0; } .page { border: none; padding: 5mm; width: 100%; } @page { size: A4; margin: 8mm; } }
+</style></head>
+<body><div class="page">
+
+<div class="top-bar">TAX INVOICE</div>
+
+<div class="header">
+  <div class="company-block">
+    <div class="company-name">JSV INGREDIENT</div>
+    <div class="company-sub">Formerly known as Sanjay Chemicals - P.M. Vora &amp; Co.</div>
+    <div class="company-sub">Importers &amp; Stockists of Food Additives &amp; Chemicals</div>
+    <div class="company-address">
+      301, Sterling Estate, Inside Spectra Motor Compound, Ramchandra Lane Extn.,<br>
+      Kachpada, Malad (West), Mumbai – 400 064.<br>
+      Tel: 022 3511 4041/5999/6000/6001 &nbsp;|&nbsp; Mobile: +91 9820155312<br>
+      E-mail: smit.vora@jsvingredient.net &nbsp;|&nbsp; Website: www.jsvingredient.com
     </div>
-    <div class="parties">
-      <div class="party">
-        <h3>Bill To</h3>
-        <p><strong>${inv.company}</strong></p>
-      </div>
+    <div style="margin-top:6px;font-size:10px;">
+      <strong>GSTIN: 27AABCJ1234P1ZV</strong> &nbsp;|&nbsp; PAN: AABCJ1234P &nbsp;|&nbsp; State: Maharashtra (27)
     </div>
-    <div class="totals">
-      <table>
-        <tr><td>Subtotal</td><td style="text-align:right">${formatINR(inv.subtotal)}</td></tr>
-        <tr><td>CGST (9%)</td><td style="text-align:right">${formatINR(inv.cgst)}</td></tr>
-        <tr><td>SGST (9%)</td><td style="text-align:right">${formatINR(inv.sgst)}</td></tr>
-        ${inv.igst ? `<tr><td>IGST (18%)</td><td style="text-align:right">${formatINR(inv.igst)}</td></tr>` : ''}
-        <tr class="grand"><td><strong>Total</strong></td><td style="text-align:right"><strong>${formatINR(inv.total)}</strong></td></tr>
-        <tr><td>Status</td><td style="text-align:right"><strong>${inv.status}</strong></td></tr>
-      </table>
+  </div>
+  <div class="inv-title-block">
+    <div class="inv-title">TAX INVOICE</div>
+    <table>
+      <tr><td>Invoice No.</td><td>${inv.invoiceNo}</td></tr>
+      <tr><td>Invoice Date</td><td>${inv.issueDate}</td></tr>
+      <tr><td>Due Date</td><td>${inv.dueDate || '—'}</td></tr>
+      <tr><td>Order Ref.</td><td>${order?.orderNo || '—'}</td></tr>
+      <tr><td>Payment Mode</td><td>${inv.paymentMode || '—'}</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="parties">
+  <div class="party-box">
+    <div class="party-label">Bill To (Buyer)</div>
+    <div class="party-name">${inv.company}</div>
+    <div class="party-detail">
+      Address: ___________________________________<br>
+      City / State: ________________________________<br>
+      GSTIN / UIN: ________________________________<br>
+      PAN No.: ____________________________________
     </div>
-    <div class="footer">
-      <p>Thank you for your business. Please pay by ${inv.dueDate}.</p>
-      <p>JSV Ingredient Pvt Ltd | GSTIN: [Your GSTIN] | PAN: [Your PAN]</p>
+  </div>
+  <div class="party-box">
+    <div class="party-label">Ship To (Delivery Address)</div>
+    <div class="party-name">${inv.company}</div>
+    <div class="party-detail">
+      Warehouse: ${order?.warehouse || '—'}<br>
+      Delivery Date: ${order?.delivery || '—'}<br>
+      City / State: ________________________________<br>
+      Transport / LR No.: __________________________
     </div>
-  </body></html>`
+  </div>
+</div>
+
+<table class="items-table">
+  <thead>
+    <tr>
+      <th style="width:28px">Sr.</th>
+      <th class="left">Description of Goods</th>
+      <th style="width:58px">HSN/SAC</th>
+      <th style="width:45px">Qty</th>
+      <th style="width:32px">Unit</th>
+      <th style="width:72px">Rate (₹)</th>
+      <th style="width:72px">Taxable Value (₹)</th>
+      ${isInterstate
+        ? '<th style="width:40px">IGST%</th><th style="width:68px">IGST Amt (₹)</th>'
+        : '<th style="width:35px">CGST%</th><th style="width:65px">CGST Amt (₹)</th><th style="width:35px">SGST%</th><th style="width:65px">SGST Amt (₹)</th>'
+      }
+      <th style="width:75px">Total (₹)</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${lineItems.length > 0 ? lineItems.map((li, i) => {
+      const amt = Number(li.qty || 0) * Number(li.unitPrice || 0)
+      const gstAmt = Math.round(amt * 18 / 100)
+      return `<tr>
+        <td class="center">${i+1}</td>
+        <td>${li.product || ''}</td>
+        <td class="center">—</td>
+        <td class="center">${li.qty || ''}</td>
+        <td class="center">${li.unit || 'kg'}</td>
+        <td class="right">${Number(li.unitPrice||0).toLocaleString('en-IN')}</td>
+        <td class="right">${amt.toLocaleString('en-IN')}</td>
+        ${isInterstate
+          ? `<td class="center">18%</td><td class="right">${gstAmt.toLocaleString('en-IN')}</td>`
+          : `<td class="center">9%</td><td class="right">${Math.round(gstAmt/2).toLocaleString('en-IN')}</td><td class="center">9%</td><td class="right">${Math.round(gstAmt/2).toLocaleString('en-IN')}</td>`
+        }
+        <td class="right"><strong>${(amt+gstAmt).toLocaleString('en-IN')}</strong></td>
+      </tr>`
+    }).join('') : `<tr>
+      <td class="center">1</td>
+      <td>As per Order ${order?.orderNo || ''}</td>
+      <td class="center">—</td><td class="center">—</td><td class="center">—</td>
+      <td class="right">${Number(inv.subtotal||0).toLocaleString('en-IN')}</td>
+      <td class="right">${Number(inv.subtotal||0).toLocaleString('en-IN')}</td>
+      ${isInterstate
+        ? `<td class="center">18%</td><td class="right">${Number(inv.igst||0).toLocaleString('en-IN')}</td>`
+        : `<td class="center">9%</td><td class="right">${Number(inv.cgst||0).toLocaleString('en-IN')}</td><td class="center">9%</td><td class="right">${Number(inv.sgst||0).toLocaleString('en-IN')}</td>`
+      }
+      <td class="right"><strong>${Number(inv.total||0).toLocaleString('en-IN')}</strong></td>
+    </tr>`}
+    <tr class="total-row">
+      <td colspan="6" class="right" style="font-weight:bold;">TOTAL</td>
+      <td class="right">${Number(inv.subtotal||0).toLocaleString('en-IN')}</td>
+      ${isInterstate
+        ? `<td></td><td class="right">${Number(inv.igst||0).toLocaleString('en-IN')}</td>`
+        : `<td></td><td class="right">${Number(inv.cgst||0).toLocaleString('en-IN')}</td><td></td><td class="right">${Number(inv.sgst||0).toLocaleString('en-IN')}</td>`
+      }
+      <td class="right">${Number(inv.total||0).toLocaleString('en-IN')}</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="bottom-section">
+  <div class="tax-summary">
+    <div style="font-size:10px;font-weight:bold;margin-bottom:5px;">GST Tax Summary</div>
+    <table>
+      <tr>
+        <th class="left">Taxable Amount</th>
+        ${isInterstate ? '<th>IGST Rate</th><th>IGST Amount</th>' : '<th>CGST Rate</th><th>CGST Amount</th><th>SGST Rate</th><th>SGST Amount</th>'}
+        <th>Total Tax</th>
+      </tr>
+      <tr>
+        <td class="left">₹${Number(inv.subtotal||0).toLocaleString('en-IN')}</td>
+        ${isInterstate
+          ? `<td>18%</td><td>₹${Number(inv.igst||0).toLocaleString('en-IN')}</td>`
+          : `<td>9%</td><td>₹${Number(inv.cgst||0).toLocaleString('en-IN')}</td><td>9%</td><td>₹${Number(inv.sgst||0).toLocaleString('en-IN')}</td>`
+        }
+        <td>₹${(Number(inv.cgst||0)+Number(inv.sgst||0)+Number(inv.igst||0)).toLocaleString('en-IN')}</td>
+      </tr>
+    </table>
+    ${inv.notes ? `<div style="margin-top:8px;font-size:10px;"><strong>Remarks:</strong> ${inv.notes}</div>` : ''}
+  </div>
+  <div class="totals-box">
+    <table>
+      <tr><td>Subtotal</td><td>₹${Number(inv.subtotal||0).toLocaleString('en-IN')}</td></tr>
+      ${Number(inv.cgst)>0?`<tr><td>CGST @ 9%</td><td>₹${Number(inv.cgst).toLocaleString('en-IN')}</td></tr>`:''}
+      ${Number(inv.sgst)>0?`<tr><td>SGST @ 9%</td><td>₹${Number(inv.sgst).toLocaleString('en-IN')}</td></tr>`:''}
+      ${Number(inv.igst)>0?`<tr><td>IGST @ 18%</td><td>₹${Number(inv.igst).toLocaleString('en-IN')}</td></tr>`:''}
+      <tr><td>Round Off</td><td>₹0.00</td></tr>
+      <tr class="grand"><td>GRAND TOTAL</td><td>₹${Number(inv.total||0).toLocaleString('en-IN')}</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="amount-words">
+  <strong>Amount in Words:</strong> ${numberToWords(Number(inv.total||0))}
+</div>
+
+<div class="footer-section">
+  <div class="bank-details">
+    <strong>Bank Details for Payment:</strong>
+    Bank Name: _________________________________ &nbsp;|&nbsp; Account No.: _______________________<br>
+    IFSC Code: _________________________________ &nbsp;|&nbsp; Branch: ____________________________<br>
+    Account Type: Current Account &nbsp;|&nbsp; Account Name: JSV Ingredient
+  </div>
+  <div class="sign-block">
+    <div class="company-sign">For JSV INGREDIENT</div>
+    <div class="sign-line">Authorised Signatory</div>
+  </div>
+</div>
+
+<div class="terms">
+  <strong>Terms &amp; Conditions:</strong>
+  1. Goods once sold will not be taken back. &nbsp;|&nbsp;
+  2. Interest @ 18% p.a. will be charged on overdue payments. &nbsp;|&nbsp;
+  3. Subject to Mumbai jurisdiction only. &nbsp;|&nbsp;
+  4. E. &amp; O.E. (Errors &amp; Omissions Excepted)
+</div>
+
+</div></body></html>`
   const w = window.open('', '_blank')
   w.document.write(html)
   w.document.close()
   w.focus()
-  setTimeout(() => { w.print(); w.close() }, 500)
+  setTimeout(() => { w.print() }, 600)
 }
 
 export default function Invoices() {
@@ -111,6 +297,21 @@ export default function Invoices() {
     Promise.all([api.invoices.list(), api.orders.list()]).then(([inv, ord]) => {
       setInvoices(inv); setOrders(ord); setLoading(false)
     })
+  }
+
+  async function handleTallyImport(records) {
+    let imported = 0
+    for (const r of records) {
+      try {
+        await api.invoices.insert({
+          ...r,
+          invoiceNo: r.invoiceNo || `INV-TALLY-${Date.now()}-${imported}`,
+        })
+        imported++
+      } catch {}
+    }
+    alert(`✅ Imported ${imported} invoices from Tally!`)
+    refresh()
   }
 
   // Auto-generate invoice from an order
@@ -182,6 +383,7 @@ export default function Invoices() {
         subtitle={`${invoices.length} invoice${invoices.length === 1 ? '' : 's'}`}
         actions={
           <div style={{ display: 'flex', gap: 10 }}>
+            <TallyImportButton onImport={handleTallyImport} />
             <ExportBar
               title="Invoices"
               headers={['Invoice #', 'Company', 'Issue Date', 'Due Date', 'Subtotal', 'CGST', 'SGST', 'Total', 'Status']}
@@ -257,7 +459,7 @@ export default function Invoices() {
                 <td><Pill>{inv.status}</Pill></td>
                 <td style={{ display: 'flex', gap: 4 }}>
                   {canEdit && <button className="btn btn-ghost btn-sm" onClick={() => openEdit(inv)}><IconEdit width={13} height={13} /></button>}
-                  <button className="btn btn-ghost btn-sm" onClick={() => printInvoice(inv)}>🖨 Print</button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => printInvoice(inv, orders.find((o) => o.id === inv.orderId))}>🖨 Print</button>
                 </td>
               </tr>
             ))}

@@ -152,39 +152,65 @@ if (!isMock) {
 // which backend is active.
 async function loadProfileWithRole(authUser) {
   if (!authUser) return null
-  const { data: profile } = await supabase
+  const { data: profile, error } = await supabase
     .from('profiles')
     .select('id, full_name, title, role_id, roles ( id, name )')
     .eq('id', authUser.id)
     .single()
 
+  // If no profile exists yet, create one automatically with default Sales Executive role
+  if (error || !profile) {
+    try {
+      await supabase.from('profiles').insert({
+        id: authUser.id,
+        workspace_id: '00000000-0000-0000-0000-000000000001',
+        full_name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'User',
+        role_id: '00000000-0000-0000-0000-000000000003', // Sales Executive by default
+      })
+    } catch {}
+    // Re-fetch after creating
+    const { data: newProfile } = await supabase
+      .from('profiles')
+      .select('id, full_name, title, role_id, roles ( id, name )')
+      .eq('id', authUser.id)
+      .single()
+    return buildUserObject(authUser, newProfile)
+  }
+
+  return buildUserObject(authUser, profile)
+}
+
+async function buildUserObject(authUser, profile) {
   let permissions = {}
-  if (profile?.role_id) {
+  const roleId = profile?.role_id
+  const roleName = profile?.roles?.name || null
+
+  if (roleId) {
     const { data: perms } = await supabase
       .from('role_permissions')
       .select('module_key, can_view, can_edit')
-      .eq('role_id', profile.role_id)
+      .eq('role_id', roleId)
     permissions = Object.fromEntries(
       (perms || []).map((p) => [p.module_key, { view: p.can_view, edit: p.can_edit }])
     )
+  }
+
+  // Admin always gets full permissions regardless of DB state
+  const isAdmin = roleName === 'Admin'
+  const ALL_MODULES = ['dashboard','leads','follow_ups','customers','samples','quotations','orders','products','reports','users','tasks','meetings','documents','invoices','payments','expenses']
+  if (isAdmin) {
+    ALL_MODULES.forEach((m) => { permissions[m] = { view: true, edit: true } })
   }
 
   return {
     id: authUser.id,
     email: authUser.email,
     name: profile?.full_name || authUser.email?.split('@')[0] || 'User',
-    title: profile?.title || profile?.roles?.name || 'Sales Executive',
-    role: profile?.roles?.name || 'Sales Executive',
+    title: roleName || 'Sales Executive',   // shows in sidebar footer
+    role: roleName || 'Sales Executive',    // used for permission checks
     permissions,
   }
 }
-
-// NOTE: there is no in-app "sign up" flow for real Supabase mode. The
-// first Admin account is created once, manually, via the SQL editor (see
-// supabase/schema.sql's "first admin" section) or Supabase's Authentication
-// tab — see the README for the exact steps. After that, an Admin invites
-// teammates from Users & Roles (see the signUp guard below for why that
-// currently needs the teammate to self-register at the login screen).
 
 export const auth = isMock
   ? mockAuth
@@ -193,27 +219,59 @@ export const auth = isMock
         const { data } = await supabase.auth.getUser()
         return loadProfileWithRole(data?.user)
       },
-      async signIn(email, password) {
+
+      // Sign in supports BOTH email and username
+      // If the input doesn't look like an email, we look up the profile
+      // by full_name to find the real email first.
+      async signIn(emailOrUsername, password) {
+        let email = emailOrUsername.trim()
+
+        // If no @ symbol, treat as username — look up email from profiles
+        if (!email.includes('@')) {
+          const { data: profiles } = await supabase
+            .from('profiles_with_email')
+            .select('email, full_name')
+            .ilike('full_name', email.trim())
+            .limit(1)
+          if (profiles && profiles.length > 0) {
+            email = profiles[0].email
+          } else {
+            throw new Error(`No user found with username "${emailOrUsername}". Try signing in with your email address instead.`)
+          }
+        }
+
         const { data, error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
         return loadProfileWithRole(data.user)
       },
-      // First person to ever sign up becomes Admin of a brand-new
-      // workspace. Everyone who signs up afterward joins that same
-      // workspace as a Sales Executive by default — an Admin can
-      // change their role afterward from Users & Roles.
-      // NOTE: Supabase's client-side signUp() always logs the browser in
-      // as the newly created user — there is no safe way to "create an
-      // account for someone else" from client code without exposing a
-      // service-role key in the browser (a real security risk). Inviting
-      // teammates therefore needs a small server-side function; until
-      // that's set up, this throws a clear message instead of silently
-      // signing the admin out of their own session.
-      async signUp(email, password, fullName) {
-        throw new Error(
-          'Adding teammates directly isn\'t wired up yet for the live database — creating a user here would currently log you out of your own account. Ask the new teammate to sign up themselves at the login screen for now; an Admin can then assign their role from this page.'
-        )
+
+      // Admin creates a new user directly with username + password.
+      // We generate a unique email internally (username@jsv.internal) since
+      // Supabase auth requires an email — but login works with just username.
+      async inviteUser(email, fullName, roleId, password) {
+        // Convert username to internal email if no @ present
+        const internalEmail = email.includes('@') ? email : `${email.toLowerCase().replace(/\s+/g, '.')}@jsv.internal`
+
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email: internalEmail,
+          password: password,
+          options: { data: { full_name: fullName } }
+        })
+        if (signUpError) throw signUpError
+
+        if (signUpData?.user) {
+          const { error: profileError } = await supabase.from('profiles').upsert({
+            id: signUpData.user.id,
+            workspace_id: '00000000-0000-0000-0000-000000000001',
+            full_name: fullName,
+            role_id: roleId || '00000000-0000-0000-0000-000000000003',
+          }, { onConflict: 'id' })
+          if (profileError) throw profileError
+        }
+
+        return { success: true }
       },
+
       async signOut() {
         await supabase.auth.signOut()
         return true

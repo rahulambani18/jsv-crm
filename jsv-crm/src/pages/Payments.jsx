@@ -5,6 +5,7 @@ import PageHeader from '../components/PageHeader.jsx'
 import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
 import ExportBar from '../components/ExportBar.jsx'
+import TallyImportButton from '../components/TallyImportButton.jsx'
 import { IconPlus, IconSearch } from '../components/Icons.jsx'
 import '../styles/components.css'
 
@@ -36,6 +37,21 @@ export default function Payments() {
     Promise.all([api.payments.list(), api.invoices.list()]).then(([p, i]) => {
       setPayments(p); setInvoices(i); setLoading(false)
     })
+  }
+
+  async function handleTallyImport(records) {
+    let imported = 0
+    for (const r of records) {
+      try {
+        await api.payments.insert({
+          ...r,
+          paymentNo: `PAY-TALLY-${Date.now()}-${imported}`,
+        })
+        imported++
+      } catch {}
+    }
+    alert(`✅ Imported ${imported} payments from Tally!`)
+    refresh()
   }
 
   async function handleSave(e) {
@@ -76,6 +92,7 @@ export default function Payments() {
         subtitle={`${payments.length} payment${payments.length === 1 ? '' : 's'} received`}
         actions={
           <div style={{ display: 'flex', gap: 10 }}>
+            <TallyImportButton onImport={handleTallyImport} />
             <ExportBar
               title="Payments"
               headers={['Payment #', 'Company', 'Amount', 'Date', 'Mode', 'Reference', 'Status']}

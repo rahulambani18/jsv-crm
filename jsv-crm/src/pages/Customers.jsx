@@ -4,7 +4,7 @@ import { INDUSTRY_OPTIONS, INDIAN_STATES } from '../data/seed.js'
 import PageHeader from '../components/PageHeader.jsx'
 import ExportBar from '../components/ExportBar.jsx'
 import Modal from '../components/Modal.jsx'
-import ComboField from '../components/ComboField.jsx'
+import TallyImportButton from '../components/TallyImportButton.jsx'
 import { IconPlus, IconSearch } from '../components/Icons.jsx'
 import { useAuth } from '../lib/AuthContext.jsx'
 import '../styles/components.css'
@@ -33,6 +33,21 @@ export default function Customers() {
   function refresh() {
     setLoading(true)
     api.customers.list().then((c) => { setCustomers(c); setLoading(false) })
+  }
+
+  async function handleTallyImport(records) {
+    let imported = 0
+    for (const r of records) {
+      try {
+        await api.customers.insert({
+          ...r,
+          code: `CUST-${String(customers.length + imported + 1).padStart(4, '0')}`,
+        })
+        imported++
+      } catch {}
+    }
+    alert(`✅ Imported ${imported} customers from Tally successfully!`)
+    refresh()
   }
 
   const filtered = useMemo(() => {
@@ -64,6 +79,7 @@ export default function Customers() {
         actions={
           canEdit && (
             <>
+              <TallyImportButton onImport={handleTallyImport} />
               <ExportBar
                 title="Customers"
                 headers={['Code', 'Company', 'Contact', 'Mobile', 'Email', 'City', 'State', 'GST', 'Industry', 'Application']}

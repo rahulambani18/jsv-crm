@@ -135,7 +135,7 @@ export default function Shell({ children }) {
           <span className="iso-pill"><span className="dot" /> ISO 9001:2015 Certified</span>
           <div className="user-row">
             <span className="name">{user?.name || 'User'} {user?.role ? `(${user.role})` : ''}</span>
-            <span className="role">{user?.title || user?.role || ''}</span>
+            <span className="role">{user?.role || user?.title || 'Sales Executive'}</span>
           </div>
           <button className="signout-btn" onClick={signOut}>
             <IconLogout /> Sign out

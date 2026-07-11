@@ -10,7 +10,7 @@ import '../styles/components.css'
 import '../styles/users.css'
 
 function emptyUserForm() {
-  return { name: '', email: '', password: '', roleId: '' }
+  return { name: '', username: '', password: '', roleId: '' }
 }
 
 function emptyRoleForm() {
@@ -96,14 +96,18 @@ export default function UsersAndRoles() {
     setSavingUser(true)
     setUserError('')
     try {
-      await auth.signUp(userForm.email, userForm.password || Math.random().toString(36).slice(2, 10), userForm.name)
-      // Assign the chosen role explicitly (mock + real both support update)
-      const created = (await api.users.list()).find((u) => u.email === userForm.email)
-      if (created && userForm.roleId) {
-        await api.users.update(created.id, { roleId: userForm.roleId })
+      if (!userForm.password || userForm.password.length < 6) {
+        throw new Error('Password must be at least 6 characters.')
       }
+      await auth.inviteUser(
+        userForm.username,   // becomes username@jsv.internal internally
+        userForm.name,
+        userForm.roleId,
+        userForm.password
+      )
       setShowUserModal(false)
       setUserForm(emptyUserForm())
+      alert(`✅ User "${userForm.name}" created successfully!\n\nThey can now log in with:\nUsername: ${userForm.username}\nPassword: ${userForm.password}`)
       refresh()
     } catch (err) {
       setUserError(err.message || 'Could not create this user.')
@@ -364,15 +368,16 @@ export default function UsersAndRoles() {
           <form id="user-form" onSubmit={handleCreateUser}>
             <div className="field">
               <label>Full name</label>
-              <input required value={userForm.name} onChange={(e) => setUserForm({ ...userForm, name: e.target.value })} />
+              <input required value={userForm.name} onChange={(e) => setUserForm({ ...userForm, name: e.target.value })} placeholder="e.g. Priya Shah" />
             </div>
             <div className="field">
-              <label>Email</label>
-              <input type="email" required value={userForm.email} onChange={(e) => setUserForm({ ...userForm, email: e.target.value })} />
+              <label>Username</label>
+              <input required value={userForm.username} onChange={(e) => setUserForm({ ...userForm, username: e.target.value })} placeholder="e.g. priya.shah (used to log in)" />
+              <p style={{ fontSize: 11.5, color: 'var(--ink-400)', marginTop: 3 }}>No spaces. This is what they type at the login screen.</p>
             </div>
             <div className="field">
-              <label>Temporary password</label>
-              <input type="password" value={userForm.password} onChange={(e) => setUserForm({ ...userForm, password: e.target.value })} placeholder="Leave blank to auto-generate" />
+              <label>Password</label>
+              <input type="password" required minLength={6} value={userForm.password} onChange={(e) => setUserForm({ ...userForm, password: e.target.value })} placeholder="Minimum 6 characters" />
             </div>
             <div className="field">
               <label>Role</label>
@@ -381,7 +386,7 @@ export default function UsersAndRoles() {
                 {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
               </select>
             </div>
-            {userError && <p style={{ color: 'var(--red-600)', fontSize: 13 }}>{userError}</p>}
+            {userError && <p style={{ color: 'var(--red-600)', fontSize: 13, marginTop: 4 }}>{userError}</p>}
           </form>
         </Modal>
       )}

@@ -42,12 +42,20 @@ export default function Login() {
 
         <form onSubmit={handleSubmit}>
           <div className="field">
-            <label htmlFor="email">Email</label>
-            <input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" />
+            <label htmlFor="email">Username or Email</label>
+            <input
+              id="email"
+              type="text"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Enter your username or email"
+              autoComplete="username"
+            />
           </div>
           <div className="field">
             <label htmlFor="password">Password</label>
-            <input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
+            <input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password" />
           </div>
           {error && <p style={{ color: 'var(--red-600)', fontSize: 13, marginTop: -4, marginBottom: 14 }}>{error}</p>}
           <button className="btn btn-primary" type="submit" disabled={busy} style={{ width: '100%', justifyContent: 'center', padding: '10px 0' }}>
