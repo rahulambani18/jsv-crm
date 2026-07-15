@@ -63,6 +63,25 @@ export default function UsersAndRoles() {
     } catch {}
   }
 
+  async function handleDeleteUser(userId, userName) {
+    if (!window.confirm(`Delete user "${userName}"? This cannot be undone and they will lose access immediately.`)) return
+    try {
+      await api.users.remove(userId)
+      logAudit('User deleted', userName)
+      alert(`✅ User "${userName}" has been deleted.`)
+      refresh()
+    } catch (err) {
+      alert('Could not delete user: ' + (err.message || 'Unknown error'))
+    }
+  }
+
+  async function handleViewPassword(userId, userName) {
+    // In real Supabase, passwords are hashed and cannot be retrieved.
+    // We show the stored username so admin can share login credentials.
+    const user = users.find((u) => u.id === userId)
+    alert(`Login credentials for ${userName}:\n\nUsername: ${user?.username || user?.email?.replace('@jsv.internal','') || user?.email}\n\n⚠️ Passwords are encrypted and cannot be displayed for security reasons.\n\nTo reset: go to Supabase → Authentication → Users → select user → Send Recovery Email`)
+  }
+
   async function handleDeleteRole(roleId) {
     const role = roleById[roleId]
     if (!role) return
@@ -132,12 +151,14 @@ export default function UsersAndRoles() {
 
   async function togglePermission(roleId, moduleKey, field) {
     const role = roleById[roleId]
-    if (!role || role.isSystem && role.name === 'Admin') return // Admin always has full access
-    const current = role.permissions?.[moduleKey] || { view: false, edit: false }
+    if (!role || (role.isSystem && role.name === 'Admin')) return
+    const current = role.permissions?.[moduleKey] || { view: false, edit: false, delete: false }
     const nextValue = !current[field]
     const updatedPerm = { ...current, [field]: nextValue }
-    // Turning on "edit" implies "view"
-    if (field === 'edit' && nextValue) updatedPerm.view = true
+    // Turning on edit/delete implies view
+    if ((field === 'edit' || field === 'delete') && nextValue) updatedPerm.view = true
+    // Turning off view implies off for edit and delete too
+    if (field === 'view' && !nextValue) { updatedPerm.edit = false; updatedPerm.delete = false }
     const permissions = { ...role.permissions, [moduleKey]: updatedPerm }
     await api.roles.update(roleId, { permissions })
     refresh()
@@ -185,7 +206,7 @@ export default function UsersAndRoles() {
           <div className="table-wrap">
             <table className="data-table">
               <thead>
-                <tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last Active</th>{canEdit && <th>Actions</th>}</tr>
+                <tr><th>Name</th><th>Email / Username</th><th>Role</th><th>Status</th><th>Last Active</th>{canEdit && <th>Actions</th>}</tr>
               </thead>
               <tbody>
                 {users.length === 0 ? (
@@ -202,14 +223,15 @@ export default function UsersAndRoles() {
                         />
                       ) : u.name}
                     </td>
-                    <td className="cell-mono" style={{ fontSize: 12.5 }}>{u.email}</td>
+                    <td className="cell-mono" style={{ fontSize: 12 }}>
+                      {/* Show username (strip @jsv.internal) or real email */}
+                      {u.email?.endsWith('@jsv.internal')
+                        ? u.email.replace('@jsv.internal', '')
+                        : u.email}
+                    </td>
                     <td>
                       {canEdit ? (
-                        <select
-                          value={u.roleId || ''}
-                          onChange={(e) => handleUserRoleChange(u.id, e.target.value)}
-                          style={{ fontSize: 12.5, padding: '5px 8px' }}
-                        >
+                        <select value={u.roleId || ''} onChange={(e) => handleUserRoleChange(u.id, e.target.value)} style={{ fontSize: 12.5, padding: '5px 8px' }}>
                           {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                         </select>
                       ) : (
@@ -220,16 +242,24 @@ export default function UsersAndRoles() {
                     <td className="cell-mono">{u.lastActive || '—'}</td>
                     {canEdit && (
                       <td>
-                        <button
-                          className="btn btn-ghost btn-sm"
-                          style={{ fontSize: 11.5 }}
-                          onClick={() => {
-                            const newPass = window.prompt(`Set new password for ${u.name || u.email}:\n\n⚠️ Note: For security, password changes require the user to reset via Supabase's "Forgot password" flow on the login page. Share the login URL with them: ${window.location.origin}/login`)
-                            if (newPass) alert('Ask the user to use "Forgot password" on the login page to reset their password securely.')
-                          }}
-                        >
-                          Reset password
-                        </button>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            style={{ fontSize: 11.5 }}
+                            onClick={() => handleViewPassword(u.id, u.name)}
+                            title="View login credentials"
+                          >
+                            👁 Credentials
+                          </button>
+                          <button
+                            className="btn btn-ghost btn-sm btn-danger"
+                            style={{ fontSize: 11.5 }}
+                            onClick={() => handleDeleteUser(u.id, u.name)}
+                            title="Delete this user"
+                          >
+                            🗑 Delete
+                          </button>
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -285,31 +315,27 @@ export default function UsersAndRoles() {
                     </button>
                   </div>
                 )}
-                <div className="perm-grid">
+                <div className="perm-grid" style={{ gridTemplateColumns: '1fr 80px 80px 80px' }}>
                   <div className="perm-grid-header">
-                    <div>Module</div><div>View</div><div>Edit</div>
+                    <div>Module</div><div>View</div><div>Edit</div><div>Delete</div>
                   </div>
                   {MODULES.map((m) => {
-                    const perm = activeRole.permissions?.[m.key] || { view: false, edit: false }
+                    const perm = activeRole.permissions?.[m.key] || { view: false, edit: false, delete: false }
                     const locked = activeRole.name === 'Admin'
                     return (
                       <div className="perm-grid-row module-name" key={m.key}>
                         <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.label}</div>
                         <div>
-                          <input
-                            type="checkbox"
-                            checked={locked || perm.view}
-                            disabled={!canEdit || locked}
-                            onChange={() => togglePermission(activeRole.id, m.key, 'view')}
-                          />
+                          <input type="checkbox" checked={locked || !!perm.view} disabled={!canEdit || locked}
+                            onChange={() => togglePermission(activeRole.id, m.key, 'view')} />
                         </div>
                         <div>
-                          <input
-                            type="checkbox"
-                            checked={locked || perm.edit}
-                            disabled={!canEdit || locked}
-                            onChange={() => togglePermission(activeRole.id, m.key, 'edit')}
-                          />
+                          <input type="checkbox" checked={locked || !!perm.edit} disabled={!canEdit || locked}
+                            onChange={() => togglePermission(activeRole.id, m.key, 'edit')} />
+                        </div>
+                        <div>
+                          <input type="checkbox" checked={locked || !!perm.delete} disabled={!canEdit || locked}
+                            onChange={() => togglePermission(activeRole.id, m.key, 'delete')} />
                         </div>
                       </div>
                     )
