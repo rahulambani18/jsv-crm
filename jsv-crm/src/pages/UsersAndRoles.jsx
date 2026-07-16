@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, auth } from '../lib/api.js'
+import { supabase } from '../lib/supabaseClient.js'
 import { MODULES } from '../data/seed.js'
 import PageHeader from '../components/PageHeader.jsx'
 import Pill from '../components/Pill.jsx'
@@ -64,11 +65,12 @@ export default function UsersAndRoles() {
   }
 
   async function handleDeleteUser(userId, userName) {
-    if (!window.confirm(`Delete user "${userName}"? This cannot be undone and they will lose access immediately.`)) return
+    if (!window.confirm(`Delete user "${userName}"? This cannot be undone.`)) return
     try {
-      await api.users.remove(userId)
+      // Delete the profile row (auth user stays but loses access)
+      await supabase?.from('profiles').delete().eq('id', userId)
       logAudit('User deleted', userName)
-      alert(`✅ User "${userName}" has been deleted.`)
+      alert(`✅ User "${userName}" removed from the CRM.`)
       refresh()
     } catch (err) {
       alert('Could not delete user: ' + (err.message || 'Unknown error'))
@@ -76,10 +78,16 @@ export default function UsersAndRoles() {
   }
 
   async function handleViewPassword(userId, userName) {
-    // In real Supabase, passwords are hashed and cannot be retrieved.
-    // We show the stored username so admin can share login credentials.
-    const user = users.find((u) => u.id === userId)
-    alert(`Login credentials for ${userName}:\n\nUsername: ${user?.username || user?.email?.replace('@jsv.internal','') || user?.email}\n\n⚠️ Passwords are encrypted and cannot be displayed for security reasons.\n\nTo reset: go to Supabase → Authentication → Users → select user → Send Recovery Email`)
+    const u = users.find((u) => u.id === userId)
+    const displayUsername = u?.email?.endsWith('@jsv.internal')
+      ? u.email.replace('@jsv.internal', '')
+      : u?.email || '—'
+    alert(
+      `Login credentials for ${userName}:\n\n` +
+      `Username: ${displayUsername}\n\n` +
+      `⚠️ Passwords are encrypted and cannot be displayed.\n` +
+      `To reset their password: go to Supabase → Authentication → Users → select user → Send Recovery Email`
+    )
   }
 
   async function handleDeleteRole(roleId) {

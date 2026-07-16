@@ -6,6 +6,7 @@ import ExportBar from '../components/ExportBar.jsx'
 import Modal from '../components/Modal.jsx'
 import TallyImportButton from '../components/TallyImportButton.jsx'
 import { IconPlus, IconSearch } from '../components/Icons.jsx'
+import ComboField from '../components/ComboField.jsx'
 import { useAuth } from '../lib/AuthContext.jsx'
 import '../styles/components.css'
 
