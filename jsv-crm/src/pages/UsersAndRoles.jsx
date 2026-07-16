@@ -35,6 +35,11 @@ export default function UsersAndRoles() {
   const [roleForm, setRoleForm] = useState(emptyRoleForm())
   const [savingRole, setSavingRole] = useState(false)
 
+  const [resetTarget, setResetTarget] = useState(null) // { id, name }
+  const [resetPassword, setResetPassword] = useState('')
+  const [resettingPassword, setResettingPassword] = useState(false)
+  const [resetError, setResetError] = useState('')
+
   const [activeRoleId, setActiveRoleId] = useState(null)
 
   useEffect(() => { refresh() }, [])
@@ -86,8 +91,30 @@ export default function UsersAndRoles() {
       `Login credentials for ${userName}:\n\n` +
       `Username: ${displayUsername}\n\n` +
       `⚠️ Passwords are encrypted and cannot be displayed.\n` +
-      `To reset their password: go to Supabase → Authentication → Users → select user → Send Recovery Email`
+      `Use the "Reset Password" button to set a new one for them.`
     )
+  }
+
+  async function handleResetPassword(e) {
+    e.preventDefault()
+    if (!resetTarget) return
+    setResetError('')
+    if (!resetPassword || resetPassword.length < 6) {
+      setResetError('Password must be at least 6 characters.')
+      return
+    }
+    setResettingPassword(true)
+    try {
+      await auth.adminResetPassword(resetTarget.id, resetPassword)
+      logAudit('Password reset', resetTarget.name)
+      alert(`✅ Password updated for "${resetTarget.name}".\n\nNew password: ${resetPassword}\n\nShare this with them securely.`)
+      setResetTarget(null)
+      setResetPassword('')
+    } catch (err) {
+      setResetError(err.message || 'Could not reset password.')
+    } finally {
+      setResettingPassword(false)
+    }
   }
 
   async function handleDeleteRole(roleId) {
@@ -260,6 +287,14 @@ export default function UsersAndRoles() {
                             👁 Credentials
                           </button>
                           <button
+                            className="btn btn-ghost btn-sm"
+                            style={{ fontSize: 11.5 }}
+                            onClick={() => { setResetTarget({ id: u.id, name: u.name }); setResetPassword(''); setResetError('') }}
+                            title="Set a new password for this user"
+                          >
+                            🔑 Reset Password
+                          </button>
+                          <button
                             className="btn btn-ghost btn-sm btn-danger"
                             style={{ fontSize: 11.5 }}
                             onClick={() => handleDeleteUser(u.id, u.name)}
@@ -421,6 +456,40 @@ export default function UsersAndRoles() {
               </select>
             </div>
             {userError && <p style={{ color: 'var(--red-600)', fontSize: 13, marginTop: 4 }}>{userError}</p>}
+          </form>
+        </Modal>
+      )}
+
+      {resetTarget && (
+        <Modal
+          title={`Reset Password — ${resetTarget.name}`}
+          onClose={() => setResetTarget(null)}
+          footer={
+            <>
+              <button className="btn btn-secondary" onClick={() => setResetTarget(null)}>Cancel</button>
+              <button className="btn btn-primary" form="reset-password-form" type="submit" disabled={resettingPassword}>
+                {resettingPassword ? 'Saving…' : 'Set new password'}
+              </button>
+            </>
+          }
+        >
+          <form id="reset-password-form" onSubmit={handleResetPassword}>
+            <div className="field">
+              <label>New password</label>
+              <input
+                type="password"
+                required
+                minLength={6}
+                autoFocus
+                value={resetPassword}
+                onChange={(e) => setResetPassword(e.target.value)}
+                placeholder="Minimum 6 characters"
+              />
+              <p style={{ fontSize: 11.5, color: 'var(--ink-400)', marginTop: 3 }}>
+                They'll need this new password the next time they log in. Share it with them securely.
+              </p>
+            </div>
+            {resetError && <p style={{ color: 'var(--red-600)', fontSize: 13, marginTop: 4 }}>{resetError}</p>}
           </form>
         </Modal>
       )}

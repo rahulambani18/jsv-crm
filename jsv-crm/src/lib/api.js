@@ -285,6 +285,26 @@ export const auth = isMock
         await supabase.auth.signOut()
         return true
       },
+
+      // Resets another user's password. Runs through the admin-reset-password
+      // Edge Function, which checks the caller's permission server-side and
+      // uses the service_role key — neither of which ever touches the browser.
+      async adminResetPassword(userId, newPassword) {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) throw new Error('Your session has expired. Please log in again.')
+
+        const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-reset-password`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ userId, newPassword }),
+        })
+        const body = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(body.error || 'Could not reset password.')
+        return true
+      },
     }
 
 export { isMock }

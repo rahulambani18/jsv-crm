@@ -90,6 +90,7 @@ create table if not exists products (
   origin text,
   moq text,
   docs text,
+  doc_url text,                    -- link to COA/MSDS/TDS document
   unit_price numeric default 0,    -- used to prefill order line items
   status text default 'Active',    -- Active | Inactive
   created_at timestamptz default now()
