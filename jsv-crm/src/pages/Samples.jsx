@@ -11,6 +11,7 @@ import { useAuth } from '../lib/AuthContext.jsx'
 import '../styles/components.css'
 
 const STATUSES = ['All statuses', 'Preparing', 'In Transit', 'Delivered']
+const STATUS_TONE = { Preparing: 'gray', 'In Transit': 'amber', Delivered: 'teal' }
 
 function emptyForm() {
   return { company: '', contact: '', phone: '', email: '', products: [], qty: '', sent: '', courier: '', tracking: '', status: 'Preparing' }
@@ -54,6 +55,16 @@ export default function Samples() {
     setShowModal(false)
     setForm(emptyForm())
     refresh()
+  }
+
+  async function handleStatusChange(sampleId, newStatus) {
+    setSamples((prev) => prev.map((s) => (s.id === sampleId ? { ...s, status: newStatus } : s)))
+    try {
+      await api.samples.update(sampleId, { status: newStatus })
+    } catch (err) {
+      alert('Could not update status: ' + (err.message || 'Unknown error'))
+      refresh()
+    }
   }
 
   return (
@@ -108,7 +119,23 @@ export default function Samples() {
                 <td className="cell-mono">{s.sent}</td>
                 <td>{s.courier}</td>
                 <td className="cell-mono" style={{ fontSize: 11.5 }}>{s.tracking}</td>
-                <td><Pill>{s.status}</Pill></td>
+                <td>
+                  {canEdit ? (
+                    <select
+                      value={s.status}
+                      onChange={(e) => handleStatusChange(s.id, e.target.value)}
+                      className={`pill pill-${STATUS_TONE[s.status] || 'gray'}`}
+                      style={{ border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', paddingRight: 22 }}
+                      title="Change status"
+                    >
+                      <option>Preparing</option>
+                      <option>In Transit</option>
+                      <option>Delivered</option>
+                    </select>
+                  ) : (
+                    <Pill>{s.status}</Pill>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>

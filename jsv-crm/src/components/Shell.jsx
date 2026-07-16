@@ -58,6 +58,16 @@ export default function Shell({ children }) {
   }, [dark])
   const title = PAGE_TITLES[location.pathname] || 'JSV CRM'
 
+  // Live clock + time-of-day greeting for the top bar
+  const [now, setNow] = useState(new Date())
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(t)
+  }, [])
+  const hour = now.getHours()
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+  const firstName = (user?.name || '').split(' ')[0]
+
   const visibleNav = NAV.filter((item) => can(item.key, 'view'))
   const visibleAdminNav = ADMIN_NAV.filter((item) => can(item.key, 'view'))
 
@@ -149,7 +159,16 @@ export default function Shell({ children }) {
             <button className="topbar-toggle" onClick={() => setNavOpen((v) => !v)} aria-label="Toggle navigation">
               <IconPanel width={16} height={16} />
             </button>
-            JSV CRM
+            <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.25 }}>
+              <span style={{ fontWeight: 700, fontSize: 14.5 }}>
+                {greeting}{firstName ? `, ${firstName}` : ''} 👋
+              </span>
+              <span style={{ fontSize: 11.5, color: 'var(--ink-400)', fontFamily: 'var(--font-mono)' }}>
+                {now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
+                {'  ·  '}
+                {now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </span>
+            </div>
           </div>
           <div className="topbar-right" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {/* Dark mode toggle */}
