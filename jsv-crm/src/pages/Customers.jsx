@@ -13,7 +13,7 @@ import '../styles/components.css'
 function emptyForm() {
   return {
     company: '', contact: '', mobile: '', email: '', gst: '',
-    industry: '', application: '',
+    businessType: '', industry: '', application: '',
     city: '', state: '', billingAddress: '', shippingAddress: '',
   }
 }
@@ -118,14 +118,14 @@ export default function Customers() {
           <thead>
             <tr>
               <th>Code</th><th>Company</th><th>Contact</th><th>City</th><th>GST</th>
-              <th>Industry</th><th>Application</th><th>Added</th>{canDelete && <th>Actions</th>}
+              <th>Type</th><th>Industry</th><th>Application</th><th>Added</th>{canDelete && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={canDelete ? 9 : 8}>Loading customers…</td></tr>
+              <tr className="empty-row"><td colSpan={canDelete ? 10 : 9}>Loading customers…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={canDelete ? 9 : 8}>{customers.length === 0 ? 'No customers yet.' : 'No customers match your search.'}</td></tr>
+              <tr className="empty-row"><td colSpan={canDelete ? 10 : 9}>{customers.length === 0 ? 'No customers yet.' : 'No customers match your search.'}</td></tr>
             ) : filtered.map((c) => (
               <tr key={c.id}>
                 <td className="cell-mono">{c.code}</td>
@@ -133,6 +133,7 @@ export default function Customers() {
                 <td>{c.contact}<br /><span className="cell-mono cell-muted" style={{ fontSize: 11.5 }}>{c.mobile}</span></td>
                 <td>{c.city}</td>
                 <td className="cell-mono" style={{ fontSize: 11.5 }}>{c.gst}</td>
+                <td>{c.businessType ? <span className="pill pill-navy">{c.businessType}</span> : <span className="cell-muted">—</span>}</td>
                 <td>{c.industry}</td>
                 <td>{c.application}</td>
                 <td className="cell-mono">{c.added}</td>
@@ -187,13 +188,22 @@ export default function Customers() {
             </div>
             <div className="field-row">
               <div className="field">
+                <label>Business type</label>
+                <select value={form.businessType} onChange={(e) => setForm({ ...form, businessType: e.target.value })}>
+                  <option value="">Select type…</option>
+                  <option value="Trader">Trader</option>
+                  <option value="Manufacturer">Manufacturer</option>
+                  <option value="Both">Both</option>
+                </select>
+              </div>
+              <div className="field">
                 <label>Industry</label>
                 <ComboField options={INDUSTRY_OPTIONS} value={form.industry} onChange={(v) => setForm({ ...form, industry: v })} placeholder="Select industry…" />
               </div>
-              <div className="field">
-                <label>Application</label>
-                <input value={form.application} onChange={(e) => setForm({ ...form, application: e.target.value })} placeholder="e.g. Flavoured Milk" />
-              </div>
+            </div>
+            <div className="field">
+              <label>Application</label>
+              <input value={form.application} onChange={(e) => setForm({ ...form, application: e.target.value })} placeholder="e.g. Flavoured Milk" />
             </div>
             <div className="field-row">
               <div className="field">

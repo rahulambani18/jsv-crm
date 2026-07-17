@@ -106,8 +106,8 @@ export default function Shell({ children }) {
   useEffect(() => {
     Promise.all([
       api.orders.list(), api.followUps.list(), api.meetings.list(),
-      api.tasks.list(), api.quotations.list(), api.samples.list(),
-    ]).then(([orders, followUps, meetings, tasks, quotations, samples]) => {
+      api.tasks.list(), api.quotations.list(), api.samples.list(), api.invoices.list(),
+    ]).then(([orders, followUps, meetings, tasks, quotations, samples, invoices]) => {
       const today = new Date().toISOString().slice(0, 10)
       const daysBetween = (a, b) => Math.round((new Date(b) - new Date(a)) / 86400000)
       const notifs = []
@@ -137,12 +137,33 @@ export default function Shell({ children }) {
         notifs.push({ id: `tk-${t.id}`, group: 'Pending Tasks', text: t.title, sub: `${t.dueDate < today ? 'Overdue since' : 'Due'} ${t.dueDate}${t.assignedTo ? ' · ' + t.assignedTo : ''}`, color: t.dueDate < today ? 'var(--red-600)' : 'var(--amber-600)' })
       })
 
-      // 4) Pending payments
+      // 4) Pending payments (order-level, general signal)
       orders.filter((o) => o.payment === 'Pending' || o.payment === 'Partial').forEach((o) => {
         notifs.push({ id: `pay-${o.id}`, group: 'Pending Payments', text: `Payment pending: ${o.company}`, sub: `${o.orderNo} · ₹${Number(o.total).toLocaleString('en-IN')}`, color: 'var(--amber-600)' })
-        // Reminder: flag it again more urgently once it's been sitting a while
-        if (o.orderDate && daysBetween(o.orderDate, today) >= 15) {
-          notifs.push({ id: `pay-rem-${o.id}`, group: 'Reminder: Payment Due', text: `${o.company} — ${daysBetween(o.orderDate, today)} days unpaid`, sub: `${o.orderNo} · ₹${Number(o.total).toLocaleString('en-IN')}`, color: 'var(--red-600)' })
+      })
+
+      // Reminder: Payment Due — fires the moment an order is saved
+      // (based on its Payment Terms, e.g. Net 30), no need to wait
+      // for an invoice to be generated. Amber a few days before,
+      // red once the due date has actually passed.
+      orders.filter((o) => o.paymentDueDate && (o.payment === 'Pending' || o.payment === 'Partial')).forEach((o) => {
+        const d = daysBetween(o.paymentDueDate, today)
+        if (d >= 0) {
+          notifs.push({ id: `ord-overdue-${o.id}`, group: 'Reminder: Payment Due', text: `${o.company} — ${o.orderNo}`, sub: `${d === 0 ? 'Due today' : `Overdue by ${d} day${d === 1 ? '' : 's'}`} · ₹${Number(o.total).toLocaleString('en-IN')}${o.paymentTerms ? ' · ' + o.paymentTerms : ''}`, color: 'var(--red-600)' })
+        } else if (d >= -3) {
+          notifs.push({ id: `ord-soon-${o.id}`, group: 'Reminder: Payment Due', text: `${o.company} — ${o.orderNo}`, sub: `Due in ${-d} day${-d === 1 ? '' : 's'} · ₹${Number(o.total).toLocaleString('en-IN')}${o.paymentTerms ? ' · ' + o.paymentTerms : ''}`, color: 'var(--amber-600)' })
+        }
+      })
+
+      // Same reminder, but for invoices that don't trace back to an
+      // order with its own due date already covered above (e.g.
+      // manually-created invoices).
+      invoices.filter((i) => i.dueDate && !i.orderId && !['Paid', 'Cancelled'].includes(i.status)).forEach((i) => {
+        const d = daysBetween(i.dueDate, today)
+        if (d >= 0) {
+          notifs.push({ id: `inv-overdue-${i.id}`, group: 'Reminder: Payment Due', text: `${i.company} — ${i.invoiceNo}`, sub: `${d === 0 ? 'Due today' : `Overdue by ${d} day${d === 1 ? '' : 's'}`} · ₹${Number(i.total).toLocaleString('en-IN')}${i.paymentTerms ? ' · ' + i.paymentTerms : ''}`, color: 'var(--red-600)' })
+        } else if (d >= -3) {
+          notifs.push({ id: `inv-soon-${i.id}`, group: 'Reminder: Payment Due', text: `${i.company} — ${i.invoiceNo}`, sub: `Due in ${-d} day${-d === 1 ? '' : 's'} · ₹${Number(i.total).toLocaleString('en-IN')}${i.paymentTerms ? ' · ' + i.paymentTerms : ''}`, color: 'var(--amber-600)' })
         }
       })
 

@@ -11,6 +11,17 @@ import '../styles/components.css'
 
 const WAREHOUSE_FILTERS = ['All warehouses', ...WAREHOUSES]
 const STATUSES = ['All statuses', 'Processing', 'Dispatched', 'Delivered', 'Cancelled']
+const PAYMENT_TERMS = ['Net 15', 'Net 30', 'Net 45', 'Net 60', 'Custom']
+
+function termsToDays(terms) {
+  const match = /Net (\d+)/.exec(terms || '')
+  return match ? Number(match[1]) : null
+}
+
+function addDays(dateStr, days) {
+  if (!dateStr || days == null) return ''
+  return new Date(new Date(dateStr).getTime() + days * 86400000).toISOString().slice(0, 10)
+}
 
 function emptyLineItem() {
   return { product: '', qty: 1, unit: 'kg', unitPrice: 0 }
@@ -19,6 +30,7 @@ function emptyLineItem() {
 function emptyForm() {
   return {
     customerId: '', company: '', warehouse: WAREHOUSES[0], orderDate: '', delivery: '',
+    paymentTerms: 'Net 30', paymentDueDate: '',
     lineItems: [emptyLineItem()], status: 'Processing', payment: 'Pending',
   }
 }
@@ -96,6 +108,7 @@ export default function Orders() {
       orderDate: form.orderDate, delivery: form.delivery, lineItems,
       subtotal, gstRate: GST_RATE, gstAmount, total,
       status: form.status, payment: form.payment,
+      paymentTerms: form.paymentTerms, paymentDueDate: form.paymentDueDate,
       orderNo: `ORD-2026-${String(300 + orders.length + 1).padStart(4, '0')}`,
     }
     await api.orders.insert(record)
@@ -200,11 +213,37 @@ export default function Orders() {
             <div className="field-row">
               <div className="field">
                 <label>Order date</label>
-                <input type="date" value={form.orderDate} onChange={(e) => setForm({ ...form, orderDate: e.target.value })} />
+                <input
+                  type="date" value={form.orderDate}
+                  onChange={(e) => {
+                    const orderDate = e.target.value
+                    const days = termsToDays(form.paymentTerms)
+                    setForm((f) => ({ ...f, orderDate, paymentDueDate: days != null ? addDays(orderDate, days) : f.paymentDueDate }))
+                  }}
+                />
               </div>
               <div className="field">
                 <label>Delivery date</label>
                 <input type="date" value={form.delivery} onChange={(e) => setForm({ ...form, delivery: e.target.value })} />
+              </div>
+            </div>
+            <div className="field-row">
+              <div className="field">
+                <label>Payment terms</label>
+                <select
+                  value={form.paymentTerms}
+                  onChange={(e) => {
+                    const paymentTerms = e.target.value
+                    const days = termsToDays(paymentTerms)
+                    setForm((f) => ({ ...f, paymentTerms, paymentDueDate: days != null ? addDays(f.orderDate, days) : f.paymentDueDate }))
+                  }}
+                >
+                  {PAYMENT_TERMS.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div className="field">
+                <label>Payment due date {form.paymentTerms !== 'Custom' && <span style={{ fontWeight: 400, color: 'var(--ink-400)', fontSize: 11 }}>(auto)</span>}</label>
+                <input type="date" value={form.paymentDueDate} onChange={(e) => setForm({ ...form, paymentDueDate: e.target.value })} />
               </div>
             </div>
 
