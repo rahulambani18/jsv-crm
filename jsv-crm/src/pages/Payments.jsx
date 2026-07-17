@@ -6,7 +6,7 @@ import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
 import ExportBar from '../components/ExportBar.jsx'
 import TallyImportButton from '../components/TallyImportButton.jsx'
-import { IconPlus, IconSearch } from '../components/Icons.jsx'
+import { IconPlus, IconSearch, IconTrash } from '../components/Icons.jsx'
 import '../styles/components.css'
 
 const PAYMENT_MODES = ['NEFT', 'RTGS', 'Cheque', 'Cash', 'UPI', 'Bank Transfer']
@@ -83,6 +83,16 @@ export default function Payments() {
     return matchSearch && matchMode
   }), [payments, search, modeFilter])
 
+  async function handleDelete(payment) {
+    if (!confirm(`Delete payment "${payment.paymentNo}"? This cannot be undone.`)) return
+    try {
+      await api.payments.remove(payment.id)
+      refresh()
+    } catch (err) {
+      alert('Could not delete: ' + (err.message || 'Unknown error'))
+    }
+  }
+
   const totalReceived = payments.filter((p) => p.status === 'Completed').reduce((s, p) => s + Number(p.amount || 0), 0)
 
   return (
@@ -128,13 +138,13 @@ export default function Payments() {
       <div className="table-wrap">
         <table className="data-table">
           <thead>
-            <tr><th>Payment #</th><th>Company</th><th>Amount</th><th>Date</th><th>Mode</th><th>Reference</th><th>Linked Invoice</th><th>Status</th></tr>
+            <tr><th>Payment #</th><th>Company</th><th>Amount</th><th>Date</th><th>Mode</th><th>Reference</th><th>Linked Invoice</th><th>Status</th>{canEdit && <th>Actions</th>}</tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={8}>Loading payments…</td></tr>
+              <tr className="empty-row"><td colSpan={canEdit ? 9 : 8}>Loading payments…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={8}>No payments recorded yet.</td></tr>
+              <tr className="empty-row"><td colSpan={canEdit ? 9 : 8}>No payments recorded yet.</td></tr>
             ) : filtered.map((p) => {
               const inv = invoices.find((i) => i.id === p.invoiceId)
               return (
@@ -147,6 +157,11 @@ export default function Payments() {
                   <td className="cell-mono" style={{ fontSize: 12 }}>{p.reference || '—'}</td>
                   <td className="cell-mono" style={{ fontSize: 12 }}>{inv ? inv.invoiceNo : '—'}</td>
                   <td><Pill>{p.status}</Pill></td>
+                  {canEdit && (
+                    <td>
+                      <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(p)}><IconTrash width={13} height={13} /></button>
+                    </td>
+                  )}
                 </tr>
               )
             })}

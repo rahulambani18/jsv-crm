@@ -6,7 +6,7 @@ import ExportBar from '../components/ExportBar.jsx'
 import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
 import MultiComboField from '../components/MultiComboField.jsx'
-import { IconPlus, IconSearch } from '../components/Icons.jsx'
+import { IconPlus, IconSearch, IconTrash } from '../components/Icons.jsx'
 import { useAuth } from '../lib/AuthContext.jsx'
 import '../styles/components.css'
 
@@ -67,6 +67,16 @@ export default function Samples() {
     }
   }
 
+  async function handleDelete(sample) {
+    if (!confirm(`Delete sample "${sample.code}" for ${sample.company}? This cannot be undone.`)) return
+    try {
+      await api.samples.remove(sample.id)
+      refresh()
+    } catch (err) {
+      alert('Could not delete: ' + (err.message || 'Unknown error'))
+    }
+  }
+
   return (
     <div>
       <PageHeader
@@ -102,13 +112,13 @@ export default function Samples() {
       <div className="table-wrap">
         <table className="data-table">
           <thead>
-            <tr><th>Code</th><th>Company</th><th>Contact</th><th>Products</th><th>Qty</th><th>Sent</th><th>Courier</th><th>Tracking</th><th>Status</th></tr>
+            <tr><th>Code</th><th>Company</th><th>Contact</th><th>Products</th><th>Qty</th><th>Sent</th><th>Courier</th><th>Tracking</th><th>Status</th>{canEdit && <th>Actions</th>}</tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={9}>Loading samples…</td></tr>
+              <tr className="empty-row"><td colSpan={canEdit ? 10 : 9}>Loading samples…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={9}>{samples.length === 0 ? 'No samples yet.' : 'No samples match your filters.'}</td></tr>
+              <tr className="empty-row"><td colSpan={canEdit ? 10 : 9}>{samples.length === 0 ? 'No samples yet.' : 'No samples match your filters.'}</td></tr>
             ) : filtered.map((s) => (
               <tr key={s.id}>
                 <td className="cell-mono">{s.code}</td>
@@ -136,6 +146,11 @@ export default function Samples() {
                     <Pill>{s.status}</Pill>
                   )}
                 </td>
+                {canEdit && (
+                  <td>
+                    <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(s)}><IconTrash width={13} height={13} /></button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

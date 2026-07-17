@@ -6,7 +6,7 @@ import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
 import ExportBar from '../components/ExportBar.jsx'
 import TallyImportButton from '../components/TallyImportButton.jsx'
-import { IconPlus, IconSearch, IconEdit } from '../components/Icons.jsx'
+import { IconPlus, IconSearch, IconEdit, IconTrash } from '../components/Icons.jsx'
 import '../styles/components.css'
 
 const GST_RATE = 18
@@ -342,6 +342,16 @@ export default function Invoices() {
     setShowModal(true)
   }
 
+  async function handleDelete(inv) {
+    if (!confirm(`Delete invoice "${inv.invoiceNo}"? This cannot be undone.`)) return
+    try {
+      await api.invoices.remove(inv.id)
+      refresh()
+    } catch (err) {
+      alert('Could not delete: ' + (err.message || 'Unknown error'))
+    }
+  }
+
   function recalcGST(subtotal) {
     const sub = Number(subtotal) || 0
     const gst = Math.round(sub * GST_RATE / 100)
@@ -460,6 +470,7 @@ export default function Invoices() {
                 <td style={{ display: 'flex', gap: 4 }}>
                   {canEdit && <button className="btn btn-ghost btn-sm" onClick={() => openEdit(inv)}><IconEdit width={13} height={13} /></button>}
                   <button className="btn btn-ghost btn-sm" onClick={() => printInvoice(inv, orders.find((o) => o.id === inv.orderId))}>🖨 Print</button>
+                  {canEdit && <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(inv)}><IconTrash width={13} height={13} /></button>}
                 </td>
               </tr>
             ))}

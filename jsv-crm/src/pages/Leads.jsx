@@ -7,7 +7,7 @@ import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
 import ComboField from '../components/ComboField.jsx'
 import MultiComboField from '../components/MultiComboField.jsx'
-import { IconPlus, IconSearch } from '../components/Icons.jsx'
+import { IconPlus, IconSearch, IconTrash } from '../components/Icons.jsx'
 import { useAuth } from '../lib/AuthContext.jsx'
 import '../styles/components.css'
 
@@ -59,6 +59,16 @@ export default function Leads() {
     refresh()
   }
 
+  async function handleDelete(lead) {
+    if (!confirm(`Delete lead "${lead.company}"? This cannot be undone.`)) return
+    try {
+      await api.leads.remove(lead.id)
+      refresh()
+    } catch (err) {
+      alert('Could not delete: ' + (err.message || 'Unknown error'))
+    }
+  }
+
   return (
     <div>
       <PageHeader
@@ -96,14 +106,14 @@ export default function Leads() {
           <thead>
             <tr>
               <th>Lead</th><th>Company</th><th>Contact</th><th>City</th>
-              <th>Priority</th><th>Status</th><th>Est. Value</th><th>Next Follow-up</th>
+              <th>Priority</th><th>Status</th><th>Est. Value</th><th>Next Follow-up</th>{canEdit && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={8}>Loading leads…</td></tr>
+              <tr className="empty-row"><td colSpan={canEdit ? 9 : 8}>Loading leads…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={8}>{leads.length === 0 ? 'No leads found.' : 'No leads match your filters.'}</td></tr>
+              <tr className="empty-row"><td colSpan={canEdit ? 9 : 8}>{leads.length === 0 ? 'No leads found.' : 'No leads match your filters.'}</td></tr>
             ) : filtered.map((l) => (
               <tr key={l.id}>
                 <td className="cell-mono cell-muted">{l.id.toUpperCase()}</td>
@@ -114,6 +124,11 @@ export default function Leads() {
                 <td><Pill>{l.status}</Pill></td>
                 <td className="cell-mono">₹{Number(l.estValue).toLocaleString('en-IN')}</td>
                 <td className="cell-mono">{l.nextFollowUp}</td>
+                {canEdit && (
+                  <td>
+                    <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(l)}><IconTrash width={13} height={13} /></button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

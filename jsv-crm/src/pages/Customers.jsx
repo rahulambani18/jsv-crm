@@ -5,7 +5,7 @@ import PageHeader from '../components/PageHeader.jsx'
 import ExportBar from '../components/ExportBar.jsx'
 import Modal from '../components/Modal.jsx'
 import TallyImportButton from '../components/TallyImportButton.jsx'
-import { IconPlus, IconSearch } from '../components/Icons.jsx'
+import { IconPlus, IconSearch, IconTrash } from '../components/Icons.jsx'
 import ComboField from '../components/ComboField.jsx'
 import { useAuth } from '../lib/AuthContext.jsx'
 import '../styles/components.css'
@@ -72,6 +72,16 @@ export default function Customers() {
     refresh()
   }
 
+  async function handleDelete(customer) {
+    if (!confirm(`Delete "${customer.company}"? This cannot be undone.`)) return
+    try {
+      await api.customers.remove(customer.id)
+      refresh()
+    } catch (err) {
+      alert('Could not delete: ' + (err.message || 'Unknown error'))
+    }
+  }
+
   return (
     <div>
       <PageHeader
@@ -107,14 +117,14 @@ export default function Customers() {
           <thead>
             <tr>
               <th>Code</th><th>Company</th><th>Contact</th><th>City</th><th>GST</th>
-              <th>Industry</th><th>Application</th><th>Added</th>
+              <th>Industry</th><th>Application</th><th>Added</th>{canEdit && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={8}>Loading customers…</td></tr>
+              <tr className="empty-row"><td colSpan={canEdit ? 9 : 8}>Loading customers…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={8}>{customers.length === 0 ? 'No customers yet.' : 'No customers match your search.'}</td></tr>
+              <tr className="empty-row"><td colSpan={canEdit ? 9 : 8}>{customers.length === 0 ? 'No customers yet.' : 'No customers match your search.'}</td></tr>
             ) : filtered.map((c) => (
               <tr key={c.id}>
                 <td className="cell-mono">{c.code}</td>
@@ -125,6 +135,11 @@ export default function Customers() {
                 <td>{c.industry}</td>
                 <td>{c.application}</td>
                 <td className="cell-mono">{c.added}</td>
+                {canEdit && (
+                  <td>
+                    <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(c)}><IconTrash width={13} height={13} /></button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
