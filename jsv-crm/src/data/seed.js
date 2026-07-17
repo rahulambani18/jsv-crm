@@ -222,8 +222,3 @@ export const seedInvoices = [
 export const seedPayments = [
   { id: 'pay1', paymentNo: 'PAY-2026-0021', invoiceId: 'inv1', company: 'Patel Agro Industries', amount: 186501, date: '2026-06-18', mode: 'NEFT', reference: 'NEFT2026061800123', notes: 'Full payment received', status: 'Completed' },
 ]
-
-export const seedExpenses = [
-  { id: 'exp1', expenseNo: 'EXP-2026-0011', category: 'Freight', description: 'Courier charges - Blue Dart June batch', amount: 8500, date: '2026-06-15', paidBy: 'Rahul', paymentMode: 'UPI', receipt: '', status: 'Approved' },
-  { id: 'exp2', expenseNo: 'EXP-2026-0012', category: 'Office', description: 'Stationery and printing', amount: 2200, date: '2026-06-20', paidBy: 'Rahul', paymentMode: 'Cash', receipt: '', status: 'Approved' },
-]

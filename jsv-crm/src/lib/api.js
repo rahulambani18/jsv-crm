@@ -5,7 +5,7 @@
 import { supabase, isMock, db as mock } from './supabaseClient.js'
 import { mockAuth } from './mockDb.js'
 
-const TABLES = ['products', 'leads', 'customers', 'samples', 'quotations', 'orders', 'followUps', 'roles', 'users', 'tasks', 'meetings', 'documents', 'invoices', 'payments', 'expenses']
+const TABLES = ['products', 'leads', 'customers', 'samples', 'quotations', 'orders', 'followUps', 'roles', 'users', 'tasks', 'meetings', 'documents', 'invoices', 'payments']
 const SQL_TABLE_NAME = {
   products: 'products',
   leads: 'leads',
@@ -21,7 +21,6 @@ const SQL_TABLE_NAME = {
   documents: 'documents',
   invoices: 'invoices',
   payments: 'payments',
-  expenses: 'expenses',
 }
 
 // Pages write/read plain camelCase fields (estValue, nextFollowUp,
@@ -147,6 +146,25 @@ if (!isMock) {
   api.users = realUsersTable
 }
 
+// File attachments — uploads to a public Supabase Storage bucket named
+// "attachments" (create it once in Supabase Dashboard → Storage) and
+// returns a public URL to save alongside the record (e.g. Documents.url).
+// In demo/mock mode there's no real storage, so we just fabricate a
+// local object URL so the UI still works for preview purposes.
+export const storage = {
+  async uploadFile(file, folder = 'documents') {
+    if (isMock) {
+      return { url: URL.createObjectURL(file), path: file.name, name: file.name, size: file.size }
+    }
+    const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')
+    const path = `${folder}/${Date.now()}-${safeName}`
+    const { error } = await supabase.storage.from('attachments').upload(path, file, { upsert: false })
+    if (error) throw new Error(error.message || 'Upload failed.')
+    const { data } = supabase.storage.from('attachments').getPublicUrl(path)
+    return { url: data.publicUrl, path, name: file.name, size: file.size }
+  },
+}
+
 // Shape both mock and real auth identically: { id, email, name, title,
 // role, permissions } — pages and AuthContext never need to branch on
 // which backend is active.
@@ -206,7 +224,7 @@ async function buildUserObject(authUser, profile) {
   }
 
   // Admin always gets full access regardless of permission rows
-  const ALL_MODULES = ['dashboard','leads','follow_ups','customers','samples','quotations','orders','products','reports','users','tasks','meetings','documents','invoices','payments','expenses']
+  const ALL_MODULES = ['dashboard','leads','follow_ups','customers','samples','quotations','orders','products','reports','users','tasks','meetings','documents','invoices','payments']
   if (roleName === 'Admin') {
     ALL_MODULES.forEach((m) => { permissions[m] = { view: true, edit: true } })
   }

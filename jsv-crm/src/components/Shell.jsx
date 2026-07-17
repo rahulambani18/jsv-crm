@@ -4,7 +4,7 @@ import { useAuth } from '../lib/AuthContext.jsx'
 import {
   IconGrid, IconUsers, IconClock, IconUserCheck, IconFlask,
   IconFile, IconCart, IconBox, IconChart, IconLogout, IconPanel, IconShield,
-  IconCheckSquare, IconCalendar, IconFolder, IconReceipt, IconCreditCard, IconDollarSign,
+  IconCheckSquare, IconCalendar, IconFolder, IconReceipt, IconCreditCard,
 } from './Icons.jsx'
 import { api } from '../lib/api.js'
 import jsvMark from '../assets/jsv-mark.png'
@@ -25,7 +25,6 @@ const NAV = [
   { to: '/documents', label: 'Documents', icon: IconFolder, key: 'documents' },
   { to: '/invoices', label: 'Invoices', icon: IconReceipt, key: 'invoices' },
   { to: '/payments', label: 'Payments', icon: IconCreditCard, key: 'payments' },
-  { to: '/expenses', label: 'Expenses', icon: IconDollarSign, key: 'expenses' },
 ]
 
 const ADMIN_NAV = [
@@ -71,20 +70,101 @@ export default function Shell({ children }) {
   const visibleNav = NAV.filter((item) => can(item.key, 'view'))
   const visibleAdminNav = ADMIN_NAV.filter((item) => can(item.key, 'view'))
 
-  // Notifications: pending payments + overdue follow-ups
+  // Notification Center + Reminder Engine — recalculated live on every
+  // navigation from current data (no server-side cron in this app, so
+  // this is a real-time "what needs attention right now" feed rather
+  // than a background push notification).
   const [notifications, setNotifications] = useState([])
   const [showNotifs, setShowNotifs] = useState(false)
   const notifRef = useRef(null)
 
+  const NOTIF_GROUPS = [
+    "Today's Follow-ups",
+    'Meetings Today',
+    'Pending Tasks',
+    'Pending Payments',
+    'Overdue Quotations',
+    'Overdue Follow-ups',
+    'Reminder: Sample Follow-up',
+    'Reminder: Payment Due',
+    'Reminder: Quote Expiry',
+    'Reminder: Upcoming Meeting',
+  ]
+  const GROUP_ICON = {
+    "Today's Follow-ups": '📞',
+    'Meetings Today': '📅',
+    'Pending Tasks': '✅',
+    'Pending Payments': '💰',
+    'Overdue Quotations': '📄',
+    'Overdue Follow-ups': '⏰',
+    'Reminder: Sample Follow-up': '🧪',
+    'Reminder: Payment Due': '💸',
+    'Reminder: Quote Expiry': '⏳',
+    'Reminder: Upcoming Meeting': '🗓️',
+  }
+
   useEffect(() => {
-    Promise.all([api.orders.list(), api.followUps.list()]).then(([orders, followUps]) => {
+    Promise.all([
+      api.orders.list(), api.followUps.list(), api.meetings.list(),
+      api.tasks.list(), api.quotations.list(), api.samples.list(),
+    ]).then(([orders, followUps, meetings, tasks, quotations, samples]) => {
+      const today = new Date().toISOString().slice(0, 10)
+      const daysBetween = (a, b) => Math.round((new Date(b) - new Date(a)) / 86400000)
       const notifs = []
-      orders.filter((o) => o.payment === 'Pending' || o.payment === 'Partial').forEach((o) => {
-        notifs.push({ id: `pay-${o.id}`, type: 'payment', text: `Payment pending: ${o.company}`, sub: `${o.orderNo} · ₹${Number(o.total).toLocaleString('en-IN')}`, color: 'var(--amber-500)' })
+
+      // 1) Today's Follow-ups
+      followUps.filter((f) => f.status === 'Today').forEach((f) => {
+        notifs.push({ id: `fu-today-${f.id}`, group: "Today's Follow-ups", text: `${f.lead || 'Follow-up'} — ${f.type || ''}`, sub: f.notes || f.date, color: 'var(--amber-600)' })
       })
+
+      // Overdue follow-ups (kept from before)
       followUps.filter((f) => f.status === 'Overdue').forEach((f) => {
-        notifs.push({ id: `fu-${f.id}`, type: 'followup', text: `Overdue follow-up: ${f.lead}`, sub: `${f.date} · ${f.type}`, color: 'var(--red-600)' })
+        notifs.push({ id: `fu-overdue-${f.id}`, group: 'Overdue Follow-ups', text: `Overdue follow-up: ${f.lead}`, sub: `${f.date} · ${f.type}`, color: 'var(--red-600)' })
       })
+
+      // 2) Meetings today
+      meetings.filter((m) => m.status === 'Scheduled' && m.date === today).forEach((m) => {
+        notifs.push({ id: `mt-${m.id}`, group: 'Meetings Today', text: m.title || m.company, sub: `${m.time || ''} · ${m.location || ''}`, color: 'var(--navy-700)' })
+      })
+
+      // Reminder: meeting tomorrow
+      meetings.filter((m) => m.status === 'Scheduled' && m.date && daysBetween(today, m.date) === 1).forEach((m) => {
+        notifs.push({ id: `mt-tmrw-${m.id}`, group: 'Reminder: Upcoming Meeting', text: m.title || m.company, sub: `Tomorrow · ${m.time || ''}`, color: 'var(--navy-700)' })
+      })
+
+      // 3) Pending tasks (due today or overdue, not completed)
+      tasks.filter((t) => t.status !== 'Completed' && t.dueDate && t.dueDate <= today).forEach((t) => {
+        notifs.push({ id: `tk-${t.id}`, group: 'Pending Tasks', text: t.title, sub: `${t.dueDate < today ? 'Overdue since' : 'Due'} ${t.dueDate}${t.assignedTo ? ' · ' + t.assignedTo : ''}`, color: t.dueDate < today ? 'var(--red-600)' : 'var(--amber-600)' })
+      })
+
+      // 4) Pending payments
+      orders.filter((o) => o.payment === 'Pending' || o.payment === 'Partial').forEach((o) => {
+        notifs.push({ id: `pay-${o.id}`, group: 'Pending Payments', text: `Payment pending: ${o.company}`, sub: `${o.orderNo} · ₹${Number(o.total).toLocaleString('en-IN')}`, color: 'var(--amber-600)' })
+        // Reminder: flag it again more urgently once it's been sitting a while
+        if (o.orderDate && daysBetween(o.orderDate, today) >= 15) {
+          notifs.push({ id: `pay-rem-${o.id}`, group: 'Reminder: Payment Due', text: `${o.company} — ${daysBetween(o.orderDate, today)} days unpaid`, sub: `${o.orderNo} · ₹${Number(o.total).toLocaleString('en-IN')}`, color: 'var(--red-600)' })
+        }
+      })
+
+      // 5) Overdue quotations (already expired, still open)
+      quotations.filter((q) => q.validUntil && q.validUntil < today && !['Accepted', 'Rejected'].includes(q.status)).forEach((q) => {
+        notifs.push({ id: `qt-overdue-${q.id}`, group: 'Overdue Quotations', text: `${q.company} — ${q.quoteNo}`, sub: `Expired ${q.validUntil}`, color: 'var(--red-600)' })
+      })
+
+      // Reminder: quote expiring within the next 3 days (not yet expired)
+      quotations.filter((q) => q.validUntil && q.validUntil >= today && !['Accepted', 'Rejected'].includes(q.status) && daysBetween(today, q.validUntil) <= 3).forEach((q) => {
+        const d = daysBetween(today, q.validUntil)
+        notifs.push({ id: `qt-exp-${q.id}`, group: 'Reminder: Quote Expiry', text: `${q.company} — ${q.quoteNo}`, sub: d === 0 ? 'Expires today' : `Expires in ${d} day${d === 1 ? '' : 's'}`, color: 'var(--amber-600)' })
+      })
+
+      // Reminder: sample sent 5+ days ago, still not delivered
+      samples.filter((s) => s.status && s.status !== 'Delivered' && s.sent).forEach((s) => {
+        const d = daysBetween(s.sent, today)
+        if (d >= 5) {
+          notifs.push({ id: `smp-${s.id}`, group: 'Reminder: Sample Follow-up', text: `${s.company}`, sub: `Sent ${d} days ago · still "${s.status}"`, color: 'var(--red-600)' })
+        }
+      })
+
       setNotifications(notifs)
     }).catch(() => {})
   }, [location.pathname])
@@ -193,21 +273,28 @@ export default function Shell({ children }) {
                 )}
               </button>
               {showNotifs && (
-                <div style={{ position: 'absolute', top: 38, right: 0, width: 320, background: '#fff', border: '1px solid var(--paper-200)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-pop)', zIndex: 200, overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', top: 38, right: 0, width: 340, background: '#fff', border: '1px solid var(--paper-200)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-pop)', zIndex: 200, overflow: 'hidden' }}>
                   <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--paper-100)', fontWeight: 700, fontSize: 13 }}>
                     Notifications {notifications.length > 0 && <span style={{ color: 'var(--ink-400)', fontWeight: 400 }}>({notifications.length})</span>}
                   </div>
                   {notifications.length === 0 ? (
                     <div style={{ padding: '20px 16px', color: 'var(--ink-400)', fontSize: 13, textAlign: 'center' }}>All caught up! No pending items.</div>
                   ) : (
-                    <div style={{ maxHeight: 320, overflowY: 'auto' }}>
-                      {notifications.map((n) => (
-                        <div key={n.id} style={{ padding: '10px 16px', borderBottom: '1px solid var(--paper-100)', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                          <span style={{ fontSize: 16, marginTop: 1 }}>{n.type === 'payment' ? '💰' : '⏰'}</span>
-                          <div>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-900)' }}>{n.text}</div>
-                            <div style={{ fontSize: 11.5, color: n.color, fontFamily: 'var(--font-mono)', marginTop: 2 }}>{n.sub}</div>
+                    <div style={{ maxHeight: 420, overflowY: 'auto' }}>
+                      {NOTIF_GROUPS.filter((g) => notifications.some((n) => n.group === g)).map((g) => (
+                        <div key={g}>
+                          <div style={{ padding: '7px 16px 5px', fontSize: 10.5, fontWeight: 700, color: 'var(--ink-400)', textTransform: 'uppercase', letterSpacing: 0.4, background: 'var(--paper-50)' }}>
+                            {g} <span style={{ fontWeight: 400 }}>({notifications.filter((n) => n.group === g).length})</span>
                           </div>
+                          {notifications.filter((n) => n.group === g).map((n) => (
+                            <div key={n.id} style={{ padding: '10px 16px', borderBottom: '1px solid var(--paper-100)', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                              <span style={{ fontSize: 16, marginTop: 1 }}>{GROUP_ICON[n.group] || '🔔'}</span>
+                              <div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-900)' }}>{n.text}</div>
+                                <div style={{ fontSize: 11.5, color: n.color, fontFamily: 'var(--font-mono)', marginTop: 2 }}>{n.sub}</div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       ))}
                     </div>

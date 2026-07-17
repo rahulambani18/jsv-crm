@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { api } from '../lib/api.js'
+import { api, storage } from '../lib/api.js'
 import { useAuth } from '../lib/AuthContext.jsx'
 import PageHeader from '../components/PageHeader.jsx'
 import Pill from '../components/Pill.jsx'
@@ -7,7 +7,7 @@ import Modal from '../components/Modal.jsx'
 import { IconPlus, IconSearch, IconEdit, IconTrash } from '../components/Icons.jsx'
 import '../styles/components.css'
 
-const DOC_TYPES = ['COA', 'MSDS', 'TDS', 'Certificate', 'Contract', 'Invoice', 'Purchase Order', 'Other']
+const DOC_TYPES = ['COA', 'MSDS', 'TDS', 'Certificate', 'Contract', 'Invoice', 'Purchase Order', 'Email', 'Other']
 
 function emptyForm() {
   return { name: '', type: 'COA', relatedProduct: '', url: '', tags: '', date: new Date().toISOString().slice(0, 10), uploadedBy: '' }
@@ -25,6 +25,8 @@ export default function Documents() {
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyForm())
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
 
   useEffect(() => { refresh() }, [])
 
@@ -46,13 +48,30 @@ export default function Documents() {
   function openCreate() {
     setEditingId(null)
     setForm({ ...emptyForm(), uploadedBy: user?.name || '' })
+    setUploadError('')
     setShowModal(true)
   }
 
   function openEdit(doc) {
     setEditingId(doc.id)
     setForm({ name: doc.name || '', type: doc.type || 'COA', relatedProduct: doc.relatedProduct || '', url: doc.url || '', tags: (doc.tags || []).join(', '), date: doc.date || '', uploadedBy: doc.uploadedBy || '' })
+    setUploadError('')
     setShowModal(true)
+  }
+
+  async function handleFileSelect(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadError('')
+    setUploading(true)
+    try {
+      const { url } = await storage.uploadFile(file, 'documents')
+      setForm((f) => ({ ...f, url, name: f.name || file.name.replace(/\.[^/.]+$/, '') }))
+    } catch (err) {
+      setUploadError(err.message || 'Upload failed. Make sure the "attachments" storage bucket exists in Supabase.')
+    } finally {
+      setUploading(false)
+    }
   }
 
   async function handleSave(e) {
@@ -69,8 +88,8 @@ export default function Documents() {
     await api.documents.remove(doc.id); refresh()
   }
 
-  const typeIcon = { COA: '🧪', MSDS: '⚠️', TDS: '📋', Certificate: '🏅', Contract: '📄', Invoice: '🧾', 'Purchase Order': '📦', Other: '📁' }
-  const typeTone = { COA: 'teal', MSDS: 'amber', TDS: 'navy', Certificate: 'teal', Contract: 'navy', Invoice: 'gray', 'Purchase Order': 'gray', Other: 'gray' }
+  const typeIcon = { COA: '🧪', MSDS: '⚠️', TDS: '📋', Certificate: '🏅', Contract: '📄', Invoice: '🧾', 'Purchase Order': '📦', Email: '📧', Other: '📁' }
+  const typeTone = { COA: 'teal', MSDS: 'amber', TDS: 'navy', Certificate: 'teal', Contract: 'navy', Invoice: 'gray', 'Purchase Order': 'gray', Email: 'navy', Other: 'gray' }
 
   return (
     <div>
@@ -154,7 +173,7 @@ export default function Documents() {
           footer={
             <>
               <button className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-              <button className="btn btn-primary" form="doc-form" type="submit" disabled={saving}>
+              <button className="btn btn-primary" form="doc-form" type="submit" disabled={saving || uploading}>
                 {saving ? 'Saving…' : editingId ? 'Save changes' : 'Add document'}
               </button>
             </>
@@ -179,9 +198,22 @@ export default function Documents() {
               </div>
             </div>
             <div className="field">
-              <label>Document link (Google Drive / Dropbox share URL)</label>
+              <label>Attach a file (PDF, Excel, Image, PO, etc.)</label>
+              <input
+                type="file"
+                accept=".pdf,.xls,.xlsx,.csv,.png,.jpg,.jpeg,.eml,.msg,.doc,.docx"
+                onChange={handleFileSelect}
+                disabled={uploading}
+              />
+              {uploading && <p style={{ fontSize: 11.5, color: 'var(--ink-400)', margin: '4px 0 0' }}>Uploading…</p>}
+              {uploadError && <p style={{ fontSize: 11.5, color: 'var(--red-600)', margin: '4px 0 0' }}>{uploadError}</p>}
+              {form.url && !uploading && (
+                <p style={{ fontSize: 11.5, color: 'var(--teal-700)', margin: '4px 0 0' }}>✓ File attached — <a href={form.url} target="_blank" rel="noopener noreferrer">preview</a></p>
+              )}
+            </div>
+            <div className="field">
+              <label>Or paste a link instead (Google Drive / Dropbox share URL)</label>
               <input type="url" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} placeholder="https://drive.google.com/…" />
-              <p style={{ fontSize: 11.5, color: 'var(--ink-400)', margin: '4px 0 0' }}>Upload to Google Drive, copy the share link, and paste here.</p>
             </div>
             <div className="field-row">
               <div className="field">
