@@ -21,6 +21,7 @@ function emptyForm() {
 export default function Customers() {
   const { can } = useAuth()
   const canEdit = can('customers', 'edit')
+  const canDelete = can('customers', 'delete')
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -117,14 +118,14 @@ export default function Customers() {
           <thead>
             <tr>
               <th>Code</th><th>Company</th><th>Contact</th><th>City</th><th>GST</th>
-              <th>Industry</th><th>Application</th><th>Added</th>{canEdit && <th>Actions</th>}
+              <th>Industry</th><th>Application</th><th>Added</th>{canDelete && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={canEdit ? 9 : 8}>Loading customers…</td></tr>
+              <tr className="empty-row"><td colSpan={canDelete ? 9 : 8}>Loading customers…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={canEdit ? 9 : 8}>{customers.length === 0 ? 'No customers yet.' : 'No customers match your search.'}</td></tr>
+              <tr className="empty-row"><td colSpan={canDelete ? 9 : 8}>{customers.length === 0 ? 'No customers yet.' : 'No customers match your search.'}</td></tr>
             ) : filtered.map((c) => (
               <tr key={c.id}>
                 <td className="cell-mono">{c.code}</td>
@@ -135,7 +136,7 @@ export default function Customers() {
                 <td>{c.industry}</td>
                 <td>{c.application}</td>
                 <td className="cell-mono">{c.added}</td>
-                {canEdit && (
+                {canDelete && (
                   <td>
                     <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(c)}><IconTrash width={13} height={13} /></button>
                   </td>

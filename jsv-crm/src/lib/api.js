@@ -90,7 +90,7 @@ const realRolesTable = {
       name: r.name,
       isSystem: r.is_system,
       permissions: Object.fromEntries(
-        (permRows || []).filter((p) => p.role_id === r.id).map((p) => [p.module_key, { view: p.can_view, edit: p.can_edit }])
+        (permRows || []).filter((p) => p.role_id === r.id).map((p) => [p.module_key, { view: p.can_view, edit: p.can_edit, delete: p.can_delete }])
       ),
     }))
   },
@@ -100,7 +100,7 @@ const realRolesTable = {
       .from('roles').insert({ workspace_id: ws.id, name, is_system: !!isSystem }).select().single()
     if (error) throw error
     const permRows = Object.entries(permissions || {}).map(([key, v]) => ({
-      role_id: role.id, module_key: key, can_view: !!v.view, can_edit: !!v.edit,
+      role_id: role.id, module_key: key, can_view: !!v.view, can_edit: !!v.edit, can_delete: !!v.delete,
     }))
     if (permRows.length) await supabase.from('role_permissions').insert(permRows)
     return role
@@ -108,7 +108,7 @@ const realRolesTable = {
   async update(roleId, { permissions }) {
     if (!permissions) return
     const rows = Object.entries(permissions).map(([key, v]) => ({
-      role_id: roleId, module_key: key, can_view: !!v.view, can_edit: !!v.edit,
+      role_id: roleId, module_key: key, can_view: !!v.view, can_edit: !!v.edit, can_delete: !!v.delete,
     }))
     await supabase.from('role_permissions').upsert(rows, { onConflict: 'role_id,module_key' })
   },
@@ -216,17 +216,17 @@ async function buildUserObject(authUser, profile) {
     // Fetch permissions
     const { data: perms } = await supabase
       .from('role_permissions')
-      .select('module_key, can_view, can_edit')
+      .select('module_key, can_view, can_edit, can_delete')
       .eq('role_id', roleId)
     permissions = Object.fromEntries(
-      (perms || []).map((p) => [p.module_key, { view: p.can_view, edit: p.can_edit }])
+      (perms || []).map((p) => [p.module_key, { view: p.can_view, edit: p.can_edit, delete: p.can_delete }])
     )
   }
 
   // Admin always gets full access regardless of permission rows
   const ALL_MODULES = ['dashboard','leads','follow_ups','customers','samples','quotations','orders','products','reports','users','tasks','meetings','documents','invoices','payments']
   if (roleName === 'Admin') {
-    ALL_MODULES.forEach((m) => { permissions[m] = { view: true, edit: true } })
+    ALL_MODULES.forEach((m) => { permissions[m] = { view: true, edit: true, delete: true } })
   }
 
   return {

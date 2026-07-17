@@ -32,7 +32,9 @@ export function AuthProvider({ children }) {
     if (user.role === 'Admin') return true
     const perm = user.permissions?.[moduleKey]
     if (!perm) return false
-    return action === 'edit' ? !!perm.edit : !!perm.view
+    if (action === 'delete') return !!perm.delete
+    if (action === 'edit') return !!perm.edit
+    return !!perm.view
   }
 
   return (

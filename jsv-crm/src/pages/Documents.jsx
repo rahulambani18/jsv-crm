@@ -16,6 +16,7 @@ function emptyForm() {
 export default function Documents() {
   const { user, can } = useAuth()
   const canEdit = can('documents', 'edit')
+  const canDelete = can('documents', 'delete')
   const [docs, setDocs] = useState([])
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
@@ -117,13 +118,13 @@ export default function Documents() {
       <div className="table-wrap">
         <table className="data-table">
           <thead>
-            <tr><th>Document</th><th>Type</th><th>Product</th><th>Tags</th><th>Added by</th><th>Date</th><th>Link</th>{canEdit && <th>Actions</th>}</tr>
+            <tr><th>Document</th><th>Type</th><th>Product</th><th>Tags</th><th>Added by</th><th>Date</th><th>Link</th>{(canEdit || canDelete) && <th>Actions</th>}</tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={canEdit ? 8 : 7}>Loading documents…</td></tr>
+              <tr className="empty-row"><td colSpan={(canEdit || canDelete) ? 8 : 7}>Loading documents…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={canEdit ? 8 : 7}>{docs.length === 0 ? 'No documents yet. Add COAs, MSDS sheets, contracts and more.' : 'No documents match.'}</td></tr>
+              <tr className="empty-row"><td colSpan={(canEdit || canDelete) ? 8 : 7}>{docs.length === 0 ? 'No documents yet. Add COAs, MSDS sheets, contracts and more.' : 'No documents match.'}</td></tr>
             ) : filtered.map((d) => (
               <tr key={d.id}>
                 <td>
@@ -152,11 +153,11 @@ export default function Documents() {
                     <span className="cell-muted">—</span>
                   )}
                 </td>
-                {canEdit && (
+                {(canEdit || canDelete) && (
                   <td>
                     <div style={{ display: 'flex', gap: 4 }}>
-                      <button className="btn btn-ghost btn-sm" onClick={() => openEdit(d)}><IconEdit width={13} height={13} /></button>
-                      <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(d)}><IconTrash width={13} height={13} /></button>
+                      {canEdit && <button className="btn btn-ghost btn-sm" onClick={() => openEdit(d)}><IconEdit width={13} height={13} /></button>}
+                      {canDelete && <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(d)}><IconTrash width={13} height={13} /></button>}
                     </div>
                   </td>
                 )}

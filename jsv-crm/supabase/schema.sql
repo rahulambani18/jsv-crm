@@ -55,6 +55,7 @@ create table if not exists role_permissions (
   module_key text references modules(key) on delete cascade,
   can_view boolean default true,
   can_edit boolean default false,
+  can_delete boolean default false,
   primary key (role_id, module_key)
 );
 

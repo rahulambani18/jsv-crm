@@ -20,6 +20,7 @@ function emptyForm() {
 export default function Samples() {
   const { can } = useAuth()
   const canEdit = can('samples', 'edit')
+  const canDelete = can('samples', 'delete')
   const [samples, setSamples] = useState([])
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
@@ -112,13 +113,13 @@ export default function Samples() {
       <div className="table-wrap">
         <table className="data-table">
           <thead>
-            <tr><th>Code</th><th>Company</th><th>Contact</th><th>Products</th><th>Qty</th><th>Sent</th><th>Courier</th><th>Tracking</th><th>Status</th>{canEdit && <th>Actions</th>}</tr>
+            <tr><th>Code</th><th>Company</th><th>Contact</th><th>Products</th><th>Qty</th><th>Sent</th><th>Courier</th><th>Tracking</th><th>Status</th>{canDelete && <th>Actions</th>}</tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={canEdit ? 10 : 9}>Loading samples…</td></tr>
+              <tr className="empty-row"><td colSpan={canDelete ? 10 : 9}>Loading samples…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={canEdit ? 10 : 9}>{samples.length === 0 ? 'No samples yet.' : 'No samples match your filters.'}</td></tr>
+              <tr className="empty-row"><td colSpan={canDelete ? 10 : 9}>{samples.length === 0 ? 'No samples yet.' : 'No samples match your filters.'}</td></tr>
             ) : filtered.map((s) => (
               <tr key={s.id}>
                 <td className="cell-mono">{s.code}</td>
@@ -146,7 +147,7 @@ export default function Samples() {
                     <Pill>{s.status}</Pill>
                   )}
                 </td>
-                {canEdit && (
+                {canDelete && (
                   <td>
                     <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(s)}><IconTrash width={13} height={13} /></button>
                   </td>

@@ -280,6 +280,7 @@ function printInvoice(inv, order) {
 export default function Invoices() {
   const { can } = useAuth()
   const canEdit = can('invoices', 'edit')
+  const canDelete = can('invoices', 'delete')
   const [invoices, setInvoices] = useState([])
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
@@ -470,7 +471,7 @@ export default function Invoices() {
                 <td style={{ display: 'flex', gap: 4 }}>
                   {canEdit && <button className="btn btn-ghost btn-sm" onClick={() => openEdit(inv)}><IconEdit width={13} height={13} /></button>}
                   <button className="btn btn-ghost btn-sm" onClick={() => printInvoice(inv, orders.find((o) => o.id === inv.orderId))}>🖨 Print</button>
-                  {canEdit && <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(inv)}><IconTrash width={13} height={13} /></button>}
+                  {canDelete && <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(inv)}><IconTrash width={13} height={13} /></button>}
                 </td>
               </tr>
             ))}

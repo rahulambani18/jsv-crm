@@ -30,6 +30,7 @@ function formatINR(n) {
 export default function Orders() {
   const { can } = useAuth()
   const canEdit = can('orders', 'edit')
+  const canDelete = can('orders', 'delete')
   const [orders, setOrders] = useState([])
   const [customers, setCustomers] = useState([])
   const [products, setProducts] = useState([])
