@@ -148,8 +148,8 @@ export default function Quotations() {
               <label style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink-700)', display: 'block', marginBottom: 8 }}>
                 Products
               </label>
-              <div style={{ border: '1px solid var(--paper-200)', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <div style={{ border: '1px solid var(--paper-200)', borderRadius: 'var(--radius-sm)', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                <table style={{ width: '100%', minWidth: 480, borderCollapse: 'collapse', fontSize: 12.5 }}>
                   <thead>
                     <tr style={{ background: 'var(--paper-0)' }}>
                       <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: 'var(--ink-500)', fontSize: 11, borderBottom: '1px solid var(--paper-200)' }}>Product</th>

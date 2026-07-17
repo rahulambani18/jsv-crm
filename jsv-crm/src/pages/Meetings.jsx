@@ -121,7 +121,7 @@ export default function Meetings() {
                 <Pill>{m.status}</Pill>
                 <span style={{ fontSize: 12, background: 'var(--paper-100)', color: 'var(--ink-500)', padding: '2px 8px', borderRadius: 100 }}>{m.type}</span>
               </div>
-              <div style={{ display: 'flex', gap: 16, fontSize: 13, color: 'var(--ink-500)', marginBottom: m.agenda ? 8 : 0 }}>
+              <div style={{ display: 'flex', gap: 16, fontSize: 13, color: 'var(--ink-500)', marginBottom: m.agenda ? 8 : 0, flexWrap: 'wrap' }}>
                 {m.company && <span>🏢 {m.company}</span>}
                 {m.contact && <span>👤 {m.contact}</span>}
                 {m.location && <span>📍 {m.location}</span>}

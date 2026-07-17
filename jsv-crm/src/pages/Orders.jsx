@@ -210,8 +210,8 @@ export default function Orders() {
 
             <div className="field">
               <label>Line items</label>
-              <div style={{ border: '1px solid var(--paper-200)', borderRadius: 8, overflow: 'hidden' }}>
-                <table style={{ width: '100%', fontSize: 12.5, borderCollapse: 'collapse' }}>
+              <div style={{ border: '1px solid var(--paper-200)', borderRadius: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                <table style={{ width: '100%', minWidth: 480, fontSize: 12.5, borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ background: 'var(--paper-0)' }}>
                       <th style={{ textAlign: 'left', padding: '8px 8px', fontWeight: 600, fontSize: 11 }}>Product</th>

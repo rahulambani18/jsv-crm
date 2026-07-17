@@ -215,3 +215,22 @@
   .sidebar.open { transform: translateX(0); }
   .page-content { padding: 20px 16px 48px; }
 }
+
+/* ---------- Mobile phones ---------- */
+@media (max-width: 640px) {
+  .topbar { padding: 0 12px; }
+  .topbar-right { gap: 6px !important; }
+  .topbar-clock { display: none; }           /* live clock is a nice-to-have, not worth the space on a phone */
+  .topbar-iso { display: none; }              /* ISO badge text is long; drop it below tablet width */
+  .notif-dropdown {
+    position: fixed !important;
+    top: 56px !important;
+    left: 8px !important;
+    right: 8px !important;
+    width: auto !important;
+    max-width: none !important;
+  }
+}
+@media (max-width: 380px) {
+  .topbar-greeting span:first-child { font-size: 13px !important; }
+}

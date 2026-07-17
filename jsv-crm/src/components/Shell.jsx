@@ -239,11 +239,11 @@ export default function Shell({ children }) {
             <button className="topbar-toggle" onClick={() => setNavOpen((v) => !v)} aria-label="Toggle navigation">
               <IconPanel width={16} height={16} />
             </button>
-            <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.25 }}>
+            <div className="topbar-greeting" style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.25 }}>
               <span style={{ fontWeight: 700, fontSize: 14.5 }}>
                 {greeting}{firstName ? `, ${firstName}` : ''} 👋
               </span>
-              <span style={{ fontSize: 11.5, color: 'var(--ink-400)', fontFamily: 'var(--font-mono)' }}>
+              <span className="topbar-clock" style={{ fontSize: 11.5, color: 'var(--ink-400)', fontFamily: 'var(--font-mono)' }}>
                 {now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
                 {'  ·  '}
                 {now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
@@ -273,7 +273,7 @@ export default function Shell({ children }) {
                 )}
               </button>
               {showNotifs && (
-                <div style={{ position: 'absolute', top: 38, right: 0, width: 340, background: '#fff', border: '1px solid var(--paper-200)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-pop)', zIndex: 200, overflow: 'hidden' }}>
+                <div className="notif-dropdown" style={{ position: 'absolute', top: 38, right: 0, width: 340, background: '#fff', border: '1px solid var(--paper-200)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-pop)', zIndex: 200, overflow: 'hidden' }}>
                   <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--paper-100)', fontWeight: 700, fontSize: 13 }}>
                     Notifications {notifications.length > 0 && <span style={{ color: 'var(--ink-400)', fontWeight: 400 }}>({notifications.length})</span>}
                   </div>
@@ -302,7 +302,7 @@ export default function Shell({ children }) {
                 </div>
               )}
             </div>
-            <span className="iso-pill"><span className="dot" /> ISO 9001:2015 Certified</span>
+            <span className="iso-pill topbar-iso"><span className="dot" /> ISO 9001:2015 Certified</span>
           </div>
         </header>
         <main className="page-content">{children}</main>
