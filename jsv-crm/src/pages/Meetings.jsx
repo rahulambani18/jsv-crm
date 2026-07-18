@@ -57,14 +57,24 @@ export default function Meetings() {
   async function handleSave(e) {
     e.preventDefault()
     setSaving(true)
-    if (editingId) await api.meetings.update(editingId, form)
-    else await api.meetings.insert(form)
-    setSaving(false); setShowModal(false); setForm(emptyForm()); setEditingId(null); refresh()
+    try {
+      if (editingId) await api.meetings.update(editingId, form)
+      else await api.meetings.insert(form)
+      setShowModal(false); setForm(emptyForm()); setEditingId(null); refresh()
+    } catch (err) {
+      alert('Could not save meeting: ' + (err.message || 'Unknown error'))
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function handleDelete(m) {
     if (!window.confirm(`Delete meeting "${m.title}"?`)) return
-    await api.meetings.remove(m.id); refresh()
+    try {
+      await api.meetings.remove(m.id); refresh()
+    } catch (err) {
+      alert('Could not delete: ' + (err.message || 'Unknown error'))
+    }
   }
 
   const typeIcon = { 'Site Visit': '🏭', 'Office Meeting': '🏢', 'Video Call': '💻', 'Call': '📞', 'Exhibition': '🎪', 'Other': '📅' }

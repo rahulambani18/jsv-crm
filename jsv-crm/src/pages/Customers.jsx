@@ -68,12 +68,17 @@ export default function Customers() {
       shippingAddress: sameAsBilling ? form.billingAddress : form.shippingAddress,
       added: new Date().toISOString().slice(0, 10),
     }
-    await api.customers.insert(record)
-    setSaving(false)
-    setShowModal(false)
-    setForm(emptyForm())
-    setSameAsBilling(true)
-    refresh()
+    try {
+      await api.customers.insert(record)
+      setShowModal(false)
+      setForm(emptyForm())
+      setSameAsBilling(true)
+      refresh()
+    } catch (err) {
+      alert('Could not save customer: ' + (err.message || 'Unknown error'))
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function handleDelete(customer) {

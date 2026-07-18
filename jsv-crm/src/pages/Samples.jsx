@@ -53,11 +53,16 @@ export default function Samples() {
     e.preventDefault()
     setSaving(true)
     const record = { ...form, code: `SMP-${1040 + samples.length + 1}` }
-    await api.samples.insert(record)
-    setSaving(false)
-    setShowModal(false)
-    setForm(emptyForm())
-    refresh()
+    try {
+      await api.samples.insert(record)
+      setShowModal(false)
+      setForm(emptyForm())
+      refresh()
+    } catch (err) {
+      alert('Could not save sample: ' + (err.message || 'Unknown error'))
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function handleStatusChange(sampleId, newStatus) {

@@ -79,14 +79,24 @@ export default function Documents() {
     e.preventDefault()
     setSaving(true)
     const record = { ...form, tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean) }
-    if (editingId) await api.documents.update(editingId, record)
-    else await api.documents.insert(record)
-    setSaving(false); setShowModal(false); setForm(emptyForm()); setEditingId(null); refresh()
+    try {
+      if (editingId) await api.documents.update(editingId, record)
+      else await api.documents.insert(record)
+      setShowModal(false); setForm(emptyForm()); setEditingId(null); refresh()
+    } catch (err) {
+      alert('Could not save document: ' + (err.message || 'Unknown error'))
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function handleDelete(doc) {
     if (!window.confirm(`Delete "${doc.name}"?`)) return
-    await api.documents.remove(doc.id); refresh()
+    try {
+      await api.documents.remove(doc.id); refresh()
+    } catch (err) {
+      alert('Could not delete: ' + (err.message || 'Unknown error'))
+    }
   }
 
   const typeIcon = { COA: '🧪', MSDS: '⚠️', TDS: '📋', Certificate: '🏅', Contract: '📄', Invoice: '🧾', 'Purchase Order': '📦', Email: '📧', Other: '📁' }

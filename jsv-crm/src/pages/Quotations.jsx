@@ -71,11 +71,16 @@ export default function Quotations() {
       lineItems,
       quoteNo: `QT-2026-${String(120 + quotations.length).padStart(4, '0')}`,
     }
-    await api.quotations.insert(record)
-    setSaving(false)
-    setShowModal(false)
-    setForm(emptyForm())
-    refresh()
+    try {
+      await api.quotations.insert(record)
+      setShowModal(false)
+      setForm(emptyForm())
+      refresh()
+    } catch (err) {
+      alert('Could not save quotation: ' + (err.message || 'Unknown error'))
+    } finally {
+      setSaving(false)
+    }
   }
 
   const fmt = (n) => '₹' + Number(n || 0).toLocaleString('en-IN')

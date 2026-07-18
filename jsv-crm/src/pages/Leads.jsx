@@ -55,11 +55,16 @@ export default function Leads() {
     e.preventDefault()
     setSaving(true)
     const record = { ...form, estValue: Number(form.estValue) || 0 }
-    await api.leads.insert(record)
-    setSaving(false)
-    setShowModal(false)
-    setForm(emptyForm())
-    refresh()
+    try {
+      await api.leads.insert(record)
+      setShowModal(false)
+      setForm(emptyForm())
+      refresh()
+    } catch (err) {
+      alert('Could not save lead: ' + (err.message || 'Unknown error'))
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function handleDelete(lead) {

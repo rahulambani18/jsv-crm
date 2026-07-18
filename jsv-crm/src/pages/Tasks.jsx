@@ -63,24 +63,37 @@ export default function Tasks() {
   async function handleSave(e) {
     e.preventDefault()
     setSaving(true)
-    if (editingId) await api.tasks.update(editingId, form)
-    else await api.tasks.insert(form)
-    setSaving(false)
-    setShowModal(false)
-    setForm(emptyForm())
-    setEditingId(null)
-    refresh()
+    try {
+      if (editingId) await api.tasks.update(editingId, form)
+      else await api.tasks.insert(form)
+      setShowModal(false)
+      setForm(emptyForm())
+      setEditingId(null)
+      refresh()
+    } catch (err) {
+      alert('Could not save task: ' + (err.message || 'Unknown error'))
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function toggleDone(task) {
-    await api.tasks.update(task.id, { status: task.status === 'Completed' ? 'Pending' : 'Completed' })
-    refresh()
+    try {
+      await api.tasks.update(task.id, { status: task.status === 'Completed' ? 'Pending' : 'Completed' })
+      refresh()
+    } catch (err) {
+      alert('Could not update task: ' + (err.message || 'Unknown error'))
+    }
   }
 
   async function handleDelete(task) {
     if (!window.confirm(`Delete task "${task.title}"?`)) return
-    await api.tasks.remove(task.id)
-    refresh()
+    try {
+      await api.tasks.remove(task.id)
+      refresh()
+    } catch (err) {
+      alert('Could not delete: ' + (err.message || 'Unknown error'))
+    }
   }
 
   const priorityColor = { High: 'var(--red-600)', Medium: 'var(--amber-600)', Low: 'var(--ink-400)' }
