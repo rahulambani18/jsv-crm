@@ -1,0 +1,18 @@
+{
+  "name": "jsv-crm-tally-sync-agent",
+  "version": "1.0.0",
+  "description": "Polls Tally's local XML server for new Sales/Tax Invoice vouchers and pushes them into the JSV CRM Supabase database automatically.",
+  "type": "module",
+  "main": "sync.js",
+  "scripts": {
+    "start": "node sync.js",
+    "once": "node sync.js --once"
+  },
+  "dependencies": {
+    "@xmldom/xmldom": "^0.8.10",
+    "dotenv": "^16.4.5"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
