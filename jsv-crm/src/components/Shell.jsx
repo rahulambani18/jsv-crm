@@ -204,7 +204,7 @@ export default function Shell({ children }) {
   const SEARCH_TARGETS = [
     { table: 'customers', label: 'Customer', path: '/customers', match: (r) => [r.company, r.contact, r.mobile, r.gst, r.city] },
     { table: 'leads', label: 'Lead', path: '/leads', match: (r) => [r.company, r.contact, r.phone, r.city] },
-    { table: 'orders', label: 'Order', path: '/orders', match: (r) => [r.orderNo, r.company, r.poNumber, r.vehicle, r.lrNumber] },
+    { table: 'orders', label: 'Order', path: '/orders', match: (r) => [r.orderNo, r.company, r.poNumber] },
     { table: 'quotations', label: 'Quotation', path: '/quotations', match: (r) => [r.quoteNo, r.company] },
     { table: 'invoices', label: 'Invoice', path: '/invoices', match: (r) => [r.invoiceNo, r.company] },
     { table: 'products', label: 'Product', path: '/products', match: (r) => [r.name, r.category, r.supplier] },

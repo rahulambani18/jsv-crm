@@ -33,7 +33,7 @@ function emptyForm() {
   return {
     customerId: '', company: '', warehouse: WAREHOUSES[0], orderDate: '', delivery: '',
     paymentTerms: 'Net 30', paymentDueDate: '',
-    poNumber: '', poDate: '', vehicle: '', lrNumber: '', transporter: '', dispatchDate: '',
+    poNumber: '', poDate: '', dispatchDate: '',
     lineItems: [emptyLineItem()], status: 'Processing', payment: 'Pending',
   }
 }
@@ -71,7 +71,7 @@ export default function Orders() {
   const filtered = useMemo(() => orders.filter((o) => {
     const matchesWarehouse = warehouseFilter === 'All warehouses' || o.warehouse === warehouseFilter
     const matchesStatus = statusFilter === 'All statuses' || o.status === statusFilter
-    const matchesSearch = !search || [o.orderNo, o.company, o.poNumber, o.vehicle, o.lrNumber, o.transporter].some((v) => (v || '').toLowerCase().includes(search.toLowerCase()))
+    const matchesSearch = !search || [o.orderNo, o.company, o.poNumber].some((v) => (v || '').toLowerCase().includes(search.toLowerCase()))
     return matchesWarehouse && matchesStatus && matchesSearch
   }), [orders, warehouseFilter, statusFilter, search])
 
@@ -138,8 +138,7 @@ export default function Orders() {
       subtotal, gstRate: GST_RATE, gstAmount, total,
       status: form.status, payment: form.payment,
       paymentTerms: form.paymentTerms, paymentDueDate: form.paymentDueDate,
-      poNumber: form.poNumber, poDate: form.poDate, vehicle: form.vehicle,
-      lrNumber: form.lrNumber, transporter: form.transporter, dispatchDate: form.dispatchDate,
+      poNumber: form.poNumber, poDate: form.poDate, dispatchDate: form.dispatchDate,
     }
     try {
       if (editingId) {
@@ -168,8 +167,8 @@ export default function Orders() {
           <div style={{ display: 'flex', gap: 10 }}>
             <ExportBar
               title="Orders"
-              headers={['Order #', 'PO Number', 'Company', 'Warehouse', 'Order Date', 'Expected Delivery', 'Vehicle', 'LR Number', 'Transporter', 'Dispatch Date', 'Total', 'Status', 'Payment']}
-              rows={filtered.map((o) => [o.orderNo, o.poNumber, o.company, o.warehouse, o.orderDate, o.delivery, o.vehicle, o.lrNumber, o.transporter, o.dispatchDate, `₹${Number(o.total).toLocaleString('en-IN')}`, o.status, o.payment])}
+              headers={['Order #', 'PO Number', 'Company', 'Warehouse', 'Order Date', 'Expected Delivery', 'Dispatch Date', 'Total', 'Status', 'Payment']}
+              rows={filtered.map((o) => [o.orderNo, o.poNumber, o.company, o.warehouse, o.orderDate, o.delivery, o.dispatchDate, `₹${Number(o.total).toLocaleString('en-IN')}`, o.status, o.payment])}
               count={filtered.length}
             />
             {canEdit && (
@@ -184,7 +183,7 @@ export default function Orders() {
       <div className="filters-bar">
         <div className="search-input">
           <IconSearch width={15} height={15} />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search order #, PO #, vehicle, LR #…" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search order #, PO #…" />
         </div>
         <select className="select-input" value={warehouseFilter} onChange={(e) => setWarehouseFilter(e.target.value)}>
           {WAREHOUSE_FILTERS.map((w) => <option key={w}>{w}</option>)}
@@ -197,7 +196,7 @@ export default function Orders() {
       <div className="table-wrap">
         <table className="data-table">
           <thead>
-            <tr><th>Order #</th><th>Company</th><th>Warehouse</th><th>Order Date</th><th>Expected Delivery</th><th>Logistics</th><th>Total (incl. GST)</th><th>Status</th><th>Payment</th>{(canEdit || canDelete) && <th>Actions</th>}</tr>
+            <tr><th>Order #</th><th>Company</th><th>Warehouse</th><th>Order Date</th><th>Expected Delivery</th><th>Dispatch Date</th><th>Total (incl. GST)</th><th>Status</th><th>Payment</th>{(canEdit || canDelete) && <th>Actions</th>}</tr>
           </thead>
           <tbody>
             {loading ? (
@@ -214,12 +213,7 @@ export default function Orders() {
                 <td>{o.warehouse}</td>
                 <td className="cell-mono">{o.orderDate}</td>
                 <td className="cell-mono">{o.delivery}</td>
-                <td style={{ fontSize: 11.5 }}>
-                  {o.vehicle && <div>🚛 {o.vehicle}</div>}
-                  {o.lrNumber && <div className="cell-mono">LR: {o.lrNumber}</div>}
-                  {o.transporter && <div className="cell-muted">{o.transporter}</div>}
-                  {!o.vehicle && !o.lrNumber && !o.transporter && <span className="cell-muted">—</span>}
-                </td>
+                <td className="cell-mono">{o.dispatchDate || <span className="cell-muted">—</span>}</td>
                 <td className="cell-mono cell-strong">
                   {formatINR(o.total)}
                   <br /><span className="cell-mono cell-muted" style={{ fontSize: 11, fontWeight: 400 }}>{formatINR(o.subtotal)} + GST {formatINR(o.gstAmount)} ({o.gstRate || 18}%)</span>
@@ -318,25 +312,9 @@ export default function Orders() {
                 <input type="date" value={form.poDate} onChange={(e) => setForm({ ...form, poDate: e.target.value })} />
               </div>
             </div>
-            <div className="field-row">
-              <div className="field">
-                <label>Vehicle number</label>
-                <input value={form.vehicle} onChange={(e) => setForm({ ...form, vehicle: e.target.value })} placeholder="e.g. MH04 AB 1234" />
-              </div>
-              <div className="field">
-                <label>LR number</label>
-                <input value={form.lrNumber} onChange={(e) => setForm({ ...form, lrNumber: e.target.value })} placeholder="Lorry receipt #" />
-              </div>
-            </div>
-            <div className="field-row">
-              <div className="field">
-                <label>Transporter</label>
-                <input value={form.transporter} onChange={(e) => setForm({ ...form, transporter: e.target.value })} placeholder="e.g. Professional Courier" />
-              </div>
-              <div className="field">
-                <label>Dispatch date</label>
-                <input type="date" value={form.dispatchDate} onChange={(e) => setForm({ ...form, dispatchDate: e.target.value })} />
-              </div>
+            <div className="field">
+              <label>Dispatch date</label>
+              <input type="date" value={form.dispatchDate} onChange={(e) => setForm({ ...form, dispatchDate: e.target.value })} />
             </div>
 
             <div className="field">
