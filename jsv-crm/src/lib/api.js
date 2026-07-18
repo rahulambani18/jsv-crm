@@ -309,24 +309,33 @@ export const auth = isMock
         return loadProfileWithRole(data?.user)
       },
 
-      // Sign in supports BOTH email and username
-      // If the input doesn't look like an email, we look up the profile
-      // by full_name to find the real email first.
+      // Sign in supports BOTH email and username.
+      // When an admin creates a user with a username (no @), inviteUser
+      // stores them internally as "<username>@jsv.internal". So signing
+      // back in with that same username must reconstruct that exact
+      // internal email — not look up by the person's display name,
+      // which was the bug here (a username like "ashishvalia41" was
+      // being matched against full_name "Ashish Valia" and never found).
       async signIn(emailOrUsername, password) {
         let email = emailOrUsername.trim()
 
-        // If no @ symbol, treat as username — look up email from profiles
         if (!email.includes('@')) {
+          const internalEmail = `${email.toLowerCase().replace(/\s+/g, '.')}@jsv.internal`
+          const attempt = await supabase.auth.signInWithPassword({ email: internalEmail, password })
+          if (!attempt.error) return loadProfileWithRole(attempt.data.user)
+
+          // Fallback: maybe they typed their display name instead of username
           const { data: profiles } = await supabase
             .from('profiles_with_email')
             .select('email, full_name')
-            .ilike('full_name', email.trim())
+            .ilike('full_name', email)
             .limit(1)
           if (profiles && profiles.length > 0) {
-            email = profiles[0].email
-          } else {
-            throw new Error(`No user found with username "${emailOrUsername}". Try signing in with your email address instead.`)
+            const { data, error } = await supabase.auth.signInWithPassword({ email: profiles[0].email, password })
+            if (error) throw error
+            return loadProfileWithRole(data.user)
           }
+          throw new Error(`No user found with username "${emailOrUsername}". Try signing in with your email address instead.`)
         }
 
         const { data, error } = await supabase.auth.signInWithPassword({ email, password })
