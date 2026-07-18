@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext.jsx'
 import {
   IconGrid, IconUsers, IconClock, IconUserCheck, IconFlask,
   IconFile, IconCart, IconBox, IconChart, IconLogout, IconPanel, IconShield,
-  IconCheckSquare, IconCalendar, IconFolder, IconReceipt, IconCreditCard,
+  IconCheckSquare, IconCalendar, IconFolder, IconReceipt, IconCreditCard, IconSearch,
 } from './Icons.jsx'
 import { api } from '../lib/api.js'
 import jsvMark from '../assets/jsv-mark.png'
@@ -48,6 +48,7 @@ export default function Shell({ children }) {
   const { user, signOut, can } = useAuth()
   const [navOpen, setNavOpen] = useState(false)
   const location = useLocation()
+  const navigate = useNavigate()
 
   // Dark mode — persists across sessions
   const [dark, setDark] = useState(() => localStorage.getItem('jsv_theme') === 'dark')
@@ -190,6 +191,59 @@ export default function Shell({ children }) {
     }).catch(() => {})
   }, [location.pathname])
 
+  // Global search — searches across the main record types and lets you
+  // jump straight to the right page. Since most pages here are list
+  // views (no per-record detail page), clicking a result takes you to
+  // that list pre-filtered to your search term.
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState([])
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [showSearch, setShowSearch] = useState(false)
+  const searchRef = useRef(null)
+
+  const SEARCH_TARGETS = [
+    { table: 'customers', label: 'Customer', path: '/customers', match: (r) => [r.company, r.contact, r.mobile, r.gst, r.city] },
+    { table: 'leads', label: 'Lead', path: '/leads', match: (r) => [r.company, r.contact, r.phone, r.city] },
+    { table: 'orders', label: 'Order', path: '/orders', match: (r) => [r.orderNo, r.company, r.poNumber, r.vehicle, r.lrNumber] },
+    { table: 'quotations', label: 'Quotation', path: '/quotations', match: (r) => [r.quoteNo, r.company] },
+    { table: 'invoices', label: 'Invoice', path: '/invoices', match: (r) => [r.invoiceNo, r.company] },
+    { table: 'products', label: 'Product', path: '/products', match: (r) => [r.name, r.category, r.supplier] },
+    { table: 'samples', label: 'Sample', path: '/samples', match: (r) => [r.code, r.company, r.tracking] },
+  ]
+
+  useEffect(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (q.length < 2) { setSearchResults([]); return }
+    setSearchLoading(true)
+    const timer = setTimeout(() => {
+      Promise.all(SEARCH_TARGETS.map((t) => api[t.table].list().catch(() => [])))
+        .then((allResults) => {
+          const grouped = []
+          SEARCH_TARGETS.forEach((t, i) => {
+            const hits = allResults[i]
+              .filter((r) => t.match(r).some((v) => String(v || '').toLowerCase().includes(q)))
+              .slice(0, 5)
+            hits.forEach((r) => grouped.push({ type: t.label, path: t.path, id: r.id, title: r.company || r.name || r.orderNo || r.invoiceNo || r.quoteNo || r.code, sub: t.match(r).filter(Boolean).join(' · ') }))
+          })
+          setSearchResults(grouped.slice(0, 25))
+        })
+        .finally(() => setSearchLoading(false))
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
+  function goToResult(result) {
+    navigate(`${result.path}?q=${encodeURIComponent(result.title || searchQuery)}`)
+    setShowSearch(false)
+    setSearchQuery('')
+  }
+
+  useEffect(() => {
+    function handleClick(e) { if (searchRef.current && !searchRef.current.contains(e.target)) setShowSearch(false) }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
   useEffect(() => {
     function handleClick(e) { if (notifRef.current && !notifRef.current.contains(e.target)) setShowNotifs(false) }
     document.addEventListener('mousedown', handleClick)
@@ -272,6 +326,50 @@ export default function Shell({ children }) {
             </div>
           </div>
           <div className="topbar-right" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div ref={searchRef} style={{ position: 'relative' }}>
+              <button
+                onClick={() => setShowSearch((v) => !v)}
+                title="Search everything"
+                style={{ background: 'transparent', border: '1px solid var(--paper-200)', borderRadius: 'var(--radius-sm)', padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--ink-500)' }}
+              >
+                <IconSearch width={15} height={15} />
+              </button>
+              {showSearch && (
+                <div className="search-dropdown" style={{ position: 'absolute', top: 38, right: 0, width: 360, background: '#fff', border: '1px solid var(--paper-200)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-pop)', zIndex: 200, overflow: 'hidden' }}>
+                  <div style={{ padding: 10, borderBottom: '1px solid var(--paper-100)' }}>
+                    <input
+                      autoFocus
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search customers, orders, invoices, products…"
+                      style={{ width: '100%', border: 'none', outline: 'none', fontSize: 13.5, padding: '6px 4px' }}
+                    />
+                  </div>
+                  <div style={{ maxHeight: 380, overflowY: 'auto' }}>
+                    {searchQuery.trim().length < 2 ? (
+                      <div style={{ padding: '18px 16px', color: 'var(--ink-400)', fontSize: 12.5, textAlign: 'center' }}>Type at least 2 characters…</div>
+                    ) : searchLoading ? (
+                      <div style={{ padding: '18px 16px', color: 'var(--ink-400)', fontSize: 12.5, textAlign: 'center' }}>Searching…</div>
+                    ) : searchResults.length === 0 ? (
+                      <div style={{ padding: '18px 16px', color: 'var(--ink-400)', fontSize: 12.5, textAlign: 'center' }}>No matches for "{searchQuery}"</div>
+                    ) : searchResults.map((r, i) => (
+                      <div
+                        key={i}
+                        onClick={() => goToResult(r)}
+                        style={{ padding: '9px 16px', borderBottom: '1px solid var(--paper-100)', cursor: 'pointer', display: 'flex', gap: 10, alignItems: 'center' }}
+                        onMouseDown={(e) => e.preventDefault()}
+                      >
+                        <span className="pill pill-navy" style={{ fontSize: 10.5, flexShrink: 0 }}>{r.type}</span>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-900)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.title}</div>
+                          <div style={{ fontSize: 11, color: 'var(--ink-400)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.sub}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
             {/* Dark mode toggle */}
               <button
                 onClick={() => setDark((v) => !v)}

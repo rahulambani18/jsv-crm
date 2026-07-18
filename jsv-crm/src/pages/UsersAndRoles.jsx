@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { api, auth } from '../lib/api.js'
+import { api, auth, auditLog } from '../lib/api.js'
 import { supabase } from '../lib/supabaseClient.js'
 import { MODULES } from '../data/seed.js'
 import PageHeader from '../components/PageHeader.jsx'
@@ -55,18 +55,22 @@ export default function UsersAndRoles() {
   const roleById = useMemo(() => Object.fromEntries(roles.map((r) => [r.id, r])), [roles])
   const activeRole = roleById[activeRoleId]
 
-  // Audit log — stored in localStorage as mock, real version uses a DB table
-  const [auditLog] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('jsv_audit') || '[]') } catch { return [] }
-  })
+  // Audit log — real, permanent, shared across everyone (backed by the
+  // audit_log table). Previously this was stored in the browser's
+  // localStorage, which meant it only existed on one device, reset on
+  // cache clear, and hardcoded the actor's name to "Rahul" regardless
+  // of who was actually signed in.
+  const [auditEntries, setAuditEntries] = useState([])
+  const [auditLoading, setAuditLoading] = useState(true)
+
+  useEffect(() => {
+    if (tab !== 'audit') return
+    setAuditLoading(true)
+    auditLog.list().then(setAuditEntries).finally(() => setAuditLoading(false))
+  }, [tab])
 
   function logAudit(action, detail) {
-    const entry = { ts: new Date().toISOString(), action, detail, user: 'Rahul' }
-    try {
-      const log = JSON.parse(localStorage.getItem('jsv_audit') || '[]')
-      log.unshift(entry)
-      localStorage.setItem('jsv_audit', JSON.stringify(log.slice(0, 200)))
-    } catch {}
+    auditLog.log(action, detail)
   }
 
   async function handleDeleteUser(userId, userName) {
@@ -406,15 +410,17 @@ export default function UsersAndRoles() {
           <div className="audit-row audit-header">
             <div>Time</div><div>User</div><div>Action</div><div>Detail</div>
           </div>
-          {auditLog.length === 0 ? (
+          {auditLoading ? (
+            <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--ink-300)', fontSize: 13 }}>Loading audit log…</div>
+          ) : auditEntries.length === 0 ? (
             <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--ink-300)', fontSize: 13 }}>
-              No audit events yet. Role changes and deletions will appear here.
+              No audit events yet. Every create, edit, and delete across the CRM will appear here.
             </div>
-          ) : auditLog.map((entry, i) => (
+          ) : auditEntries.map((entry, i) => (
             <div key={i} className="audit-row">
               <div className="cell-mono" style={{ fontSize: 12 }}>{new Date(entry.ts).toLocaleString('en-IN')}</div>
               <div style={{ fontWeight: 600 }}>{entry.user}</div>
-              <div><span className="pill pill-navy" style={{ fontSize: 11 }}>{entry.action}</span></div>
+              <div><span className="pill pill-navy" style={{ fontSize: 11 }}>{entry.table ? `${entry.action} · ${entry.table}` : entry.action}</span></div>
               <div style={{ color: 'var(--ink-500)', fontSize: 12.5 }}>{entry.detail}</div>
             </div>
           ))}

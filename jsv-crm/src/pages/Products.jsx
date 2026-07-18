@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api.js'
 import { useAuth } from '../lib/AuthContext.jsx'
 import { readSpreadsheetFile, normalizeRow } from '../lib/fileImport.js'
@@ -29,7 +30,8 @@ export default function Products() {
   const canDelete = can('products', 'delete')
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
+  const [searchParams] = useSearchParams()
+  const [search, setSearch] = useState(searchParams.get('q') || '')
   const [categoryFilter, setCategoryFilter] = useState('All categories')
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)

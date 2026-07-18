@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api.js'
 import { INDUSTRY_OPTIONS, INDIAN_STATES } from '../data/seed.js'
 import PageHeader from '../components/PageHeader.jsx'
@@ -24,7 +25,8 @@ export default function Customers() {
   const canDelete = can('customers', 'delete')
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
+  const [searchParams] = useSearchParams()
+  const [search, setSearch] = useState(searchParams.get('q') || '')
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(emptyForm())
   const [sameAsBilling, setSameAsBilling] = useState(true)
