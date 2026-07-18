@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api.js'
 import { useAuth } from '../lib/AuthContext.jsx'
 import { readSpreadsheetFile, normalizeRow } from '../lib/fileImport.js'
@@ -27,11 +26,9 @@ function emptyForm() {
 export default function Products() {
   const { can } = useAuth()
   const canEdit = can('products', 'edit')
-  const canDelete = can('products', 'delete')
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
-  const [searchParams] = useSearchParams()
-  const [search, setSearch] = useState(searchParams.get('q') || '')
+  const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('All categories')
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
@@ -185,13 +182,13 @@ export default function Products() {
       <div className="table-wrap">
         <table className="data-table">
           <thead>
-            <tr><th>Product</th><th>Category</th><th>Supplier</th><th>Origin</th><th>MOQ</th><th>Unit Price</th><th>Docs</th><th>Status</th>{(canEdit || canDelete) && <th>Actions</th>}</tr>
+            <tr><th>Product</th><th>Category</th><th>Supplier</th><th>Origin</th><th>MOQ</th><th>Unit Price</th><th>Docs</th><th>Status</th>{canEdit && <th>Actions</th>}</tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={(canEdit || canDelete) ? 9 : 8}>Loading products…</td></tr>
+              <tr className="empty-row"><td colSpan={canEdit ? 9 : 8}>Loading products…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={(canEdit || canDelete) ? 9 : 8}>No products match.</td></tr>
+              <tr className="empty-row"><td colSpan={canEdit ? 9 : 8}>No products match.</td></tr>
             ) : filtered.map((p) => (
               <tr key={p.id} style={{ opacity: p.status === 'Inactive' ? 0.55 : 1 }}>
                 <td className="cell-strong">{p.name}</td>
@@ -210,16 +207,14 @@ export default function Products() {
                   )}
                 </td>
                 <td><Pill>{p.status}</Pill></td>
-                {(canEdit || canDelete) && (
+                {canEdit && (
                   <td>
                     <div style={{ display: 'flex', gap: 4 }}>
-                      {canEdit && <button className="btn btn-ghost btn-sm" onClick={() => openEdit(p)} title="Edit"><IconEdit width={13} height={13} /></button>}
-                      {canEdit && (
-                        <button className="btn btn-ghost btn-sm" onClick={() => toggleStatus(p)} title={p.status === 'Active' ? 'Mark inactive' : 'Mark active'}>
-                          {p.status === 'Active' ? 'Deactivate' : 'Activate'}
-                        </button>
-                      )}
-                      {canDelete && <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(p)} title="Remove"><IconTrash width={13} height={13} /></button>}
+                      <button className="btn btn-ghost btn-sm" onClick={() => openEdit(p)} title="Edit"><IconEdit width={13} height={13} /></button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => toggleStatus(p)} title={p.status === 'Active' ? 'Mark inactive' : 'Mark active'}>
+                        {p.status === 'Active' ? 'Deactivate' : 'Activate'}
+                      </button>
+                      <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(p)} title="Remove"><IconTrash width={13} height={13} /></button>
                     </div>
                   </td>
                 )}

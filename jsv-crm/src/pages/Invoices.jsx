@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api.js'
 import { useAuth } from '../lib/AuthContext.jsx'
 import PageHeader from '../components/PageHeader.jsx'
@@ -14,23 +13,11 @@ const GST_RATE = 18
 
 const STATUS_OPTIONS = ['Draft', 'Sent', 'Paid', 'Unpaid', 'Overdue', 'Cancelled']
 const PAYMENT_MODES = ['NEFT', 'RTGS', 'Cheque', 'Cash', 'UPI', 'Bank Transfer']
-const PAYMENT_TERMS = ['Net 15', 'Net 30', 'Net 45', 'Net 60', 'Custom']
-
-function termsToDays(terms) {
-  const match = /Net (\d+)/.exec(terms || '')
-  return match ? Number(match[1]) : null
-}
-
-function addDays(dateStr, days) {
-  if (!dateStr || days == null) return ''
-  return new Date(new Date(dateStr).getTime() + days * 86400000).toISOString().slice(0, 10)
-}
 
 function emptyForm() {
   return {
     company: '', orderId: '', issueDate: new Date().toISOString().slice(0, 10),
-    dueDate: addDays(new Date().toISOString().slice(0, 10), 30), paymentTerms: 'Net 30',
-    subtotal: 0, cgst: 0, sgst: 0, igst: 0, total: 0,
+    dueDate: '', subtotal: 0, cgst: 0, sgst: 0, igst: 0, total: 0,
     status: 'Draft', paymentMode: '', notes: '',
   }
 }
@@ -137,7 +124,6 @@ function printInvoice(inv, order) {
       <tr><td>Invoice No.</td><td>${inv.invoiceNo}</td></tr>
       <tr><td>Invoice Date</td><td>${inv.issueDate}</td></tr>
       <tr><td>Due Date</td><td>${inv.dueDate || '—'}</td></tr>
-      <tr><td>Payment Terms</td><td>${inv.paymentTerms || '—'}</td></tr>
       <tr><td>Order Ref.</td><td>${order?.orderNo || '—'}</td></tr>
       <tr><td>Payment Mode</td><td>${inv.paymentMode || '—'}</td></tr>
     </table>
@@ -294,12 +280,10 @@ function printInvoice(inv, order) {
 export default function Invoices() {
   const { can } = useAuth()
   const canEdit = can('invoices', 'edit')
-  const canDelete = can('invoices', 'delete')
   const [invoices, setInvoices] = useState([])
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
-  const [searchParams] = useSearchParams()
-  const [search, setSearch] = useState(searchParams.get('q') || '')
+  const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
@@ -338,8 +322,7 @@ export default function Invoices() {
       company: order.company,
       orderId: order.id,
       issueDate: new Date().toISOString().slice(0, 10),
-      dueDate: order.paymentDueDate || addDays(new Date().toISOString().slice(0, 10), 30),
-      paymentTerms: order.paymentTerms || 'Net 30',
+      dueDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
       subtotal: Math.round(subtotal),
       cgst: Math.round(gst / 2),
       sgst: Math.round(gst / 2),
@@ -354,7 +337,7 @@ export default function Invoices() {
   }
 
   function openEdit(inv) {
-    setForm({ paymentTerms: 'Custom', ...inv })
+    setForm({ ...inv })
     setEditingId(inv.id)
     setShowModal(true)
   }
@@ -479,10 +462,7 @@ export default function Invoices() {
                 <td className="cell-mono cell-strong">{inv.invoiceNo}</td>
                 <td className="cell-strong">{inv.company}</td>
                 <td className="cell-mono">{inv.issueDate}</td>
-                <td className="cell-mono" style={{ color: inv.status === 'Overdue' ? 'var(--red-600)' : undefined }}>
-                  {inv.dueDate}
-                  {inv.paymentTerms && <><br /><span className="cell-mono cell-muted" style={{ fontSize: 11 }}>{inv.paymentTerms}</span></>}
-                </td>
+                <td className="cell-mono" style={{ color: inv.status === 'Overdue' ? 'var(--red-600)' : undefined }}>{inv.dueDate}</td>
                 <td className="cell-mono">{formatINR(inv.subtotal)}</td>
                 <td className="cell-mono">{formatINR(Number(inv.cgst || 0) + Number(inv.sgst || 0) + Number(inv.igst || 0))}</td>
                 <td className="cell-mono cell-strong">{formatINR(inv.total)}</td>
@@ -490,7 +470,7 @@ export default function Invoices() {
                 <td style={{ display: 'flex', gap: 4 }}>
                   {canEdit && <button className="btn btn-ghost btn-sm" onClick={() => openEdit(inv)}><IconEdit width={13} height={13} /></button>}
                   <button className="btn btn-ghost btn-sm" onClick={() => printInvoice(inv, orders.find((o) => o.id === inv.orderId))}>🖨 Print</button>
-                  {canDelete && <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(inv)}><IconTrash width={13} height={13} /></button>}
+                  {canEdit && <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(inv)}><IconTrash width={13} height={13} /></button>}
                 </td>
               </tr>
             ))}
@@ -519,32 +499,12 @@ export default function Invoices() {
             <div className="field-row">
               <div className="field">
                 <label>Issue date</label>
-                <input
-                  type="date" required value={form.issueDate}
-                  onChange={(e) => {
-                    const issueDate = e.target.value
-                    const days = termsToDays(form.paymentTerms)
-                    setForm((f) => ({ ...f, issueDate, dueDate: days != null ? addDays(issueDate, days) : f.dueDate }))
-                  }}
-                />
+                <input type="date" required value={form.issueDate} onChange={(e) => setForm({ ...form, issueDate: e.target.value })} />
               </div>
               <div className="field">
-                <label>Payment terms</label>
-                <select
-                  value={form.paymentTerms || 'Custom'}
-                  onChange={(e) => {
-                    const paymentTerms = e.target.value
-                    const days = termsToDays(paymentTerms)
-                    setForm((f) => ({ ...f, paymentTerms, dueDate: days != null ? addDays(f.issueDate, days) : f.dueDate }))
-                  }}
-                >
-                  {PAYMENT_TERMS.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
+                <label>Due date</label>
+                <input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} />
               </div>
-            </div>
-            <div className="field">
-              <label>Due date {form.paymentTerms !== 'Custom' && <span style={{ fontWeight: 400, color: 'var(--ink-400)' }}>(auto-calculated from payment terms — you can still adjust it)</span>}</label>
-              <input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} />
             </div>
             <div className="field">
               <label>Subtotal (₹) — GST calculated automatically</label>

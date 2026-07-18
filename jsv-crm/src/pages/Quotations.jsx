@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api.js'
 import PageHeader from '../components/PageHeader.jsx'
 import ExportBar from '../components/ExportBar.jsx'
 import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
-import { IconPlus, IconTrash, IconSearch } from '../components/Icons.jsx'
+import { IconPlus, IconTrash } from '../components/Icons.jsx'
 import '../styles/components.css'
 
 function emptyLineItem() {
@@ -17,8 +16,6 @@ function emptyForm() {
 }
 
 export default function Quotations() {
-  const [searchParams] = useSearchParams()
-  const [search, setSearch] = useState(searchParams.get('q') || '')
   const [quotations, setQuotations] = useState([])
   const [products, setProducts] = useState([])
   const [customers, setCustomers] = useState([])
@@ -38,10 +35,6 @@ export default function Quotations() {
 
   const productOptions = useMemo(() => products.map((p) => p.name), [products])
   const customerOptions = useMemo(() => customers.map((c) => c.company), [customers])
-
-  const filtered = useMemo(() => quotations.filter((q) =>
-    !search || [q.quoteNo, q.company].some((v) => (v || '').toLowerCase().includes(search.toLowerCase()))
-  ), [quotations, search])
 
   function updateLineItem(i, patch) {
     const items = [...form.lineItems]
@@ -90,8 +83,8 @@ export default function Quotations() {
             <ExportBar
               title="Quotations"
               headers={['Quote #', 'Company', 'Items', 'Total', 'Valid Until', 'Status']}
-              rows={filtered.map((q) => [q.quoteNo, q.company, q.items, `₹${Number(q.total).toLocaleString('en-IN')}`, q.validUntil, q.status])}
-              count={filtered.length}
+              rows={quotations.map((q) => [q.quoteNo, q.company, q.items, `₹${Number(q.total).toLocaleString('en-IN')}`, q.validUntil, q.status])}
+              count={quotations.length}
             />
             <button className="btn btn-primary" onClick={() => setShowModal(true)}>
               <IconPlus width={15} height={15} /> New Quotation
@@ -99,13 +92,6 @@ export default function Quotations() {
           </div>
         }
       />
-
-      <div className="filters-bar">
-        <div className="search-input">
-          <IconSearch width={15} height={15} />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search quote #, company…" />
-        </div>
-      </div>
 
       <div className="table-wrap">
         <table className="data-table">
@@ -115,9 +101,9 @@ export default function Quotations() {
           <tbody>
             {loading ? (
               <tr className="empty-row"><td colSpan={7}>Loading quotations…</td></tr>
-            ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={7}>{quotations.length === 0 ? 'No quotations yet.' : 'No quotations match your search.'}</td></tr>
-            ) : filtered.map((q) => (
+            ) : quotations.length === 0 ? (
+              <tr className="empty-row"><td colSpan={7}>No quotations yet.</td></tr>
+            ) : quotations.map((q) => (
               <tr key={q.id}>
                 <td className="cell-mono">{q.quoteNo}</td>
                 <td className="cell-strong">{q.company}</td>
@@ -162,8 +148,8 @@ export default function Quotations() {
               <label style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink-700)', display: 'block', marginBottom: 8 }}>
                 Products
               </label>
-              <div style={{ border: '1px solid var(--paper-200)', borderRadius: 'var(--radius-sm)', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                <table style={{ width: '100%', minWidth: 480, borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <div style={{ border: '1px solid var(--paper-200)', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
                   <thead>
                     <tr style={{ background: 'var(--paper-0)' }}>
                       <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: 'var(--ink-500)', fontSize: 11, borderBottom: '1px solid var(--paper-200)' }}>Product</th>

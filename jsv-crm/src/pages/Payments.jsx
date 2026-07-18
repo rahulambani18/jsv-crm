@@ -21,7 +21,6 @@ function formatINR(n) { return '₹' + Number(n || 0).toLocaleString('en-IN') }
 export default function Payments() {
   const { can } = useAuth()
   const canEdit = can('payments', 'edit')
-  const canDelete = can('payments', 'delete')
   const [payments, setPayments] = useState([])
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(true)
@@ -139,13 +138,13 @@ export default function Payments() {
       <div className="table-wrap">
         <table className="data-table">
           <thead>
-            <tr><th>Payment #</th><th>Company</th><th>Amount</th><th>Date</th><th>Mode</th><th>Reference</th><th>Linked Invoice</th><th>Status</th>{canDelete && <th>Actions</th>}</tr>
+            <tr><th>Payment #</th><th>Company</th><th>Amount</th><th>Date</th><th>Mode</th><th>Reference</th><th>Linked Invoice</th><th>Status</th>{canEdit && <th>Actions</th>}</tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={canDelete ? 9 : 8}>Loading payments…</td></tr>
+              <tr className="empty-row"><td colSpan={canEdit ? 9 : 8}>Loading payments…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={canDelete ? 9 : 8}>No payments recorded yet.</td></tr>
+              <tr className="empty-row"><td colSpan={canEdit ? 9 : 8}>No payments recorded yet.</td></tr>
             ) : filtered.map((p) => {
               const inv = invoices.find((i) => i.id === p.invoiceId)
               return (
@@ -158,7 +157,7 @@ export default function Payments() {
                   <td className="cell-mono" style={{ fontSize: 12 }}>{p.reference || '—'}</td>
                   <td className="cell-mono" style={{ fontSize: 12 }}>{inv ? inv.invoiceNo : '—'}</td>
                   <td><Pill>{p.status}</Pill></td>
-                  {canDelete && (
+                  {canEdit && (
                     <td>
                       <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(p)}><IconTrash width={13} height={13} /></button>
                     </td>

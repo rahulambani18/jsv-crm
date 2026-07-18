@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api.js'
 import { INDUSTRY_OPTIONS, INDIAN_STATES } from '../data/seed.js'
 import PageHeader from '../components/PageHeader.jsx'
@@ -14,7 +13,7 @@ import '../styles/components.css'
 function emptyForm() {
   return {
     company: '', contact: '', mobile: '', email: '', gst: '',
-    businessType: '', industry: '', application: '',
+    industry: '', application: '',
     city: '', state: '', billingAddress: '', shippingAddress: '',
   }
 }
@@ -22,11 +21,9 @@ function emptyForm() {
 export default function Customers() {
   const { can } = useAuth()
   const canEdit = can('customers', 'edit')
-  const canDelete = can('customers', 'delete')
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
-  const [searchParams] = useSearchParams()
-  const [search, setSearch] = useState(searchParams.get('q') || '')
+  const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(emptyForm())
   const [sameAsBilling, setSameAsBilling] = useState(true)
@@ -120,14 +117,14 @@ export default function Customers() {
           <thead>
             <tr>
               <th>Code</th><th>Company</th><th>Contact</th><th>City</th><th>GST</th>
-              <th>Type</th><th>Industry</th><th>Application</th><th>Added</th>{canDelete && <th>Actions</th>}
+              <th>Industry</th><th>Application</th><th>Added</th>{canEdit && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={canDelete ? 10 : 9}>Loading customers…</td></tr>
+              <tr className="empty-row"><td colSpan={canEdit ? 9 : 8}>Loading customers…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={canDelete ? 10 : 9}>{customers.length === 0 ? 'No customers yet.' : 'No customers match your search.'}</td></tr>
+              <tr className="empty-row"><td colSpan={canEdit ? 9 : 8}>{customers.length === 0 ? 'No customers yet.' : 'No customers match your search.'}</td></tr>
             ) : filtered.map((c) => (
               <tr key={c.id}>
                 <td className="cell-mono">{c.code}</td>
@@ -135,11 +132,10 @@ export default function Customers() {
                 <td>{c.contact}<br /><span className="cell-mono cell-muted" style={{ fontSize: 11.5 }}>{c.mobile}</span></td>
                 <td>{c.city}</td>
                 <td className="cell-mono" style={{ fontSize: 11.5 }}>{c.gst}</td>
-                <td>{c.businessType ? <span className="pill pill-navy">{c.businessType}</span> : <span className="cell-muted">—</span>}</td>
                 <td>{c.industry}</td>
                 <td>{c.application}</td>
                 <td className="cell-mono">{c.added}</td>
-                {canDelete && (
+                {canEdit && (
                   <td>
                     <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(c)}><IconTrash width={13} height={13} /></button>
                   </td>
@@ -190,22 +186,13 @@ export default function Customers() {
             </div>
             <div className="field-row">
               <div className="field">
-                <label>Business type</label>
-                <select value={form.businessType} onChange={(e) => setForm({ ...form, businessType: e.target.value })}>
-                  <option value="">Select type…</option>
-                  <option value="Trader">Trader</option>
-                  <option value="Manufacturer">Manufacturer</option>
-                  <option value="Both">Both</option>
-                </select>
-              </div>
-              <div className="field">
                 <label>Industry</label>
                 <ComboField options={INDUSTRY_OPTIONS} value={form.industry} onChange={(v) => setForm({ ...form, industry: v })} placeholder="Select industry…" />
               </div>
-            </div>
-            <div className="field">
-              <label>Application</label>
-              <input value={form.application} onChange={(e) => setForm({ ...form, application: e.target.value })} placeholder="e.g. Flavoured Milk" />
+              <div className="field">
+                <label>Application</label>
+                <input value={form.application} onChange={(e) => setForm({ ...form, application: e.target.value })} placeholder="e.g. Flavoured Milk" />
+              </div>
             </div>
             <div className="field-row">
               <div className="field">

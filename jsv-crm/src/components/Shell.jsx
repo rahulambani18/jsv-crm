@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
-import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext.jsx'
 import {
   IconGrid, IconUsers, IconClock, IconUserCheck, IconFlask,
   IconFile, IconCart, IconBox, IconChart, IconLogout, IconPanel, IconShield,
-  IconCheckSquare, IconCalendar, IconFolder, IconReceipt, IconCreditCard, IconSearch,
+  IconCheckSquare, IconCalendar, IconFolder, IconReceipt, IconCreditCard,
 } from './Icons.jsx'
 import { api } from '../lib/api.js'
 import jsvMark from '../assets/jsv-mark.png'
@@ -48,7 +48,6 @@ export default function Shell({ children }) {
   const { user, signOut, can } = useAuth()
   const [navOpen, setNavOpen] = useState(false)
   const location = useLocation()
-  const navigate = useNavigate()
 
   // Dark mode — persists across sessions
   const [dark, setDark] = useState(() => localStorage.getItem('jsv_theme') === 'dark')
@@ -107,8 +106,8 @@ export default function Shell({ children }) {
   useEffect(() => {
     Promise.all([
       api.orders.list(), api.followUps.list(), api.meetings.list(),
-      api.tasks.list(), api.quotations.list(), api.samples.list(), api.invoices.list(),
-    ]).then(([orders, followUps, meetings, tasks, quotations, samples, invoices]) => {
+      api.tasks.list(), api.quotations.list(), api.samples.list(),
+    ]).then(([orders, followUps, meetings, tasks, quotations, samples]) => {
       const today = new Date().toISOString().slice(0, 10)
       const daysBetween = (a, b) => Math.round((new Date(b) - new Date(a)) / 86400000)
       const notifs = []
@@ -138,33 +137,12 @@ export default function Shell({ children }) {
         notifs.push({ id: `tk-${t.id}`, group: 'Pending Tasks', text: t.title, sub: `${t.dueDate < today ? 'Overdue since' : 'Due'} ${t.dueDate}${t.assignedTo ? ' · ' + t.assignedTo : ''}`, color: t.dueDate < today ? 'var(--red-600)' : 'var(--amber-600)' })
       })
 
-      // 4) Pending payments (order-level, general signal)
+      // 4) Pending payments
       orders.filter((o) => o.payment === 'Pending' || o.payment === 'Partial').forEach((o) => {
         notifs.push({ id: `pay-${o.id}`, group: 'Pending Payments', text: `Payment pending: ${o.company}`, sub: `${o.orderNo} · ₹${Number(o.total).toLocaleString('en-IN')}`, color: 'var(--amber-600)' })
-      })
-
-      // Reminder: Payment Due — fires the moment an order is saved
-      // (based on its Payment Terms, e.g. Net 30), no need to wait
-      // for an invoice to be generated. Amber a few days before,
-      // red once the due date has actually passed.
-      orders.filter((o) => o.paymentDueDate && (o.payment === 'Pending' || o.payment === 'Partial')).forEach((o) => {
-        const d = daysBetween(o.paymentDueDate, today)
-        if (d >= 0) {
-          notifs.push({ id: `ord-overdue-${o.id}`, group: 'Reminder: Payment Due', text: `${o.company} — ${o.orderNo}`, sub: `${d === 0 ? 'Due today' : `Overdue by ${d} day${d === 1 ? '' : 's'}`} · ₹${Number(o.total).toLocaleString('en-IN')}${o.paymentTerms ? ' · ' + o.paymentTerms : ''}`, color: 'var(--red-600)' })
-        } else if (d >= -3) {
-          notifs.push({ id: `ord-soon-${o.id}`, group: 'Reminder: Payment Due', text: `${o.company} — ${o.orderNo}`, sub: `Due in ${-d} day${-d === 1 ? '' : 's'} · ₹${Number(o.total).toLocaleString('en-IN')}${o.paymentTerms ? ' · ' + o.paymentTerms : ''}`, color: 'var(--amber-600)' })
-        }
-      })
-
-      // Same reminder, but for invoices that don't trace back to an
-      // order with its own due date already covered above (e.g.
-      // manually-created invoices).
-      invoices.filter((i) => i.dueDate && !i.orderId && !['Paid', 'Cancelled'].includes(i.status)).forEach((i) => {
-        const d = daysBetween(i.dueDate, today)
-        if (d >= 0) {
-          notifs.push({ id: `inv-overdue-${i.id}`, group: 'Reminder: Payment Due', text: `${i.company} — ${i.invoiceNo}`, sub: `${d === 0 ? 'Due today' : `Overdue by ${d} day${d === 1 ? '' : 's'}`} · ₹${Number(i.total).toLocaleString('en-IN')}${i.paymentTerms ? ' · ' + i.paymentTerms : ''}`, color: 'var(--red-600)' })
-        } else if (d >= -3) {
-          notifs.push({ id: `inv-soon-${i.id}`, group: 'Reminder: Payment Due', text: `${i.company} — ${i.invoiceNo}`, sub: `Due in ${-d} day${-d === 1 ? '' : 's'} · ₹${Number(i.total).toLocaleString('en-IN')}${i.paymentTerms ? ' · ' + i.paymentTerms : ''}`, color: 'var(--amber-600)' })
+        // Reminder: flag it again more urgently once it's been sitting a while
+        if (o.orderDate && daysBetween(o.orderDate, today) >= 15) {
+          notifs.push({ id: `pay-rem-${o.id}`, group: 'Reminder: Payment Due', text: `${o.company} — ${daysBetween(o.orderDate, today)} days unpaid`, sub: `${o.orderNo} · ₹${Number(o.total).toLocaleString('en-IN')}`, color: 'var(--red-600)' })
         }
       })
 
@@ -190,59 +168,6 @@ export default function Shell({ children }) {
       setNotifications(notifs)
     }).catch(() => {})
   }, [location.pathname])
-
-  // Global search — searches across the main record types and lets you
-  // jump straight to the right page. Since most pages here are list
-  // views (no per-record detail page), clicking a result takes you to
-  // that list pre-filtered to your search term.
-  const [searchQuery, setSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState([])
-  const [searchLoading, setSearchLoading] = useState(false)
-  const [showSearch, setShowSearch] = useState(false)
-  const searchRef = useRef(null)
-
-  const SEARCH_TARGETS = [
-    { table: 'customers', label: 'Customer', path: '/customers', match: (r) => [r.company, r.contact, r.mobile, r.gst, r.city] },
-    { table: 'leads', label: 'Lead', path: '/leads', match: (r) => [r.company, r.contact, r.phone, r.city] },
-    { table: 'orders', label: 'Order', path: '/orders', match: (r) => [r.orderNo, r.company, r.poNumber, r.vehicle, r.lrNumber] },
-    { table: 'quotations', label: 'Quotation', path: '/quotations', match: (r) => [r.quoteNo, r.company] },
-    { table: 'invoices', label: 'Invoice', path: '/invoices', match: (r) => [r.invoiceNo, r.company] },
-    { table: 'products', label: 'Product', path: '/products', match: (r) => [r.name, r.category, r.supplier] },
-    { table: 'samples', label: 'Sample', path: '/samples', match: (r) => [r.code, r.company, r.tracking] },
-  ]
-
-  useEffect(() => {
-    const q = searchQuery.trim().toLowerCase()
-    if (q.length < 2) { setSearchResults([]); return }
-    setSearchLoading(true)
-    const timer = setTimeout(() => {
-      Promise.all(SEARCH_TARGETS.map((t) => api[t.table].list().catch(() => [])))
-        .then((allResults) => {
-          const grouped = []
-          SEARCH_TARGETS.forEach((t, i) => {
-            const hits = allResults[i]
-              .filter((r) => t.match(r).some((v) => String(v || '').toLowerCase().includes(q)))
-              .slice(0, 5)
-            hits.forEach((r) => grouped.push({ type: t.label, path: t.path, id: r.id, title: r.company || r.name || r.orderNo || r.invoiceNo || r.quoteNo || r.code, sub: t.match(r).filter(Boolean).join(' · ') }))
-          })
-          setSearchResults(grouped.slice(0, 25))
-        })
-        .finally(() => setSearchLoading(false))
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [searchQuery])
-
-  function goToResult(result) {
-    navigate(`${result.path}?q=${encodeURIComponent(result.title || searchQuery)}`)
-    setShowSearch(false)
-    setSearchQuery('')
-  }
-
-  useEffect(() => {
-    function handleClick(e) { if (searchRef.current && !searchRef.current.contains(e.target)) setShowSearch(false) }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [])
 
   useEffect(() => {
     function handleClick(e) { if (notifRef.current && !notifRef.current.contains(e.target)) setShowNotifs(false) }
@@ -314,11 +239,11 @@ export default function Shell({ children }) {
             <button className="topbar-toggle" onClick={() => setNavOpen((v) => !v)} aria-label="Toggle navigation">
               <IconPanel width={16} height={16} />
             </button>
-            <div className="topbar-greeting" style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.25 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.25 }}>
               <span style={{ fontWeight: 700, fontSize: 14.5 }}>
                 {greeting}{firstName ? `, ${firstName}` : ''} 👋
               </span>
-              <span className="topbar-clock" style={{ fontSize: 11.5, color: 'var(--ink-400)', fontFamily: 'var(--font-mono)' }}>
+              <span style={{ fontSize: 11.5, color: 'var(--ink-400)', fontFamily: 'var(--font-mono)' }}>
                 {now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
                 {'  ·  '}
                 {now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
@@ -326,50 +251,6 @@ export default function Shell({ children }) {
             </div>
           </div>
           <div className="topbar-right" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div ref={searchRef} style={{ position: 'relative' }}>
-              <button
-                onClick={() => setShowSearch((v) => !v)}
-                title="Search everything"
-                style={{ background: 'transparent', border: '1px solid var(--paper-200)', borderRadius: 'var(--radius-sm)', padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--ink-500)' }}
-              >
-                <IconSearch width={15} height={15} />
-              </button>
-              {showSearch && (
-                <div className="search-dropdown" style={{ position: 'absolute', top: 38, right: 0, width: 360, background: '#fff', border: '1px solid var(--paper-200)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-pop)', zIndex: 200, overflow: 'hidden' }}>
-                  <div style={{ padding: 10, borderBottom: '1px solid var(--paper-100)' }}>
-                    <input
-                      autoFocus
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search customers, orders, invoices, products…"
-                      style={{ width: '100%', border: 'none', outline: 'none', fontSize: 13.5, padding: '6px 4px' }}
-                    />
-                  </div>
-                  <div style={{ maxHeight: 380, overflowY: 'auto' }}>
-                    {searchQuery.trim().length < 2 ? (
-                      <div style={{ padding: '18px 16px', color: 'var(--ink-400)', fontSize: 12.5, textAlign: 'center' }}>Type at least 2 characters…</div>
-                    ) : searchLoading ? (
-                      <div style={{ padding: '18px 16px', color: 'var(--ink-400)', fontSize: 12.5, textAlign: 'center' }}>Searching…</div>
-                    ) : searchResults.length === 0 ? (
-                      <div style={{ padding: '18px 16px', color: 'var(--ink-400)', fontSize: 12.5, textAlign: 'center' }}>No matches for "{searchQuery}"</div>
-                    ) : searchResults.map((r, i) => (
-                      <div
-                        key={i}
-                        onClick={() => goToResult(r)}
-                        style={{ padding: '9px 16px', borderBottom: '1px solid var(--paper-100)', cursor: 'pointer', display: 'flex', gap: 10, alignItems: 'center' }}
-                        onMouseDown={(e) => e.preventDefault()}
-                      >
-                        <span className="pill pill-navy" style={{ fontSize: 10.5, flexShrink: 0 }}>{r.type}</span>
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-900)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.title}</div>
-                          <div style={{ fontSize: 11, color: 'var(--ink-400)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.sub}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
             {/* Dark mode toggle */}
               <button
                 onClick={() => setDark((v) => !v)}
@@ -392,7 +273,7 @@ export default function Shell({ children }) {
                 )}
               </button>
               {showNotifs && (
-                <div className="notif-dropdown" style={{ position: 'absolute', top: 38, right: 0, width: 340, background: '#fff', border: '1px solid var(--paper-200)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-pop)', zIndex: 200, overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', top: 38, right: 0, width: 340, background: '#fff', border: '1px solid var(--paper-200)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-pop)', zIndex: 200, overflow: 'hidden' }}>
                   <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--paper-100)', fontWeight: 700, fontSize: 13 }}>
                     Notifications {notifications.length > 0 && <span style={{ color: 'var(--ink-400)', fontWeight: 400 }}>({notifications.length})</span>}
                   </div>
@@ -421,7 +302,7 @@ export default function Shell({ children }) {
                 </div>
               )}
             </div>
-            <span className="iso-pill topbar-iso"><span className="dot" /> ISO 9001:2015 Certified</span>
+            <span className="iso-pill"><span className="dot" /> ISO 9001:2015 Certified</span>
           </div>
         </header>
         <main className="page-content">{children}</main>

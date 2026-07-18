@@ -135,9 +135,3 @@
   background: var(--paper-0);
   border-bottom: 1px solid var(--paper-200);
 }
-
-@media (max-width: 480px) {
-  .perm-grid { grid-template-columns: 1fr 56px 56px 56px !important; }
-  .perm-grid-header > div, .perm-grid-row > div { padding: 0 6px; font-size: 12px; }
-  .perm-grid-header > div { padding: 10px 6px; }
-}

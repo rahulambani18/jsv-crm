@@ -1,28 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api.js'
 import { WAREHOUSES, calcOrderTotals, GST_RATE } from '../data/seed.js'
 import PageHeader from '../components/PageHeader.jsx'
 import ExportBar from '../components/ExportBar.jsx'
 import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
-import { IconPlus, IconTrash, IconEdit, IconSearch } from '../components/Icons.jsx'
+import { IconPlus, IconTrash } from '../components/Icons.jsx'
 import { useAuth } from '../lib/AuthContext.jsx'
 import '../styles/components.css'
 
 const WAREHOUSE_FILTERS = ['All warehouses', ...WAREHOUSES]
 const STATUSES = ['All statuses', 'Processing', 'Dispatched', 'Delivered', 'Cancelled']
-const PAYMENT_TERMS = ['Net 15', 'Net 30', 'Net 45', 'Net 60', 'Custom']
-
-function termsToDays(terms) {
-  const match = /Net (\d+)/.exec(terms || '')
-  return match ? Number(match[1]) : null
-}
-
-function addDays(dateStr, days) {
-  if (!dateStr || days == null) return ''
-  return new Date(new Date(dateStr).getTime() + days * 86400000).toISOString().slice(0, 10)
-}
 
 function emptyLineItem() {
   return { product: '', qty: 1, unit: 'kg', unitPrice: 0 }
@@ -31,8 +19,6 @@ function emptyLineItem() {
 function emptyForm() {
   return {
     customerId: '', company: '', warehouse: WAREHOUSES[0], orderDate: '', delivery: '',
-    paymentTerms: 'Net 30', paymentDueDate: '',
-    poNumber: '', poDate: '', vehicle: '', lrNumber: '', transporter: '', dispatchDate: '',
     lineItems: [emptyLineItem()], status: 'Processing', payment: 'Pending',
   }
 }
@@ -44,9 +30,6 @@ function formatINR(n) {
 export default function Orders() {
   const { can } = useAuth()
   const canEdit = can('orders', 'edit')
-  const canDelete = can('orders', 'delete')
-  const [searchParams] = useSearchParams()
-  const [search, setSearch] = useState(searchParams.get('q') || '')
   const [orders, setOrders] = useState([])
   const [customers, setCustomers] = useState([])
   const [products, setProducts] = useState([])
@@ -54,7 +37,6 @@ export default function Orders() {
   const [warehouseFilter, setWarehouseFilter] = useState('All warehouses')
   const [statusFilter, setStatusFilter] = useState('All statuses')
   const [showModal, setShowModal] = useState(false)
-  const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyForm())
   const [saving, setSaving] = useState(false)
 
@@ -70,9 +52,8 @@ export default function Orders() {
   const filtered = useMemo(() => orders.filter((o) => {
     const matchesWarehouse = warehouseFilter === 'All warehouses' || o.warehouse === warehouseFilter
     const matchesStatus = statusFilter === 'All statuses' || o.status === statusFilter
-    const matchesSearch = !search || [o.orderNo, o.company, o.poNumber, o.vehicle, o.lrNumber, o.transporter].some((v) => (v || '').toLowerCase().includes(search.toLowerCase()))
-    return matchesWarehouse && matchesStatus && matchesSearch
-  }), [orders, warehouseFilter, statusFilter, search])
+    return matchesWarehouse && matchesStatus
+  }), [orders, warehouseFilter, statusFilter])
 
   const totals = useMemo(() => calcOrderTotals(form.lineItems), [form.lineItems])
 
@@ -102,29 +83,7 @@ export default function Orders() {
     setForm((f) => ({ ...f, customerId, company: customer?.company || f.company }))
   }
 
-  function openCreate() {
-    setEditingId(null)
-    setForm(emptyForm())
-    setShowModal(true)
-  }
-
-  function openEdit(order) {
-    setEditingId(order.id)
-    setForm({ ...emptyForm(), ...order })
-    setShowModal(true)
-  }
-
-  async function handleDelete(order) {
-    if (!confirm(`Delete order "${order.orderNo}"? This cannot be undone.`)) return
-    try {
-      await api.orders.remove(order.id)
-      refresh()
-    } catch (err) {
-      alert('Could not delete: ' + (err.message || 'Unknown error'))
-    }
-  }
-
-  async function handleSave(e) {
+  async function handleCreate(e) {
     e.preventDefault()
     setSaving(true)
     const lineItems = form.lineItems
@@ -136,26 +95,13 @@ export default function Orders() {
       orderDate: form.orderDate, delivery: form.delivery, lineItems,
       subtotal, gstRate: GST_RATE, gstAmount, total,
       status: form.status, payment: form.payment,
-      paymentTerms: form.paymentTerms, paymentDueDate: form.paymentDueDate,
-      poNumber: form.poNumber, poDate: form.poDate, vehicle: form.vehicle,
-      lrNumber: form.lrNumber, transporter: form.transporter, dispatchDate: form.dispatchDate,
+      orderNo: `ORD-2026-${String(300 + orders.length + 1).padStart(4, '0')}`,
     }
-    try {
-      if (editingId) {
-        await api.orders.update(editingId, record)
-      } else {
-        record.orderNo = `ORD-2026-${String(300 + orders.length + 1).padStart(4, '0')}`
-        await api.orders.insert(record)
-      }
-      setShowModal(false)
-      setForm(emptyForm())
-      setEditingId(null)
-      refresh()
-    } catch (err) {
-      alert('Could not save: ' + (err.message || 'Unknown error'))
-    } finally {
-      setSaving(false)
-    }
+    await api.orders.insert(record)
+    setSaving(false)
+    setShowModal(false)
+    setForm(emptyForm())
+    refresh()
   }
 
   return (
@@ -167,12 +113,12 @@ export default function Orders() {
           <div style={{ display: 'flex', gap: 10 }}>
             <ExportBar
               title="Orders"
-              headers={['Order #', 'PO Number', 'Company', 'Warehouse', 'Order Date', 'Expected Delivery', 'Vehicle', 'LR Number', 'Transporter', 'Dispatch Date', 'Total', 'Status', 'Payment']}
-              rows={filtered.map((o) => [o.orderNo, o.poNumber, o.company, o.warehouse, o.orderDate, o.delivery, o.vehicle, o.lrNumber, o.transporter, o.dispatchDate, `₹${Number(o.total).toLocaleString('en-IN')}`, o.status, o.payment])}
+              headers={['Order #', 'Company', 'Warehouse', 'Order Date', 'Delivery', 'Total', 'Status', 'Payment']}
+              rows={filtered.map((o) => [o.orderNo, o.company, o.warehouse, o.orderDate, o.delivery, `₹${Number(o.total).toLocaleString('en-IN')}`, o.status, o.payment])}
               count={filtered.length}
             />
             {canEdit && (
-              <button className="btn btn-primary" onClick={openCreate}>
+              <button className="btn btn-primary" onClick={() => setShowModal(true)}>
                 <IconPlus width={15} height={15} /> New Order
               </button>
             )}
@@ -181,10 +127,6 @@ export default function Orders() {
       />
 
       <div className="filters-bar">
-        <div className="search-input">
-          <IconSearch width={15} height={15} />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search order #, PO #, vehicle, LR #…" />
-        </div>
         <select className="select-input" value={warehouseFilter} onChange={(e) => setWarehouseFilter(e.target.value)}>
           {WAREHOUSE_FILTERS.map((w) => <option key={w}>{w}</option>)}
         </select>
@@ -196,43 +138,25 @@ export default function Orders() {
       <div className="table-wrap">
         <table className="data-table">
           <thead>
-            <tr><th>Order #</th><th>Company</th><th>Warehouse</th><th>Order Date</th><th>Expected Delivery</th><th>Logistics</th><th>Total (incl. GST)</th><th>Status</th><th>Payment</th>{(canEdit || canDelete) && <th>Actions</th>}</tr>
+            <tr><th>Order #</th><th>Company</th><th>Warehouse</th><th>Order Date</th><th>Delivery</th><th>Subtotal</th><th>GST</th><th>Total</th><th>Status</th><th>Payment</th></tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={(canEdit || canDelete) ? 10 : 9}>Loading orders…</td></tr>
+              <tr className="empty-row"><td colSpan={10}>Loading orders…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={(canEdit || canDelete) ? 10 : 9}>{orders.length === 0 ? 'No orders yet.' : 'No orders match your filters.'}</td></tr>
+              <tr className="empty-row"><td colSpan={10}>{orders.length === 0 ? 'No orders yet.' : 'No orders match your filters.'}</td></tr>
             ) : filtered.map((o) => (
               <tr key={o.id}>
-                <td className="cell-mono">
-                  {o.orderNo}
-                  {o.poNumber && <><br /><span className="cell-mono cell-muted" style={{ fontSize: 11 }}>PO: {o.poNumber}</span></>}
-                </td>
+                <td className="cell-mono">{o.orderNo}</td>
                 <td className="cell-strong">{o.company}</td>
                 <td>{o.warehouse}</td>
                 <td className="cell-mono">{o.orderDate}</td>
                 <td className="cell-mono">{o.delivery}</td>
-                <td style={{ fontSize: 11.5 }}>
-                  {o.vehicle && <div>🚛 {o.vehicle}</div>}
-                  {o.lrNumber && <div className="cell-mono">LR: {o.lrNumber}</div>}
-                  {o.transporter && <div className="cell-muted">{o.transporter}</div>}
-                  {!o.vehicle && !o.lrNumber && !o.transporter && <span className="cell-muted">—</span>}
-                </td>
-                <td className="cell-mono cell-strong">
-                  {formatINR(o.total)}
-                  <br /><span className="cell-mono cell-muted" style={{ fontSize: 11, fontWeight: 400 }}>{formatINR(o.subtotal)} + GST {formatINR(o.gstAmount)} ({o.gstRate || 18}%)</span>
-                </td>
+                <td className="cell-mono">{formatINR(o.subtotal)}</td>
+                <td className="cell-mono cell-muted">{formatINR(o.gstAmount)} ({o.gstRate || 18}%)</td>
+                <td className="cell-mono cell-strong">{formatINR(o.total)}</td>
                 <td><Pill>{o.status}</Pill></td>
                 <td><Pill>{o.payment}</Pill></td>
-                {(canEdit || canDelete) && (
-                  <td>
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      {canEdit && <button className="btn btn-ghost btn-sm" onClick={() => openEdit(o)}><IconEdit width={13} height={13} /></button>}
-                      {canDelete && <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(o)}><IconTrash width={13} height={13} /></button>}
-                    </div>
-                  </td>
-                )}
               </tr>
             ))}
           </tbody>
@@ -241,18 +165,18 @@ export default function Orders() {
 
       {showModal && (
         <Modal
-          title={editingId ? 'Edit Order' : 'New Order'}
+          title="New Order"
           onClose={() => setShowModal(false)}
           footer={
             <>
               <button className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
               <button className="btn btn-primary" form="order-form" type="submit" disabled={saving}>
-                {saving ? 'Saving…' : editingId ? 'Save changes' : 'Save order'}
+                {saving ? 'Saving…' : 'Save order'}
               </button>
             </>
           }
         >
-          <form id="order-form" onSubmit={handleSave}>
+          <form id="order-form" onSubmit={handleCreate}>
             <div className="field-row">
               <div className="field">
                 <label>Customer</label>
@@ -275,75 +199,18 @@ export default function Orders() {
             <div className="field-row">
               <div className="field">
                 <label>Order date</label>
-                <input
-                  type="date" value={form.orderDate}
-                  onChange={(e) => {
-                    const orderDate = e.target.value
-                    const days = termsToDays(form.paymentTerms)
-                    setForm((f) => ({ ...f, orderDate, paymentDueDate: days != null ? addDays(orderDate, days) : f.paymentDueDate }))
-                  }}
-                />
+                <input type="date" value={form.orderDate} onChange={(e) => setForm({ ...form, orderDate: e.target.value })} />
               </div>
               <div className="field">
-                <label>Expected delivery</label>
+                <label>Delivery date</label>
                 <input type="date" value={form.delivery} onChange={(e) => setForm({ ...form, delivery: e.target.value })} />
-              </div>
-            </div>
-            <div className="field-row">
-              <div className="field">
-                <label>Payment terms</label>
-                <select
-                  value={form.paymentTerms}
-                  onChange={(e) => {
-                    const paymentTerms = e.target.value
-                    const days = termsToDays(paymentTerms)
-                    setForm((f) => ({ ...f, paymentTerms, paymentDueDate: days != null ? addDays(f.orderDate, days) : f.paymentDueDate }))
-                  }}
-                >
-                  {PAYMENT_TERMS.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
-              <div className="field">
-                <label>Payment due date {form.paymentTerms !== 'Custom' && <span style={{ fontWeight: 400, color: 'var(--ink-400)', fontSize: 11 }}>(auto)</span>}</label>
-                <input type="date" value={form.paymentDueDate} onChange={(e) => setForm({ ...form, paymentDueDate: e.target.value })} />
-              </div>
-            </div>
-
-            <div className="field-row">
-              <div className="field">
-                <label>Purchase order number</label>
-                <input value={form.poNumber} onChange={(e) => setForm({ ...form, poNumber: e.target.value })} placeholder="Customer's PO #" />
-              </div>
-              <div className="field">
-                <label>PO date</label>
-                <input type="date" value={form.poDate} onChange={(e) => setForm({ ...form, poDate: e.target.value })} />
-              </div>
-            </div>
-            <div className="field-row">
-              <div className="field">
-                <label>Vehicle number</label>
-                <input value={form.vehicle} onChange={(e) => setForm({ ...form, vehicle: e.target.value })} placeholder="e.g. MH04 AB 1234" />
-              </div>
-              <div className="field">
-                <label>LR number</label>
-                <input value={form.lrNumber} onChange={(e) => setForm({ ...form, lrNumber: e.target.value })} placeholder="Lorry receipt #" />
-              </div>
-            </div>
-            <div className="field-row">
-              <div className="field">
-                <label>Transporter</label>
-                <input value={form.transporter} onChange={(e) => setForm({ ...form, transporter: e.target.value })} placeholder="e.g. Professional Courier" />
-              </div>
-              <div className="field">
-                <label>Dispatch date</label>
-                <input type="date" value={form.dispatchDate} onChange={(e) => setForm({ ...form, dispatchDate: e.target.value })} />
               </div>
             </div>
 
             <div className="field">
               <label>Line items</label>
-              <div style={{ border: '1px solid var(--paper-200)', borderRadius: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                <table style={{ width: '100%', minWidth: 480, fontSize: 12.5, borderCollapse: 'collapse' }}>
+              <div style={{ border: '1px solid var(--paper-200)', borderRadius: 8, overflow: 'hidden' }}>
+                <table style={{ width: '100%', fontSize: 12.5, borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ background: 'var(--paper-0)' }}>
                       <th style={{ textAlign: 'left', padding: '8px 8px', fontWeight: 600, fontSize: 11 }}>Product</th>
