@@ -196,17 +196,19 @@ export default function Orders() {
       <div className="table-wrap">
         <table className="data-table">
           <thead>
-            <tr><th>Order #</th><th>PO Number</th><th>Company</th><th>Warehouse</th><th>Order Date</th><th>Expected Delivery</th><th>Logistics</th><th>Subtotal</th><th>GST</th><th>Total</th><th>Status</th><th>Payment</th>{(canEdit || canDelete) && <th>Actions</th>}</tr>
+            <tr><th>Order #</th><th>Company</th><th>Warehouse</th><th>Order Date</th><th>Expected Delivery</th><th>Logistics</th><th>Total (incl. GST)</th><th>Status</th><th>Payment</th>{(canEdit || canDelete) && <th>Actions</th>}</tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={(canEdit || canDelete) ? 13 : 12}>Loading orders…</td></tr>
+              <tr className="empty-row"><td colSpan={(canEdit || canDelete) ? 10 : 9}>Loading orders…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={(canEdit || canDelete) ? 13 : 12}>{orders.length === 0 ? 'No orders yet.' : 'No orders match your filters.'}</td></tr>
+              <tr className="empty-row"><td colSpan={(canEdit || canDelete) ? 10 : 9}>{orders.length === 0 ? 'No orders yet.' : 'No orders match your filters.'}</td></tr>
             ) : filtered.map((o) => (
               <tr key={o.id}>
-                <td className="cell-mono">{o.orderNo}</td>
-                <td className="cell-mono">{o.poNumber || '—'}</td>
+                <td className="cell-mono">
+                  {o.orderNo}
+                  {o.poNumber && <><br /><span className="cell-mono cell-muted" style={{ fontSize: 11 }}>PO: {o.poNumber}</span></>}
+                </td>
                 <td className="cell-strong">{o.company}</td>
                 <td>{o.warehouse}</td>
                 <td className="cell-mono">{o.orderDate}</td>
@@ -217,9 +219,10 @@ export default function Orders() {
                   {o.transporter && <div className="cell-muted">{o.transporter}</div>}
                   {!o.vehicle && !o.lrNumber && !o.transporter && <span className="cell-muted">—</span>}
                 </td>
-                <td className="cell-mono">{formatINR(o.subtotal)}</td>
-                <td className="cell-mono cell-muted">{formatINR(o.gstAmount)} ({o.gstRate || 18}%)</td>
-                <td className="cell-mono cell-strong">{formatINR(o.total)}</td>
+                <td className="cell-mono cell-strong">
+                  {formatINR(o.total)}
+                  <br /><span className="cell-mono cell-muted" style={{ fontSize: 11, fontWeight: 400 }}>{formatINR(o.subtotal)} + GST {formatINR(o.gstAmount)} ({o.gstRate || 18}%)</span>
+                </td>
                 <td><Pill>{o.status}</Pill></td>
                 <td><Pill>{o.payment}</Pill></td>
                 {(canEdit || canDelete) && (
