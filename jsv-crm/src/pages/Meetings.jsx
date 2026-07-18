@@ -18,6 +18,7 @@ function emptyForm() {
 export default function Meetings() {
   const { can } = useAuth()
   const canEdit = can('meetings', 'edit')
+  const canDelete = can('meetings', 'delete')
   const [meetings, setMeetings] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('All')
@@ -120,7 +121,7 @@ export default function Meetings() {
                 <Pill>{m.status}</Pill>
                 <span style={{ fontSize: 12, background: 'var(--paper-100)', color: 'var(--ink-500)', padding: '2px 8px', borderRadius: 100 }}>{m.type}</span>
               </div>
-              <div style={{ display: 'flex', gap: 16, fontSize: 13, color: 'var(--ink-500)', marginBottom: m.agenda ? 8 : 0 }}>
+              <div style={{ display: 'flex', gap: 16, fontSize: 13, color: 'var(--ink-500)', marginBottom: m.agenda ? 8 : 0, flexWrap: 'wrap' }}>
                 {m.company && <span>🏢 {m.company}</span>}
                 {m.contact && <span>👤 {m.contact}</span>}
                 {m.location && <span>📍 {m.location}</span>}
@@ -129,10 +130,10 @@ export default function Meetings() {
               {m.notes && <p style={{ fontSize: 12.5, color: 'var(--teal-700)', margin: 0, background: 'var(--teal-100)', padding: '6px 10px', borderRadius: 6 }}>📝 {m.notes}</p>}
             </div>
 
-            {canEdit && (
+            {(canEdit || canDelete) && (
               <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                <button className="btn btn-ghost btn-sm" onClick={() => openEdit(m)}><IconEdit width={13} height={13} /></button>
-                <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(m)}><IconTrash width={13} height={13} /></button>
+                {canEdit && <button className="btn btn-ghost btn-sm" onClick={() => openEdit(m)}><IconEdit width={13} height={13} /></button>}
+                {canDelete && <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(m)}><IconTrash width={13} height={13} /></button>}
               </div>
             )}
           </div>

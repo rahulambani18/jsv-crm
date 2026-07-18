@@ -47,6 +47,37 @@ function fromDbShape(obj) {
 
 const DEFAULT_WORKSPACE = '00000000-0000-0000-0000-000000000001'
 
+const MODULE_LABEL = {
+  products: 'Product', leads: 'Lead', customers: 'Customer', samples: 'Sample',
+  quotations: 'Quotation', orders: 'Order', followUps: 'Follow-up', tasks: 'Task',
+  meetings: 'Meeting', documents: 'Document', invoices: 'Invoice', payments: 'Payment',
+}
+
+function pickLabel(record) {
+  if (!record) return ''
+  const candidates = [record.company, record.name, record.title, record.orderNo, record.invoiceNo, record.quoteNo, record.paymentNo, record.code, record.fullName]
+  return String(candidates.find((v) => v) || record.id || '').slice(0, 200)
+}
+
+// Writes one row to audit_log so Users & Roles -> Audit Log shows a
+// real, shared, permanent record of who changed what. Never blocks or
+// fails the actual save — logging is best-effort.
+async function logAuditEntry(tableName, action, record) {
+  if (isMock) return
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    await supabase.from('audit_log').insert({
+      workspace_id: DEFAULT_WORKSPACE,
+      actor_email: user?.email || 'Unknown',
+      table_name: MODULE_LABEL[tableName] || tableName,
+      action,
+      record_label: pickLabel(record),
+    })
+  } catch {
+    // audit logging must never break the real operation
+  }
+}
+
 function makeRealTable(name) {
   const tableName = SQL_TABLE_NAME[name]
   return {
@@ -65,16 +96,19 @@ function makeRealTable(name) {
       const withWorkspace = { workspaceId: DEFAULT_WORKSPACE, ...record }
       const { data, error } = await supabase.from(tableName).insert(toDbShape(withWorkspace)).select().single()
       if (error) throw error
+      logAuditEntry(name, 'Created', record)
       return fromDbShape(data)
     },
     async update(id, patch) {
       const { data, error } = await supabase.from(tableName).update(toDbShape(patch)).eq('id', id).select().single()
       if (error) throw error
+      logAuditEntry(name, 'Updated', patch)
       return fromDbShape(data)
     },
     async remove(id) {
       const { error } = await supabase.from(tableName).delete().eq('id', id)
       if (error) throw error
+      logAuditEntry(name, 'Deleted', { id })
       return true
     },
   }
@@ -90,7 +124,7 @@ const realRolesTable = {
       name: r.name,
       isSystem: r.is_system,
       permissions: Object.fromEntries(
-        (permRows || []).filter((p) => p.role_id === r.id).map((p) => [p.module_key, { view: p.can_view, edit: p.can_edit }])
+        (permRows || []).filter((p) => p.role_id === r.id).map((p) => [p.module_key, { view: p.can_view, edit: p.can_edit, delete: p.can_delete }])
       ),
     }))
   },
@@ -100,7 +134,7 @@ const realRolesTable = {
       .from('roles').insert({ workspace_id: ws.id, name, is_system: !!isSystem }).select().single()
     if (error) throw error
     const permRows = Object.entries(permissions || {}).map(([key, v]) => ({
-      role_id: role.id, module_key: key, can_view: !!v.view, can_edit: !!v.edit,
+      role_id: role.id, module_key: key, can_view: !!v.view, can_edit: !!v.edit, can_delete: !!v.delete,
     }))
     if (permRows.length) await supabase.from('role_permissions').insert(permRows)
     return role
@@ -108,7 +142,7 @@ const realRolesTable = {
   async update(roleId, { permissions }) {
     if (!permissions) return
     const rows = Object.entries(permissions).map(([key, v]) => ({
-      role_id: roleId, module_key: key, can_view: !!v.view, can_edit: !!v.edit,
+      role_id: roleId, module_key: key, can_view: !!v.view, can_edit: !!v.edit, can_delete: !!v.delete,
     }))
     await supabase.from('role_permissions').upsert(rows, { onConflict: 'role_id,module_key' })
   },
@@ -144,6 +178,34 @@ export const api = Object.fromEntries(
 if (!isMock) {
   api.roles = realRolesTable
   api.users = realUsersTable
+}
+
+// Real, permanent, shared Audit Log — replaces the old localStorage-based
+// version that only existed in one browser and hardcoded the actor's name.
+export const auditLog = {
+  async list(limit = 300) {
+    if (isMock) return []
+    const { data, error } = await supabase.from('audit_log').select('*').order('created_at', { ascending: false }).limit(limit)
+    if (error) throw error
+    return data.map((r) => ({ ts: r.created_at, user: r.actor_email, action: r.action, detail: r.record_label, table: r.table_name }))
+  },
+  // For actions outside the standard tables (user deletion, password
+  // resets, role deletion) — same underlying log, called directly.
+  async log(action, detail, category = 'Users & Roles') {
+    if (isMock) return
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      await supabase.from('audit_log').insert({
+        workspace_id: '00000000-0000-0000-0000-000000000001',
+        actor_email: user?.email || 'Unknown',
+        table_name: category,
+        action,
+        record_label: String(detail || '').slice(0, 200),
+      })
+    } catch {
+      // best-effort
+    }
+  },
 }
 
 // File attachments — uploads to a public Supabase Storage bucket named
@@ -216,17 +278,17 @@ async function buildUserObject(authUser, profile) {
     // Fetch permissions
     const { data: perms } = await supabase
       .from('role_permissions')
-      .select('module_key, can_view, can_edit')
+      .select('module_key, can_view, can_edit, can_delete')
       .eq('role_id', roleId)
     permissions = Object.fromEntries(
-      (perms || []).map((p) => [p.module_key, { view: p.can_view, edit: p.can_edit }])
+      (perms || []).map((p) => [p.module_key, { view: p.can_view, edit: p.can_edit, delete: p.can_delete }])
     )
   }
 
   // Admin always gets full access regardless of permission rows
   const ALL_MODULES = ['dashboard','leads','follow_ups','customers','samples','quotations','orders','products','reports','users','tasks','meetings','documents','invoices','payments']
   if (roleName === 'Admin') {
-    ALL_MODULES.forEach((m) => { permissions[m] = { view: true, edit: true } })
+    ALL_MODULES.forEach((m) => { permissions[m] = { view: true, edit: true, delete: true } })
   }
 
   return {

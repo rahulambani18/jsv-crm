@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api.js'
 import { PIPELINE_STAGES, INDUSTRY_OPTIONS } from '../data/seed.js'
 import PageHeader from '../components/PageHeader.jsx'
@@ -20,10 +21,12 @@ function emptyForm() {
 export default function Leads() {
   const { can } = useAuth()
   const canEdit = can('leads', 'edit')
+  const canDelete = can('leads', 'delete')
   const [leads, setLeads] = useState([])
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
+  const [searchParams] = useSearchParams()
+  const [search, setSearch] = useState(searchParams.get('q') || '')
   const [statusFilter, setStatusFilter] = useState('All statuses')
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(emptyForm())
@@ -106,14 +109,14 @@ export default function Leads() {
           <thead>
             <tr>
               <th>Lead</th><th>Company</th><th>Contact</th><th>City</th>
-              <th>Priority</th><th>Status</th><th>Est. Value</th><th>Next Follow-up</th>{canEdit && <th>Actions</th>}
+              <th>Priority</th><th>Status</th><th>Est. Value</th><th>Next Follow-up</th>{canDelete && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={canEdit ? 9 : 8}>Loading leads…</td></tr>
+              <tr className="empty-row"><td colSpan={canDelete ? 9 : 8}>Loading leads…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={canEdit ? 9 : 8}>{leads.length === 0 ? 'No leads found.' : 'No leads match your filters.'}</td></tr>
+              <tr className="empty-row"><td colSpan={canDelete ? 9 : 8}>{leads.length === 0 ? 'No leads found.' : 'No leads match your filters.'}</td></tr>
             ) : filtered.map((l) => (
               <tr key={l.id}>
                 <td className="cell-mono cell-muted">{l.id.toUpperCase()}</td>
@@ -124,7 +127,7 @@ export default function Leads() {
                 <td><Pill>{l.status}</Pill></td>
                 <td className="cell-mono">₹{Number(l.estValue).toLocaleString('en-IN')}</td>
                 <td className="cell-mono">{l.nextFollowUp}</td>
-                {canEdit && (
+                {canDelete && (
                   <td>
                     <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(l)}><IconTrash width={13} height={13} /></button>
                   </td>

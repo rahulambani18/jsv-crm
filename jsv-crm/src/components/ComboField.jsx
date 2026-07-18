@@ -1,11 +1,13 @@
 import { useState } from 'react'
+import Dropdown from './Dropdown.jsx'
 
 const OTHER_VALUE = '__other__'
 
 /**
- * A <select> that includes an "Other (type manually)" option. When chosen,
- * swaps to a free-text <input> so the user can enter a value not in the
- * list. Used for Industry, Product interest, etc. across multiple forms.
+ * A custom-styled dropdown that includes an "Other (type manually)"
+ * option. When chosen, swaps to a free-text <input> so the user can
+ * enter a value not in the list. Used for Industry, Product interest,
+ * etc. across multiple forms.
  */
 export default function ComboField({ options, value, onChange, placeholder = 'Select…' }) {
   const isCustomValue = value && !options.includes(value)
@@ -32,21 +34,21 @@ export default function ComboField({ options, value, onChange, placeholder = 'Se
     )
   }
 
+  const dropdownOptions = [...options, { value: OTHER_VALUE, label: 'Other (type manually)…' }]
+
   return (
-    <select
+    <Dropdown
+      options={dropdownOptions}
       value={isCustomValue ? OTHER_VALUE : value}
-      onChange={(e) => {
-        if (e.target.value === OTHER_VALUE) {
+      placeholder={placeholder}
+      onChange={(v) => {
+        if (v === OTHER_VALUE) {
           setManualMode(true)
           onChange('')
         } else {
-          onChange(e.target.value)
+          onChange(v)
         }
       }}
-    >
-      <option value="" disabled>{placeholder}</option>
-      {options.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
-      <option value={OTHER_VALUE}>Other (type manually)…</option>
-    </select>
+    />
   )
 }

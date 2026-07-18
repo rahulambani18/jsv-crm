@@ -19,6 +19,7 @@ function emptyForm() {
 export default function Tasks() {
   const { user, can } = useAuth()
   const canEdit = can('tasks', 'edit')
+  const canDelete = can('tasks', 'delete')
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('All')
@@ -135,16 +136,16 @@ export default function Tasks() {
                 <span style={{ fontSize: 12, background: 'var(--paper-100)', color: 'var(--ink-500)', padding: '2px 8px', borderRadius: 100 }}>{t.type}</span>
               </div>
               {t.description && <p style={{ fontSize: 13, color: 'var(--ink-500)', margin: '0 0 6px' }}>{t.description}</p>}
-              <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--ink-400)' }}>
+              <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--ink-400)', flexWrap: 'wrap' }}>
                 {t.assignedTo && <span>👤 {t.assignedTo}</span>}
                 {t.relatedTo && <span>🏢 {t.relatedTo}</span>}
                 {t.dueDate && <span style={{ color: t.dueDate < new Date().toISOString().slice(0, 10) && t.status !== 'Completed' ? 'var(--red-600)' : 'var(--ink-400)' }}>📅 Due {t.dueDate}</span>}
               </div>
             </div>
-            {canEdit && (
+            {(canEdit || canDelete) && (
               <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                <button className="btn btn-ghost btn-sm" onClick={() => openEdit(t)}><IconEdit width={13} height={13} /></button>
-                <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(t)}><IconTrash width={13} height={13} /></button>
+                {canEdit && <button className="btn btn-ghost btn-sm" onClick={() => openEdit(t)}><IconEdit width={13} height={13} /></button>}
+                {canDelete && <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(t)}><IconTrash width={13} height={13} /></button>}
               </div>
             )}
           </div>

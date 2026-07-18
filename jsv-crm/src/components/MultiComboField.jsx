@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { IconX } from './Icons.jsx'
+import Dropdown from './Dropdown.jsx'
 
 /**
  * Tag-style multi-select: pick from a dropdown of known products, or type
@@ -40,14 +41,14 @@ export default function MultiComboField({ options, value = [], onChange, placeho
         </div>
       )}
       <div style={{ display: 'flex', gap: 6 }}>
-        <select
-          value=""
-          onChange={(e) => { if (e.target.value) addItem(e.target.value) }}
-          style={{ flex: 1 }}
-        >
-          <option value="">{placeholder}</option>
-          {options.filter((o) => !value.includes(o)).map((opt) => <option key={opt} value={opt}>{opt}</option>)}
-        </select>
+        <div style={{ flex: 1 }}>
+          <Dropdown
+            options={options.filter((o) => !value.includes(o))}
+            value=""
+            placeholder={placeholder}
+            onChange={(v) => { if (v) addItem(v) }}
+          />
+        </div>
       </div>
       <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
         <input
