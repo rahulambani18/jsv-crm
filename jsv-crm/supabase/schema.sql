@@ -132,6 +132,7 @@ create table if not exists customers (
   billing_address text,
   shipping_address text,
   added date default current_date,
+  assigned_to text,
   created_at timestamptz default now()
 );
 
@@ -180,6 +181,7 @@ create table if not exists orders (
   po_number text,
   po_date date,
   dispatch_date date,
+  assigned_to text,
   line_items jsonb default '[]',   -- [{ product, qty, unit, unit_price, line_total }]
   subtotal numeric default 0,
   gst_rate numeric default 18,

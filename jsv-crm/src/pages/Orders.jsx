@@ -8,7 +8,10 @@ import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
 import { IconPlus, IconTrash, IconEdit, IconSearch } from '../components/Icons.jsx'
 import Dropdown from '../components/Dropdown.jsx'
+import BulkActionsBar from '../components/BulkActionsBar.jsx'
 import { useAuth } from '../lib/AuthContext.jsx'
+import { showToast } from '../lib/toast.js'
+import { exportCSV } from '../lib/exportUtils.js'
 import '../styles/components.css'
 
 const WAREHOUSE_FILTERS = ['All warehouses', ...WAREHOUSES]
@@ -58,8 +61,11 @@ export default function Orders() {
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyForm())
   const [saving, setSaving] = useState(false)
+  const [selected, setSelected] = useState(new Set())
+  const [users, setUsers] = useState([])
 
   useEffect(() => { refresh() }, [])
+  useEffect(() => { api.users.list().then(setUsers).catch(() => {}) }, [])
 
   function refresh() {
     setLoading(true)
@@ -120,8 +126,71 @@ export default function Orders() {
     try {
       await api.orders.remove(order.id)
       refresh()
+      showToast(`Order ${order.orderNo} deleted`)
     } catch (err) {
-      alert('Could not delete: ' + (err.message || 'Unknown error'))
+      showToast('Could not delete: ' + (err.message || 'Unknown error'), 'error')
+    }
+  }
+
+  function toggleSelected(id) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    setSelected((prev) =>
+      prev.size === filtered.length ? new Set() : new Set(filtered.map((o) => o.id))
+    )
+  }
+
+  async function handleBulkDelete() {
+    const count = selected.size
+    if (!confirm(`Delete ${count} order${count === 1 ? '' : 's'}? This cannot be undone.`)) return
+    try {
+      await Promise.all([...selected].map((id) => api.orders.remove(id)))
+      setSelected(new Set())
+      refresh()
+      showToast(`${count} order${count === 1 ? '' : 's'} deleted`)
+    } catch (err) {
+      showToast('Could not delete selected orders: ' + (err.message || 'Unknown error'), 'error')
+    }
+  }
+
+  function handleBulkExport() {
+    const rows = filtered.filter((o) => selected.has(o.id))
+    exportCSV(
+      'Orders',
+      ['Order #', 'PO Number', 'Company', 'Warehouse', 'Order Date', 'Expected Delivery', 'Dispatch Date', 'Total', 'Status', 'Payment'],
+      rows.map((o) => [o.orderNo, o.poNumber, o.company, o.warehouse, o.orderDate, o.delivery, o.dispatchDate, `₹${Number(o.total).toLocaleString('en-IN')}`, o.status, o.payment])
+    )
+  }
+
+  async function handleBulkAssign(repName) {
+    if (!repName) return
+    const count = selected.size
+    try {
+      await Promise.all([...selected].map((id) => api.orders.update(id, { assignedTo: repName })))
+      setSelected(new Set())
+      refresh()
+      showToast(`${count} order${count === 1 ? '' : 's'} assigned to ${repName}`)
+    } catch (err) {
+      showToast('Could not assign: ' + (err.message || 'Unknown error'), 'error')
+    }
+  }
+
+  async function handleBulkStatus(status) {
+    if (!status) return
+    const count = selected.size
+    try {
+      await Promise.all([...selected].map((id) => api.orders.update(id, { status })))
+      setSelected(new Set())
+      refresh()
+      showToast(`Status updated to "${status}" for ${count} order${count === 1 ? '' : 's'}`)
+    } catch (err) {
+      showToast('Could not update status: ' + (err.message || 'Unknown error'), 'error')
     }
   }
 
@@ -143,16 +212,18 @@ export default function Orders() {
     try {
       if (editingId) {
         await api.orders.update(editingId, record)
+        showToast('Order updated successfully')
       } else {
         record.orderNo = `ORD-2026-${String(300 + orders.length + 1).padStart(4, '0')}`
         await api.orders.insert(record)
+        showToast('Order created successfully')
       }
       setShowModal(false)
       setForm(emptyForm())
       setEditingId(null)
       refresh()
     } catch (err) {
-      alert('Could not save: ' + (err.message || 'Unknown error'))
+      showToast('Could not save: ' + (err.message || 'Unknown error'), 'error')
     } finally {
       setSaving(false)
     }
@@ -193,18 +264,55 @@ export default function Orders() {
         </select>
       </div>
 
+      {canEdit && (
+        <BulkActionsBar
+          count={selected.size}
+          onClear={() => setSelected(new Set())}
+          onExport={handleBulkExport}
+          onDelete={canDelete ? handleBulkDelete : undefined}
+        >
+          <select className="btn btn-ghost-light" defaultValue="" onChange={(e) => { handleBulkAssign(e.target.value); e.target.value = '' }}>
+            <option value="" disabled>Assign to…</option>
+            {users.map((u) => <option key={u.id} value={u.name}>{u.name}</option>)}
+          </select>
+          <select className="btn btn-ghost-light" defaultValue="" onChange={(e) => { handleBulkStatus(e.target.value); e.target.value = '' }}>
+            <option value="" disabled>Change status…</option>
+            <option value="Processing">Processing</option>
+            <option value="Dispatched">Dispatched</option>
+            <option value="Delivered">Delivered</option>
+            <option value="Cancelled">Cancelled</option>
+          </select>
+        </BulkActionsBar>
+      )}
+
       <div className="table-wrap">
         <table className="data-table">
           <thead>
-            <tr><th>Order #</th><th>Company</th><th>Warehouse</th><th>Order Date</th><th>Expected Delivery</th><th>Dispatch Date</th><th>Total (incl. GST)</th><th>Status</th><th>Payment</th>{(canEdit || canDelete) && <th>Actions</th>}</tr>
+            <tr>
+              {canEdit && (
+                <th className="header-checkbox-cell">
+                  <input
+                    type="checkbox"
+                    checked={filtered.length > 0 && selected.size === filtered.length}
+                    onChange={toggleSelectAll}
+                  />
+                </th>
+              )}
+              <th>Order #</th><th>Company</th><th>Warehouse</th><th>Order Date</th><th>Expected Delivery</th><th>Dispatch Date</th><th>Total (incl. GST)</th><th>Status</th><th>Payment</th>{(canEdit || canDelete) && <th>Actions</th>}
+            </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={(canEdit || canDelete) ? 10 : 9}>Loading orders…</td></tr>
+              <tr className="empty-row"><td colSpan={9 + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>Loading orders…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={(canEdit || canDelete) ? 10 : 9}>{orders.length === 0 ? 'No orders yet.' : 'No orders match your filters.'}</td></tr>
+              <tr className="empty-row"><td colSpan={9 + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>{orders.length === 0 ? 'No orders yet.' : 'No orders match your filters.'}</td></tr>
             ) : filtered.map((o) => (
               <tr key={o.id}>
+                {canEdit && (
+                  <td className="row-checkbox-cell">
+                    <input type="checkbox" checked={selected.has(o.id)} onChange={() => toggleSelected(o.id)} />
+                  </td>
+                )}
                 <td className="cell-mono">
                   {o.orderNo}
                   {o.poNumber && <><br /><span className="cell-mono cell-muted" style={{ fontSize: 11 }}>PO: {o.poNumber}</span></>}

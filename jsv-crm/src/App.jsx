@@ -17,6 +17,7 @@ import Meetings from './pages/Meetings.jsx'
 import Documents from './pages/Documents.jsx'
 import Invoices from './pages/Invoices.jsx'
 import Payments from './pages/Payments.jsx'
+import ToastStack from './components/ToastStack.jsx'
 import './styles/components.css'
 
 function Protected({ children }) {
@@ -61,6 +62,7 @@ export default function App() {
   return (
     <AuthProvider>
       <AppRoutes />
+      <ToastStack />
     </AuthProvider>
   )
 }

@@ -112,6 +112,15 @@ button {
   border-color: var(--paper-200);
 }
 
+[data-theme="dark"] .modal-footer {
+  background: var(--paper-50);
+}
+
+[data-theme="dark"] .toast {
+  background: var(--paper-100);
+  color: var(--ink-900);
+}
+
 [data-theme="dark"] .data-table thead th {
   background: var(--paper-100);
   color: var(--ink-500);

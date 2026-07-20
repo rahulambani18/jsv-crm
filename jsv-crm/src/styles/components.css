@@ -358,7 +358,9 @@ table.data-table {
   width: 100%;
   max-width: 520px;
   max-height: 88vh;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   animation: modalCardScaleIn 200ms ease-out;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -370,6 +372,7 @@ table.data-table {
   justify-content: space-between;
   padding: 18px 22px;
   border-bottom: 1px solid var(--paper-200);
+  flex-shrink: 0;
 }
 .modal-header h3 {
   font-family: var(--font-display);
@@ -386,13 +389,15 @@ table.data-table {
   border-radius: 6px;
 }
 .modal-close:hover { background: var(--paper-50); }
-.modal-body { padding: 20px 22px; }
+.modal-body { padding: 20px 22px; overflow-y: auto; flex: 1 1 auto; min-height: 0; }
 .modal-footer {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
   padding: 16px 22px;
   border-top: 1px solid var(--paper-200);
+  flex-shrink: 0;
+  background: #fff;
 }
 
 .field { margin-bottom: 14px; }
@@ -606,3 +611,79 @@ select::-ms-expand { display: none; }
 
   .stat-card { padding: 16px; }
 }
+
+/* ── Toast notifications (bottom-right) ── */
+.toast-stack {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 300;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 10px;
+  max-width: 360px;
+}
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 13px 14px;
+  border-radius: var(--radius-md);
+  background: #fff;
+  box-shadow: var(--shadow-pop);
+  border-left: 4px solid var(--teal-600);
+  animation: toastSlideIn 220ms ease-out;
+  font-size: 13.5px;
+  line-height: 1.4;
+}
+.toast-error { border-left-color: #d64545; }
+.toast-icon { flex-shrink: 0; font-size: 15px; line-height: 1.4; }
+.toast-message { flex: 1; color: var(--ink-900); }
+.toast-dismiss {
+  background: transparent;
+  border: none;
+  color: var(--ink-500);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0 0 4px;
+  flex-shrink: 0;
+}
+.toast-dismiss:hover { color: var(--ink-900); }
+@keyframes toastSlideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast { animation: none; }
+}
+@media (max-width: 640px) {
+  .toast-stack { left: 16px; right: 16px; bottom: 16px; max-width: none; }
+}
+
+/* ── Bulk actions bar ── */
+.bulk-actions-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--navy-900);
+  color: #fff;
+  border-radius: var(--radius-md);
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  animation: toastSlideIn 150ms ease-out;
+}
+.bulk-actions-bar .bulk-count { font-weight: 600; font-size: 13.5px; margin-right: auto; }
+.bulk-actions-bar .btn { font-size: 12.5px; padding: 7px 12px; }
+.bulk-actions-bar .btn-danger { background: #d64545; border-color: #d64545; color: #fff; }
+.bulk-actions-bar .btn-danger:hover { background: #b83838; }
+.bulk-actions-bar .btn-ghost-light {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #fff;
+}
+.bulk-actions-bar .btn-ghost-light:hover { background: rgba(255,255,255,0.18); }
+.bulk-actions-bar select.btn-ghost-light { cursor: pointer; }
+.row-checkbox-cell { width: 36px; text-align: center; }
+.row-checkbox-cell input, .header-checkbox-cell input { cursor: pointer; width: 15px; height: 15px; }

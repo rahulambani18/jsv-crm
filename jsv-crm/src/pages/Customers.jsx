@@ -9,7 +9,10 @@ import TallyImportButton from '../components/TallyImportButton.jsx'
 import { IconPlus, IconSearch, IconTrash } from '../components/Icons.jsx'
 import ComboField from '../components/ComboField.jsx'
 import Dropdown from '../components/Dropdown.jsx'
+import BulkActionsBar from '../components/BulkActionsBar.jsx'
 import { useAuth } from '../lib/AuthContext.jsx'
+import { showToast } from '../lib/toast.js'
+import { exportCSV } from '../lib/exportUtils.js'
 import '../styles/components.css'
 
 function emptyForm() {
@@ -32,8 +35,11 @@ export default function Customers() {
   const [form, setForm] = useState(emptyForm())
   const [sameAsBilling, setSameAsBilling] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [selected, setSelected] = useState(new Set())
+  const [users, setUsers] = useState([])
 
   useEffect(() => { refresh() }, [])
+  useEffect(() => { api.users.list().then(setUsers).catch(() => {}) }, [])
 
   function refresh() {
     setLoading(true)
@@ -51,7 +57,7 @@ export default function Customers() {
         imported++
       } catch {}
     }
-    alert(`✅ Imported ${imported} customers from Tally successfully!`)
+    showToast(`Imported ${imported} customers from Tally successfully`)
     refresh()
   }
 
@@ -74,8 +80,9 @@ export default function Customers() {
       setForm(emptyForm())
       setSameAsBilling(true)
       refresh()
+      showToast('Customer created successfully')
     } catch (err) {
-      alert('Could not save customer: ' + (err.message || 'Unknown error'))
+      showToast('Could not save customer: ' + (err.message || 'Unknown error'), 'error')
     } finally {
       setSaving(false)
     }
@@ -86,8 +93,71 @@ export default function Customers() {
     try {
       await api.customers.remove(customer.id)
       refresh()
+      showToast(`Customer "${customer.company}" deleted`)
     } catch (err) {
-      alert('Could not delete: ' + (err.message || 'Unknown error'))
+      showToast('Could not delete: ' + (err.message || 'Unknown error'), 'error')
+    }
+  }
+
+  function toggleSelected(id) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    setSelected((prev) =>
+      prev.size === filtered.length ? new Set() : new Set(filtered.map((c) => c.id))
+    )
+  }
+
+  async function handleBulkDelete() {
+    const count = selected.size
+    if (!confirm(`Delete ${count} customer${count === 1 ? '' : 's'}? This cannot be undone.`)) return
+    try {
+      await Promise.all([...selected].map((id) => api.customers.remove(id)))
+      setSelected(new Set())
+      refresh()
+      showToast(`${count} customer${count === 1 ? '' : 's'} deleted`)
+    } catch (err) {
+      showToast('Could not delete selected customers: ' + (err.message || 'Unknown error'), 'error')
+    }
+  }
+
+  function handleBulkExport() {
+    const rows = filtered.filter((c) => selected.has(c.id))
+    exportCSV(
+      'Customers',
+      ['Code', 'Company', 'Contact', 'Mobile', 'Email', 'City', 'State', 'GST', 'Industry', 'Application'],
+      rows.map((c) => [c.code, c.company, c.contact, c.mobile, c.email, c.city, c.state, c.gst, c.industry, c.application])
+    )
+  }
+
+  async function handleBulkAssign(repName) {
+    if (!repName) return
+    const count = selected.size
+    try {
+      await Promise.all([...selected].map((id) => api.customers.update(id, { assignedTo: repName })))
+      setSelected(new Set())
+      refresh()
+      showToast(`${count} customer${count === 1 ? '' : 's'} assigned to ${repName}`)
+    } catch (err) {
+      showToast('Could not assign: ' + (err.message || 'Unknown error'), 'error')
+    }
+  }
+
+  async function handleBulkBusinessType(type) {
+    if (!type) return
+    const count = selected.size
+    try {
+      await Promise.all([...selected].map((id) => api.customers.update(id, { businessType: type })))
+      setSelected(new Set())
+      refresh()
+      showToast(`Business type updated for ${count} customer${count === 1 ? '' : 's'}`)
+    } catch (err) {
+      showToast('Could not update: ' + (err.message || 'Unknown error'), 'error')
     }
   }
 
@@ -121,21 +191,55 @@ export default function Customers() {
         </div>
       </div>
 
+      {canEdit && (
+        <BulkActionsBar
+          count={selected.size}
+          onClear={() => setSelected(new Set())}
+          onExport={handleBulkExport}
+          onDelete={canDelete ? handleBulkDelete : undefined}
+        >
+          <select className="btn btn-ghost-light" defaultValue="" onChange={(e) => { handleBulkAssign(e.target.value); e.target.value = '' }}>
+            <option value="" disabled>Assign to…</option>
+            {users.map((u) => <option key={u.id} value={u.name}>{u.name}</option>)}
+          </select>
+          <select className="btn btn-ghost-light" defaultValue="" onChange={(e) => { handleBulkBusinessType(e.target.value); e.target.value = '' }}>
+            <option value="" disabled>Set type…</option>
+            <option value="Trader">Trader</option>
+            <option value="Manufacturer">Manufacturer</option>
+            <option value="Both">Both</option>
+          </select>
+        </BulkActionsBar>
+      )}
+
       <div className="table-wrap">
         <table className="data-table">
           <thead>
             <tr>
+              {canEdit && (
+                <th className="header-checkbox-cell">
+                  <input
+                    type="checkbox"
+                    checked={filtered.length > 0 && selected.size === filtered.length}
+                    onChange={toggleSelectAll}
+                  />
+                </th>
+              )}
               <th>Code</th><th>Company</th><th>Contact</th><th>City</th><th>GST</th>
               <th>Type</th><th>Industry</th><th>Application</th><th>Added</th>{canDelete && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={canDelete ? 10 : 9}>Loading customers…</td></tr>
+              <tr className="empty-row"><td colSpan={9 + (canEdit ? 1 : 0) + (canDelete ? 1 : 0)}>Loading customers…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={canDelete ? 10 : 9}>{customers.length === 0 ? 'No customers yet.' : 'No customers match your search.'}</td></tr>
+              <tr className="empty-row"><td colSpan={9 + (canEdit ? 1 : 0) + (canDelete ? 1 : 0)}>{customers.length === 0 ? 'No customers yet.' : 'No customers match your search.'}</td></tr>
             ) : filtered.map((c) => (
               <tr key={c.id}>
+                {canEdit && (
+                  <td className="row-checkbox-cell">
+                    <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleSelected(c.id)} />
+                  </td>
+                )}
                 <td className="cell-mono">{c.code}</td>
                 <td className="cell-strong">{c.company}</td>
                 <td>{c.contact}<br /><span className="cell-mono cell-muted" style={{ fontSize: 11.5 }}>{c.mobile}</span></td>
