@@ -7,8 +7,10 @@ import ExportBar from '../components/ExportBar.jsx'
 import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
 import MultiComboField from '../components/MultiComboField.jsx'
+import SendButtons from '../components/SendButtons.jsx'
 import { IconPlus, IconSearch, IconTrash } from '../components/Icons.jsx'
 import { useAuth } from '../lib/AuthContext.jsx'
+import { templates } from '../lib/messaging.js'
 import '../styles/components.css'
 
 const STATUSES = ['All statuses', 'Preparing', 'In Transit', 'Delivered']
@@ -120,14 +122,16 @@ export default function Samples() {
       <div className="table-wrap">
         <table className="data-table">
           <thead>
-            <tr><th>Code</th><th>Company</th><th>Contact</th><th>Products</th><th>Qty</th><th>Sent</th><th>Courier</th><th>Tracking</th><th>Status</th>{canDelete && <th>Actions</th>}</tr>
+            <tr><th>Code</th><th>Company</th><th>Contact</th><th>Products</th><th>Qty</th><th>Sent</th><th>Courier</th><th>Tracking</th><th>Status</th>{(canEdit || canDelete) && <th>Actions</th>}</tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={canDelete ? 10 : 9}>Loading samples…</td></tr>
+              <tr className="empty-row"><td colSpan={(canEdit || canDelete) ? 10 : 9}>Loading samples…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={canDelete ? 10 : 9}>{samples.length === 0 ? 'No samples yet.' : 'No samples match your filters.'}</td></tr>
-            ) : filtered.map((s) => (
+              <tr className="empty-row"><td colSpan={(canEdit || canDelete) ? 10 : 9}>{samples.length === 0 ? 'No samples yet.' : 'No samples match your filters.'}</td></tr>
+            ) : filtered.map((s) => {
+              const t = templates.sample(s)
+              return (
               <tr key={s.id}>
                 <td className="cell-mono">{s.code}</td>
                 <td className="cell-strong">{s.company}</td>
@@ -154,13 +158,16 @@ export default function Samples() {
                     <Pill>{s.status}</Pill>
                   )}
                 </td>
-                {canDelete && (
+                {(canEdit || canDelete) && (
                   <td>
-                    <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(s)}><IconTrash width={13} height={13} /></button>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <SendButtons phone={s.phone} email={s.email} whatsappMessage={t.whatsapp} mailSubject={t.subject} mailBody={t.body} />
+                      {canDelete && <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(s)}><IconTrash width={13} height={13} /></button>}
+                    </div>
                   </td>
                 )}
               </tr>
-            ))}
+            )})}
           </tbody>
         </table>
       </div>

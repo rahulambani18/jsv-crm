@@ -7,8 +7,10 @@ import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
 import ExportBar from '../components/ExportBar.jsx'
 import TallyImportButton from '../components/TallyImportButton.jsx'
+import SendButtons from '../components/SendButtons.jsx'
 import { IconPlus, IconSearch, IconEdit, IconTrash } from '../components/Icons.jsx'
 import Dropdown from '../components/Dropdown.jsx'
+import { templates } from '../lib/messaging.js'
 import '../styles/components.css'
 
 const GST_RATE = 18
@@ -298,6 +300,7 @@ export default function Invoices() {
   const canDelete = can('invoices', 'delete')
   const [invoices, setInvoices] = useState([])
   const [orders, setOrders] = useState([])
+  const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchParams] = useSearchParams()
   const [search, setSearch] = useState(searchParams.get('q') || '')
@@ -311,8 +314,8 @@ export default function Invoices() {
 
   function refresh() {
     setLoading(true)
-    Promise.all([api.invoices.list(), api.orders.list()]).then(([inv, ord]) => {
-      setInvoices(inv); setOrders(ord); setLoading(false)
+    Promise.all([api.invoices.list(), api.orders.list(), api.customers.list()]).then(([inv, ord, cust]) => {
+      setInvoices(inv); setOrders(ord); setCustomers(cust); setLoading(false)
     })
   }
 
@@ -475,7 +478,10 @@ export default function Invoices() {
               <tr className="empty-row"><td colSpan={9}>Loading invoices…</td></tr>
             ) : filtered.length === 0 ? (
               <tr className="empty-row"><td colSpan={9}>No invoices yet. Generate one from an order above.</td></tr>
-            ) : filtered.map((inv) => (
+            ) : filtered.map((inv) => {
+              const customer = customers.find((c) => c.company === inv.company)
+              const t = templates.invoice(inv)
+              return (
               <tr key={inv.id}>
                 <td className="cell-mono cell-strong">{inv.invoiceNo}</td>
                 <td className="cell-strong">{inv.company}</td>
@@ -490,11 +496,12 @@ export default function Invoices() {
                 <td><Pill>{inv.status}</Pill></td>
                 <td style={{ display: 'flex', gap: 4 }}>
                   {canEdit && <button className="btn btn-ghost btn-sm" onClick={() => openEdit(inv)}><IconEdit width={13} height={13} /></button>}
+                  <SendButtons phone={customer?.mobile} email={customer?.email} whatsappMessage={t.whatsapp} mailSubject={t.subject} mailBody={t.body} />
                   <button className="btn btn-ghost btn-sm" onClick={() => printInvoice(inv, orders.find((o) => o.id === inv.orderId))}>🖨 Print</button>
                   {canDelete && <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(inv)}><IconTrash width={13} height={13} /></button>}
                 </td>
               </tr>
-            ))}
+            )})}
           </tbody>
         </table>
       </div>

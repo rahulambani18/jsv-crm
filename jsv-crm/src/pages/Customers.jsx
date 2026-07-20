@@ -6,13 +6,17 @@ import PageHeader from '../components/PageHeader.jsx'
 import ExportBar from '../components/ExportBar.jsx'
 import Modal from '../components/Modal.jsx'
 import TallyImportButton from '../components/TallyImportButton.jsx'
-import { IconPlus, IconSearch, IconTrash } from '../components/Icons.jsx'
+import Pill from '../components/Pill.jsx'
+import SendButtons from '../components/SendButtons.jsx'
+import { IconPlus, IconSearch, IconTrash, IconEdit } from '../components/Icons.jsx'
 import ComboField from '../components/ComboField.jsx'
 import Dropdown from '../components/Dropdown.jsx'
 import BulkActionsBar from '../components/BulkActionsBar.jsx'
 import { useAuth } from '../lib/AuthContext.jsx'
 import { showToast } from '../lib/toast.js'
 import { exportCSV } from '../lib/exportUtils.js'
+import { outstandingForCustomer } from '../lib/credit.js'
+import { templates } from '../lib/messaging.js'
 import '../styles/components.css'
 
 function emptyForm() {
@@ -20,7 +24,12 @@ function emptyForm() {
     company: '', contact: '', mobile: '', email: '', gst: '',
     businessType: '', industry: '', application: '',
     city: '', state: '', billingAddress: '', shippingAddress: '',
+    creditLimit: '',
   }
+}
+
+function formatINR(n) {
+  return '₹' + Number(n || 0).toLocaleString('en-IN')
 }
 
 export default function Customers() {
@@ -28,10 +37,13 @@ export default function Customers() {
   const canEdit = can('customers', 'edit')
   const canDelete = can('customers', 'delete')
   const [customers, setCustomers] = useState([])
+  const [invoices, setInvoices] = useState([])
+  const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchParams] = useSearchParams()
   const [search, setSearch] = useState(searchParams.get('q') || '')
   const [showModal, setShowModal] = useState(false)
+  const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyForm())
   const [sameAsBilling, setSameAsBilling] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -43,8 +55,18 @@ export default function Customers() {
 
   function refresh() {
     setLoading(true)
-    api.customers.list().then((c) => { setCustomers(c); setLoading(false) })
+    Promise.all([api.customers.list(), api.invoices.list(), api.payments.list()]).then(([c, inv, pay]) => {
+      setCustomers(c); setInvoices(inv); setPayments(pay); setLoading(false)
+    })
   }
+
+  // Outstanding balance per customer, computed live from invoices +
+  // payments — never stored, so it's always current.
+  const outstandingByCompany = useMemo(() => {
+    const map = {}
+    customers.forEach((c) => { map[c.company] = outstandingForCustomer(c.company, invoices, payments) })
+    return map
+  }, [customers, invoices, payments])
 
   async function handleTallyImport(records) {
     let imported = 0
@@ -65,22 +87,43 @@ export default function Customers() {
     return customers.filter((c) => !search || [c.company, c.contact, c.mobile, c.gst, c.city].some((v) => (v || '').toLowerCase().includes(search.toLowerCase())))
   }, [customers, search])
 
-  async function handleCreate(e) {
+  function openEdit(customer) {
+    setEditingId(customer.id)
+    setForm({ ...emptyForm(), ...customer, creditLimit: customer.creditLimit ?? '' })
+    setSameAsBilling(customer.billingAddress === customer.shippingAddress)
+    setShowModal(true)
+  }
+
+  function openCreate() {
+    setEditingId(null)
+    setForm(emptyForm())
+    setSameAsBilling(true)
+    setShowModal(true)
+  }
+
+  async function handleSave(e) {
     e.preventDefault()
     setSaving(true)
     const record = {
       ...form,
-      code: `CUST-${String(customers.length + 1).padStart(4, '0')}`,
+      creditLimit: Number(form.creditLimit) || 0,
       shippingAddress: sameAsBilling ? form.billingAddress : form.shippingAddress,
-      added: new Date().toISOString().slice(0, 10),
     }
     try {
-      await api.customers.insert(record)
+      if (editingId) {
+        await api.customers.update(editingId, record)
+        showToast('Customer updated successfully')
+      } else {
+        record.code = `CUST-${String(customers.length + 1).padStart(4, '0')}`
+        record.added = new Date().toISOString().slice(0, 10)
+        await api.customers.insert(record)
+        showToast('Customer created successfully')
+      }
       setShowModal(false)
       setForm(emptyForm())
+      setEditingId(null)
       setSameAsBilling(true)
       refresh()
-      showToast('Customer created successfully')
     } catch (err) {
       showToast('Could not save customer: ' + (err.message || 'Unknown error'), 'error')
     } finally {
@@ -176,7 +219,7 @@ export default function Customers() {
                 rows={filtered.map((c) => [c.code, c.company, c.contact, c.mobile, c.email, c.city, c.state, c.gst, c.industry, c.application])}
                 count={filtered.length}
               />
-              <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+              <button className="btn btn-primary" onClick={openCreate}>
                 <IconPlus width={15} height={15} /> New Customer
               </button>
             </>
@@ -225,15 +268,19 @@ export default function Customers() {
                 </th>
               )}
               <th>Code</th><th>Company</th><th>Contact</th><th>City</th><th>GST</th>
-              <th>Type</th><th>Industry</th><th>Application</th><th>Added</th>{canDelete && <th>Actions</th>}
+              <th>Type</th><th>Industry</th><th>Application</th><th>Credit Limit</th><th>Outstanding</th>{(canEdit || canDelete) && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={9 + (canEdit ? 1 : 0) + (canDelete ? 1 : 0)}>Loading customers…</td></tr>
+              <tr className="empty-row"><td colSpan={10 + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>Loading customers…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={9 + (canEdit ? 1 : 0) + (canDelete ? 1 : 0)}>{customers.length === 0 ? 'No customers yet.' : 'No customers match your search.'}</td></tr>
-            ) : filtered.map((c) => (
+              <tr className="empty-row"><td colSpan={10 + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>{customers.length === 0 ? 'No customers yet.' : 'No customers match your search.'}</td></tr>
+            ) : filtered.map((c) => {
+              const outstanding = outstandingByCompany[c.company] || 0
+              const overLimit = Number(c.creditLimit) > 0 && outstanding > Number(c.creditLimit)
+              const t = templates.paymentReminder(c.company, outstanding)
+              return (
               <tr key={c.id}>
                 {canEdit && (
                   <td className="row-checkbox-cell">
@@ -248,32 +295,40 @@ export default function Customers() {
                 <td>{c.businessType ? <span className="pill pill-navy">{c.businessType}</span> : <span className="cell-muted">—</span>}</td>
                 <td>{c.industry}</td>
                 <td>{c.application}</td>
-                <td className="cell-mono">{c.added}</td>
-                {canDelete && (
+                <td className="cell-mono">{c.creditLimit ? formatINR(c.creditLimit) : <span className="cell-muted">—</span>}</td>
+                <td className="cell-mono">
+                  {formatINR(outstanding)}
+                  {overLimit && <><br /><Pill tone="red">Over limit</Pill></>}
+                </td>
+                {(canEdit || canDelete) && (
                   <td>
-                    <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(c)}><IconTrash width={13} height={13} /></button>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {canEdit && <button className="btn btn-ghost btn-sm" onClick={() => openEdit(c)} title="Edit"><IconEdit width={13} height={13} /></button>}
+                      <SendButtons phone={c.mobile} email={c.email} whatsappMessage={t.whatsapp} mailSubject={t.subject} mailBody={t.body} />
+                      {canDelete && <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(c)}><IconTrash width={13} height={13} /></button>}
+                    </div>
                   </td>
                 )}
               </tr>
-            ))}
+            )})}
           </tbody>
         </table>
       </div>
 
       {showModal && (
         <Modal
-          title="New Customer"
+          title={editingId ? 'Edit Customer' : 'New Customer'}
           onClose={() => setShowModal(false)}
           footer={
             <>
               <button className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
               <button className="btn btn-primary" form="customer-form" type="submit" disabled={saving}>
-                {saving ? 'Saving…' : 'Save customer'}
+                {saving ? 'Saving…' : editingId ? 'Save changes' : 'Save customer'}
               </button>
             </>
           }
         >
-          <form id="customer-form" onSubmit={handleCreate}>
+          <form id="customer-form" onSubmit={handleSave}>
             <div className="field">
               <label>Company name</label>
               <input required value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} />
@@ -313,9 +368,15 @@ export default function Customers() {
                 <ComboField options={INDUSTRY_OPTIONS} value={form.industry} onChange={(v) => setForm({ ...form, industry: v })} placeholder="Select industry…" />
               </div>
             </div>
-            <div className="field">
-              <label>Application</label>
-              <input value={form.application} onChange={(e) => setForm({ ...form, application: e.target.value })} placeholder="e.g. Flavoured Milk" />
+            <div className="field-row">
+              <div className="field">
+                <label>Application</label>
+                <input value={form.application} onChange={(e) => setForm({ ...form, application: e.target.value })} placeholder="e.g. Flavoured Milk" />
+              </div>
+              <div className="field">
+                <label>Credit limit (₹)</label>
+                <input type="number" min="0" value={form.creditLimit} onChange={(e) => setForm({ ...form, creditLimit: e.target.value })} placeholder="e.g. 500000" />
+              </div>
             </div>
             <div className="field-row">
               <div className="field">

@@ -12,6 +12,7 @@ import BulkActionsBar from '../components/BulkActionsBar.jsx'
 import { useAuth } from '../lib/AuthContext.jsx'
 import { showToast } from '../lib/toast.js'
 import { exportCSV } from '../lib/exportUtils.js'
+import { outstandingForCustomer } from '../lib/credit.js'
 import '../styles/components.css'
 
 const WAREHOUSE_FILTERS = ['All warehouses', ...WAREHOUSES]
@@ -63,9 +64,12 @@ export default function Orders() {
   const [saving, setSaving] = useState(false)
   const [selected, setSelected] = useState(new Set())
   const [users, setUsers] = useState([])
+  const [invoices, setInvoices] = useState([])
+  const [payments, setPayments] = useState([])
 
   useEffect(() => { refresh() }, [])
   useEffect(() => { api.users.list().then(setUsers).catch(() => {}) }, [])
+  useEffect(() => { Promise.all([api.invoices.list(), api.payments.list()]).then(([inv, pay]) => { setInvoices(inv); setPayments(pay) }).catch(() => {}) }, [])
 
   function refresh() {
     setLoading(true)
@@ -73,6 +77,8 @@ export default function Orders() {
       setOrders(o); setCustomers(c); setProducts(p); setLoading(false)
     })
   }
+
+
 
   const filtered = useMemo(() => orders.filter((o) => {
     const matchesWarehouse = warehouseFilter === 'All warehouses' || o.warehouse === warehouseFilter
@@ -82,6 +88,17 @@ export default function Orders() {
   }), [orders, warehouseFilter, statusFilter, search])
 
   const totals = useMemo(() => calcOrderTotals(form.lineItems), [form.lineItems])
+
+  const selectedCustomer = useMemo(() => customers.find((c) => c.id === form.customerId), [customers, form.customerId])
+  const creditWarning = useMemo(() => {
+    if (!selectedCustomer || !Number(selectedCustomer.creditLimit)) return null
+    const outstanding = outstandingForCustomer(selectedCustomer.company, invoices, payments)
+    const projected = outstanding + (editingId ? 0 : totals.total)
+    if (projected > Number(selectedCustomer.creditLimit)) {
+      return `${selectedCustomer.company} already owes ₹${outstanding.toLocaleString('en-IN')} against a ₹${Number(selectedCustomer.creditLimit).toLocaleString('en-IN')} credit limit — this order would put them over.`
+    }
+    return null
+  }, [selectedCustomer, invoices, payments, totals.total, editingId])
 
   function updateLineItem(index, patch) {
     setForm((f) => {
@@ -369,6 +386,11 @@ export default function Orders() {
                 <input required value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} placeholder="Auto-fills from customer" />
               </div>
             </div>
+            {creditWarning && (
+              <div style={{ background: 'var(--red-100)', color: 'var(--red-600)', border: '1px solid var(--red-600)', borderRadius: 'var(--radius-sm)', padding: '10px 12px', fontSize: 12.5, marginBottom: 14, fontWeight: 600 }}>
+                ⚠️ {creditWarning}
+              </div>
+            )}
             <div className="field">
               <label>Warehouse</label>
               <select value={form.warehouse} onChange={(e) => setForm({ ...form, warehouse: e.target.value })}>

@@ -5,7 +5,9 @@ import PageHeader from '../components/PageHeader.jsx'
 import ExportBar from '../components/ExportBar.jsx'
 import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
+import SendButtons from '../components/SendButtons.jsx'
 import { IconPlus, IconTrash, IconSearch } from '../components/Icons.jsx'
+import { templates } from '../lib/messaging.js'
 import '../styles/components.css'
 
 function emptyLineItem() {
@@ -122,7 +124,10 @@ export default function Quotations() {
               <tr className="empty-row"><td colSpan={7}>Loading quotations…</td></tr>
             ) : filtered.length === 0 ? (
               <tr className="empty-row"><td colSpan={7}>{quotations.length === 0 ? 'No quotations yet.' : 'No quotations match your search.'}</td></tr>
-            ) : filtered.map((q) => (
+            ) : filtered.map((q) => {
+              const customer = customers.find((c) => c.company === q.company)
+              const t = templates.quotation(q)
+              return (
               <tr key={q.id}>
                 <td className="cell-mono">{q.quoteNo}</td>
                 <td className="cell-strong">{q.company}</td>
@@ -130,9 +135,12 @@ export default function Quotations() {
                 <td className="cell-mono">{fmt(q.total)}</td>
                 <td className="cell-mono">{q.validUntil}</td>
                 <td><Pill>{q.status}</Pill></td>
-                <td><button className="btn btn-ghost btn-sm">View</button></td>
+                <td style={{ display: 'flex', gap: 4 }}>
+                  <SendButtons phone={customer?.mobile} email={customer?.email} whatsappMessage={t.whatsapp} mailSubject={t.subject} mailBody={t.body} />
+                  <button className="btn btn-ghost btn-sm">View</button>
+                </td>
               </tr>
-            ))}
+            )})}
           </tbody>
         </table>
       </div>

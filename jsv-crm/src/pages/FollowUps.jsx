@@ -4,7 +4,9 @@ import PageHeader from '../components/PageHeader.jsx'
 import ExportBar from '../components/ExportBar.jsx'
 import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
+import SendButtons from '../components/SendButtons.jsx'
 import { IconPlus } from '../components/Icons.jsx'
+import { templates } from '../lib/messaging.js'
 import '../styles/components.css'
 
 const TABS = ['Today', 'Upcoming', 'Overdue', 'Completed', 'All']
@@ -15,6 +17,8 @@ function emptyForm() {
 
 export default function FollowUps() {
   const [items, setItems] = useState([])
+  const [leads, setLeads] = useState([])
+  const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('Today')
   const [showModal, setShowModal] = useState(false)
@@ -22,10 +26,19 @@ export default function FollowUps() {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => { refresh() }, [])
+  useEffect(() => { Promise.all([api.leads.list(), api.customers.list()]).then(([l, c]) => { setLeads(l); setCustomers(c) }).catch(() => {}) }, [])
 
   function refresh() {
     setLoading(true)
     api.followUps.list().then((data) => { setItems(data); setLoading(false) })
+  }
+
+  // A follow-up's "lead" field holds the company name — look it up in
+  // leads first (most follow-ups are pre-conversion), then customers.
+  function contactInfoFor(f) {
+    const l = leads.find((x) => x.company === f.lead)
+    const c = customers.find((x) => x.company === f.lead)
+    return { phone: l?.phone || c?.mobile, email: l?.email || c?.email }
   }
 
   const counts = useMemo(() => {
@@ -77,14 +90,17 @@ export default function FollowUps() {
       <div className="table-wrap">
         <table className="data-table">
           <thead>
-            <tr><th>Date</th><th>Type</th><th>Lead</th><th>Contact</th><th>Notes</th><th>Status</th></tr>
+            <tr><th>Date</th><th>Type</th><th>Lead</th><th>Contact</th><th>Notes</th><th>Status</th><th>Actions</th></tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={6}>Loading follow-ups…</td></tr>
+              <tr className="empty-row"><td colSpan={7}>Loading follow-ups…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={6}>No follow-ups in this view.</td></tr>
-            ) : filtered.map((f) => (
+              <tr className="empty-row"><td colSpan={7}>No follow-ups in this view.</td></tr>
+            ) : filtered.map((f) => {
+              const { phone, email } = contactInfoFor(f)
+              const t = templates.followUp(f)
+              return (
               <tr key={f.id}>
                 <td className="cell-mono">{f.date}</td>
                 <td>{f.type}</td>
@@ -92,8 +108,11 @@ export default function FollowUps() {
                 <td>{f.contact}</td>
                 <td style={{ maxWidth: 320 }}>{f.notes}</td>
                 <td><Pill>{f.status}</Pill></td>
+                <td style={{ display: 'flex', gap: 4 }}>
+                  <SendButtons phone={phone} email={email} whatsappMessage={t.whatsapp} mailSubject={t.subject} mailBody={t.body} />
+                </td>
               </tr>
-            ))}
+            )})}
           </tbody>
         </table>
       </div>
