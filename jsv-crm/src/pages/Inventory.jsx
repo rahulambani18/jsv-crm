@@ -56,11 +56,16 @@ export default function Inventory() {
 
   async function refresh() {
     setLoading(true)
-    const [s, m, p] = await Promise.all([api.stock.list(), api.stockMovements.list(), api.products.list()])
-    setStock(s)
-    setMovements(m)
-    setProducts(p)
-    setLoading(false)
+    try {
+      const [s, m, p] = await Promise.all([api.stock.list(), api.stockMovements.list(), api.products.list()])
+      setStock(s)
+      setMovements(m)
+      setProducts(p)
+    } catch (err) {
+      showToast('Could not load inventory: ' + (err.message || 'Unknown error'), 'error')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const priceByProduct = useMemo(() => {

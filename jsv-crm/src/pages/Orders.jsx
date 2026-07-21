@@ -71,7 +71,7 @@ export default function Orders() {
   useEffect(() => { refresh() }, [])
   useEffect(() => { api.users.list().then(setUsers).catch(() => {}) }, [])
   useEffect(() => { Promise.all([api.invoices.list(), api.payments.list()]).then(([inv, pay]) => { setInvoices(inv); setPayments(pay) }).catch(() => {}) }, [])
-  useEffect(() => { api.stock.list().then(setStock).catch(() => {}) }, [])
+  useEffect(() => { api.stock.list().then(setStock).catch(() => { /* Inventory not set up yet — stock warnings just won't show */ }) }, [])
 
   function refresh() {
     setLoading(true)
