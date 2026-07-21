@@ -349,26 +349,31 @@ export const auth = isMock
       // Admin creates a new user directly with username + password.
       // We generate a unique email internally (username@jsv.internal) since
       // Supabase auth requires an email — but login works with just username.
+      //
+      // This runs through the admin-create-user Edge Function rather than
+      // calling supabase.auth.signUp() here in the browser. signUp() would
+      // work, but it also logs the CALLING browser into the newly created
+      // account — so the admin creating the user would silently get signed
+      // out of their own session and into the new rep's account. The Edge
+      // Function creates the account server-side with the service_role key
+      // instead, so the admin's session is never touched.
       async inviteUser(email, fullName, roleId, password) {
         // Convert username to internal email if no @ present
         const internalEmail = email.includes('@') ? email : `${email.toLowerCase().replace(/\s+/g, '.')}@jsv.internal`
 
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-          email: internalEmail,
-          password: password,
-          options: { data: { full_name: fullName } }
-        })
-        if (signUpError) throw signUpError
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) throw new Error('Your session has expired. Please log in again.')
 
-        if (signUpData?.user) {
-          const { error: profileError } = await supabase.from('profiles').upsert({
-            id: signUpData.user.id,
-            workspace_id: '00000000-0000-0000-0000-000000000001',
-            full_name: fullName,
-            role_id: roleId || '00000000-0000-0000-0000-000000000003',
-          }, { onConflict: 'id' })
-          if (profileError) throw profileError
-        }
+        const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-create-user`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ email: internalEmail, fullName, roleId, password }),
+        })
+        const body = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(body.error || 'Could not create user.')
 
         return { success: true }
       },
