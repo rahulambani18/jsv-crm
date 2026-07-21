@@ -8,6 +8,7 @@ import Modal from '../components/Modal.jsx'
 import TallyImportButton from '../components/TallyImportButton.jsx'
 import Pill from '../components/Pill.jsx'
 import SendButtons from '../components/SendButtons.jsx'
+import CustomerTimelineModal from '../components/CustomerTimelineModal.jsx'
 import { IconPlus, IconSearch, IconTrash, IconEdit } from '../components/Icons.jsx'
 import ComboField from '../components/ComboField.jsx'
 import Dropdown from '../components/Dropdown.jsx'
@@ -39,6 +40,13 @@ export default function Customers() {
   const [customers, setCustomers] = useState([])
   const [invoices, setInvoices] = useState([])
   const [payments, setPayments] = useState([])
+  const [leads, setLeads] = useState([])
+  const [samples, setSamples] = useState([])
+  const [quotations, setQuotations] = useState([])
+  const [orders, setOrders] = useState([])
+  const [meetings, setMeetings] = useState([])
+  const [followUps, setFollowUps] = useState([])
+  const [timelineFor, setTimelineFor] = useState(null)
   const [loading, setLoading] = useState(true)
   const [searchParams] = useSearchParams()
   const [search, setSearch] = useState(searchParams.get('q') || '')
@@ -55,8 +63,14 @@ export default function Customers() {
 
   function refresh() {
     setLoading(true)
-    Promise.all([api.customers.list(), api.invoices.list(), api.payments.list()]).then(([c, inv, pay]) => {
-      setCustomers(c); setInvoices(inv); setPayments(pay); setLoading(false)
+    Promise.all([
+      api.customers.list(), api.invoices.list(), api.payments.list(),
+      api.leads.list(), api.samples.list(), api.quotations.list(),
+      api.orders.list(), api.meetings.list(), api.followUps.list(),
+    ]).then(([c, inv, pay, l, s, q, o, m, f]) => {
+      setCustomers(c); setInvoices(inv); setPayments(pay)
+      setLeads(l); setSamples(s); setQuotations(q); setOrders(o); setMeetings(m); setFollowUps(f)
+      setLoading(false)
     })
   }
 
@@ -304,6 +318,7 @@ export default function Customers() {
                   <td>
                     <div style={{ display: 'flex', gap: 4 }}>
                       {canEdit && <button className="btn btn-ghost btn-sm" onClick={() => openEdit(c)} title="Edit"><IconEdit width={13} height={13} /></button>}
+                      <button className="btn btn-ghost btn-sm" onClick={() => setTimelineFor(c)} title="View activity timeline">🕘</button>
                       <SendButtons phone={c.mobile} email={c.email} whatsappMessage={t.whatsapp} mailSubject={t.subject} mailBody={t.body} />
                       {canDelete && <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(c)}><IconTrash width={13} height={13} /></button>}
                     </div>
@@ -411,6 +426,14 @@ export default function Customers() {
             )}
           </form>
         </Modal>
+      )}
+
+      {timelineFor && (
+        <CustomerTimelineModal
+          customer={timelineFor}
+          data={{ leads, samples, quotations, orders, invoices, payments, meetings, followUps }}
+          onClose={() => setTimelineFor(null)}
+        />
       )}
     </div>
   )
