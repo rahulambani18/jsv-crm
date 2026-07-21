@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { api } from '../lib/api.js'
 import { useAuth } from '../lib/AuthContext.jsx'
 import { PIPELINE_STAGES } from '../data/seed.js'
 import StatCard from '../components/StatCard.jsx'
+import Pill from '../components/Pill.jsx'
 import {
   IconUsers, IconTrend, IconClock, IconFlame, IconUserCheck,
-  IconFile, IconCart, IconRupee,
+  IconFile, IconCart, IconRupee, IconBox, IconReceipt, IconChevronRight,
 } from '../components/Icons.jsx'
 import '../styles/components.css'
 
@@ -18,19 +20,23 @@ function formatINR(n) {
 
 export default function Dashboard() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [leads, setLeads] = useState([])
   const [customers, setCustomers] = useState([])
   const [quotations, setQuotations] = useState([])
   const [orders, setOrders] = useState([])
   const [followUps, setFollowUps] = useState([])
+  const [invoices, setInvoices] = useState([])
+  const [stock, setStock] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     Promise.all([
       api.leads.list(), api.customers.list(), api.quotations.list(),
-      api.orders.list(), api.followUps.list(),
-    ]).then(([l, c, q, o, f]) => {
+      api.orders.list(), api.followUps.list(), api.invoices.list(), api.stock.list(),
+    ]).then(([l, c, q, o, f, inv, st]) => {
       setLeads(l); setCustomers(c); setQuotations(q); setOrders(o); setFollowUps(f)
+      setInvoices(inv); setStock(st)
       setLoading(false)
     })
   }, [])
@@ -69,6 +75,41 @@ export default function Dashboard() {
     return Object.entries(counts).map(([name, value]) => ({ name, value }))
   }, [leads])
 
+  // "Attention needed" — the handful of things across other modules that
+  // are actionable right now, surfaced here so the day can start from one
+  // screen instead of clicking into Follow-ups / Inventory / Invoices to
+  // find out what's overdue.
+  const attention = useMemo(() => {
+    const overdueFollowUps = followUps
+      .filter((f) => f.status === 'Overdue')
+      .map((f) => ({
+        key: `f-${f.id}`, tone: 'red', icon: IconClock,
+        title: f.lead || f.contact || 'Follow-up',
+        detail: f.notes || 'Overdue follow-up',
+        route: '/follow-ups',
+      }))
+
+    const lowStock = stock
+      .filter((s) => Number(s.reorderLevel) > 0 && Number(s.qtyOnHand) <= Number(s.reorderLevel))
+      .map((s) => ({
+        key: `s-${s.id}`, tone: s.qtyOnHand === 0 ? 'red' : 'amber', icon: IconBox,
+        title: s.product,
+        detail: `${s.qtyOnHand} ${s.unit} left at ${s.warehouse} (reorder at ${s.reorderLevel})`,
+        route: '/inventory',
+      }))
+
+    const overdueInvoices = invoices
+      .filter((i) => i.status !== 'Paid' && i.status !== 'Cancelled' && i.dueDate && i.dueDate < today)
+      .map((i) => ({
+        key: `i-${i.id}`, tone: 'red', icon: IconReceipt,
+        title: i.company,
+        detail: `${i.invoiceNo} · ${formatINR(i.total)} overdue since ${i.dueDate}`,
+        route: '/invoices',
+      }))
+
+    return [...overdueFollowUps, ...overdueInvoices, ...lowStock]
+  }, [followUps, stock, invoices])
+
   if (loading) return <div className="loading-screen">Loading dashboard…</div>
 
   return (
@@ -90,6 +131,29 @@ export default function Dashboard() {
         <StatCard icon={IconCart} tone="amber" label="Orders Received" value={stats.ordersReceived} />
         <StatCard icon={IconRupee} tone="red" label="Pending Payments" value={formatINR(stats.pendingPayments)} mono />
       </div>
+
+      {attention.length > 0 && (
+        <div className="panel" style={{ marginBottom: 20 }}>
+          <p className="panel-title">Attention Needed ({attention.length})</p>
+          <div className="attention-list">
+            {attention.map((a) => (
+              <button
+                key={a.key}
+                className="attention-row"
+                onClick={() => navigate(a.route)}
+              >
+                <span className={`attention-icon ${a.tone}`}><a.icon /></span>
+                <span className="attention-text">
+                  <span className="attention-title">{a.title}</span>
+                  <span className="attention-detail">{a.detail}</span>
+                </span>
+                <Pill tone={a.tone}>{a.tone === 'red' ? 'Urgent' : 'Attention'}</Pill>
+                <IconChevronRight />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="panel-row">
         <div className="panel">
