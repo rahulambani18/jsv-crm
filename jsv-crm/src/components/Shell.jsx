@@ -117,32 +117,32 @@ export default function Shell({ children }) {
 
       // 1) Today's Follow-ups
       followUps.filter((f) => f.status === 'Today').forEach((f) => {
-        notifs.push({ id: `fu-today-${f.id}`, group: "Today's Follow-ups", text: `${f.lead || 'Follow-up'} — ${f.type || ''}`, sub: f.notes || f.date, color: 'var(--amber-600)' })
+        notifs.push({ id: `fu-today-${f.id}`, group: "Today's Follow-ups", text: `${f.lead || 'Follow-up'} — ${f.type || ''}`, sub: f.notes || f.date, color: 'var(--amber-600)', route: '/follow-ups' })
       })
 
       // Overdue follow-ups (kept from before)
       followUps.filter((f) => f.status === 'Overdue').forEach((f) => {
-        notifs.push({ id: `fu-overdue-${f.id}`, group: 'Overdue Follow-ups', text: `Overdue follow-up: ${f.lead}`, sub: `${f.date} · ${f.type}`, color: 'var(--red-600)' })
+        notifs.push({ id: `fu-overdue-${f.id}`, group: 'Overdue Follow-ups', text: `Overdue follow-up: ${f.lead}`, sub: `${f.date} · ${f.type}`, color: 'var(--red-600)', route: '/follow-ups' })
       })
 
       // 2) Meetings today
       meetings.filter((m) => m.status === 'Scheduled' && m.date === today).forEach((m) => {
-        notifs.push({ id: `mt-${m.id}`, group: 'Meetings Today', text: m.title || m.company, sub: `${m.time || ''} · ${m.location || ''}`, color: 'var(--navy-700)' })
+        notifs.push({ id: `mt-${m.id}`, group: 'Meetings Today', text: m.title || m.company, sub: `${m.time || ''} · ${m.location || ''}`, color: 'var(--navy-700)', route: '/meetings' })
       })
 
       // Reminder: meeting tomorrow
       meetings.filter((m) => m.status === 'Scheduled' && m.date && daysBetween(today, m.date) === 1).forEach((m) => {
-        notifs.push({ id: `mt-tmrw-${m.id}`, group: 'Reminder: Upcoming Meeting', text: m.title || m.company, sub: `Tomorrow · ${m.time || ''}`, color: 'var(--navy-700)' })
+        notifs.push({ id: `mt-tmrw-${m.id}`, group: 'Reminder: Upcoming Meeting', text: m.title || m.company, sub: `Tomorrow · ${m.time || ''}`, color: 'var(--navy-700)', route: '/meetings' })
       })
 
       // 3) Pending tasks (due today or overdue, not completed)
       tasks.filter((t) => t.status !== 'Completed' && t.dueDate && t.dueDate <= today).forEach((t) => {
-        notifs.push({ id: `tk-${t.id}`, group: 'Pending Tasks', text: t.title, sub: `${t.dueDate < today ? 'Overdue since' : 'Due'} ${t.dueDate}${t.assignedTo ? ' · ' + t.assignedTo : ''}`, color: t.dueDate < today ? 'var(--red-600)' : 'var(--amber-600)' })
+        notifs.push({ id: `tk-${t.id}`, group: 'Pending Tasks', text: t.title, sub: `${t.dueDate < today ? 'Overdue since' : 'Due'} ${t.dueDate}${t.assignedTo ? ' · ' + t.assignedTo : ''}`, color: t.dueDate < today ? 'var(--red-600)' : 'var(--amber-600)', route: '/tasks' })
       })
 
       // 4) Pending payments (order-level, general signal)
       orders.filter((o) => o.payment === 'Pending' || o.payment === 'Partial').forEach((o) => {
-        notifs.push({ id: `pay-${o.id}`, group: 'Pending Payments', text: `Payment pending: ${o.company}`, sub: `${o.orderNo} · ₹${Number(o.total).toLocaleString('en-IN')}`, color: 'var(--amber-600)' })
+        notifs.push({ id: `pay-${o.id}`, group: 'Pending Payments', text: `Payment pending: ${o.company}`, sub: `${o.orderNo} · ₹${Number(o.total).toLocaleString('en-IN')}`, color: 'var(--amber-600)', route: '/orders' })
       })
 
       // Reminder: Payment Due — fires the moment an order is saved
@@ -152,9 +152,9 @@ export default function Shell({ children }) {
       orders.filter((o) => o.paymentDueDate && (o.payment === 'Pending' || o.payment === 'Partial')).forEach((o) => {
         const d = daysBetween(o.paymentDueDate, today)
         if (d >= 0) {
-          notifs.push({ id: `ord-overdue-${o.id}`, group: 'Reminder: Payment Due', text: `${o.company} — ${o.orderNo}`, sub: `${d === 0 ? 'Due today' : `Overdue by ${d} day${d === 1 ? '' : 's'}`} · ₹${Number(o.total).toLocaleString('en-IN')}${o.paymentTerms ? ' · ' + o.paymentTerms : ''}`, color: 'var(--red-600)' })
+          notifs.push({ id: `ord-overdue-${o.id}`, group: 'Reminder: Payment Due', text: `${o.company} — ${o.orderNo}`, sub: `${d === 0 ? 'Due today' : `Overdue by ${d} day${d === 1 ? '' : 's'}`} · ₹${Number(o.total).toLocaleString('en-IN')}${o.paymentTerms ? ' · ' + o.paymentTerms : ''}`, color: 'var(--red-600)', route: '/orders' })
         } else if (d >= -3) {
-          notifs.push({ id: `ord-soon-${o.id}`, group: 'Reminder: Payment Due', text: `${o.company} — ${o.orderNo}`, sub: `Due in ${-d} day${-d === 1 ? '' : 's'} · ₹${Number(o.total).toLocaleString('en-IN')}${o.paymentTerms ? ' · ' + o.paymentTerms : ''}`, color: 'var(--amber-600)' })
+          notifs.push({ id: `ord-soon-${o.id}`, group: 'Reminder: Payment Due', text: `${o.company} — ${o.orderNo}`, sub: `Due in ${-d} day${-d === 1 ? '' : 's'} · ₹${Number(o.total).toLocaleString('en-IN')}${o.paymentTerms ? ' · ' + o.paymentTerms : ''}`, color: 'var(--amber-600)', route: '/orders' })
         }
       })
 
@@ -164,28 +164,28 @@ export default function Shell({ children }) {
       invoices.filter((i) => i.dueDate && !i.orderId && !['Paid', 'Cancelled'].includes(i.status)).forEach((i) => {
         const d = daysBetween(i.dueDate, today)
         if (d >= 0) {
-          notifs.push({ id: `inv-overdue-${i.id}`, group: 'Reminder: Payment Due', text: `${i.company} — ${i.invoiceNo}`, sub: `${d === 0 ? 'Due today' : `Overdue by ${d} day${d === 1 ? '' : 's'}`} · ₹${Number(i.total).toLocaleString('en-IN')}${i.paymentTerms ? ' · ' + i.paymentTerms : ''}`, color: 'var(--red-600)' })
+          notifs.push({ id: `inv-overdue-${i.id}`, group: 'Reminder: Payment Due', text: `${i.company} — ${i.invoiceNo}`, sub: `${d === 0 ? 'Due today' : `Overdue by ${d} day${d === 1 ? '' : 's'}`} · ₹${Number(i.total).toLocaleString('en-IN')}${i.paymentTerms ? ' · ' + i.paymentTerms : ''}`, color: 'var(--red-600)', route: '/invoices' })
         } else if (d >= -3) {
-          notifs.push({ id: `inv-soon-${i.id}`, group: 'Reminder: Payment Due', text: `${i.company} — ${i.invoiceNo}`, sub: `Due in ${-d} day${-d === 1 ? '' : 's'} · ₹${Number(i.total).toLocaleString('en-IN')}${i.paymentTerms ? ' · ' + i.paymentTerms : ''}`, color: 'var(--amber-600)' })
+          notifs.push({ id: `inv-soon-${i.id}`, group: 'Reminder: Payment Due', text: `${i.company} — ${i.invoiceNo}`, sub: `Due in ${-d} day${-d === 1 ? '' : 's'} · ₹${Number(i.total).toLocaleString('en-IN')}${i.paymentTerms ? ' · ' + i.paymentTerms : ''}`, color: 'var(--amber-600)', route: '/invoices' })
         }
       })
 
       // 5) Overdue quotations (already expired, still open)
       quotations.filter((q) => q.validUntil && q.validUntil < today && !['Accepted', 'Rejected'].includes(q.status)).forEach((q) => {
-        notifs.push({ id: `qt-overdue-${q.id}`, group: 'Overdue Quotations', text: `${q.company} — ${q.quoteNo}`, sub: `Expired ${q.validUntil}`, color: 'var(--red-600)' })
+        notifs.push({ id: `qt-overdue-${q.id}`, group: 'Overdue Quotations', text: `${q.company} — ${q.quoteNo}`, sub: `Expired ${q.validUntil}`, color: 'var(--red-600)', route: '/quotations' })
       })
 
       // Reminder: quote expiring within the next 3 days (not yet expired)
       quotations.filter((q) => q.validUntil && q.validUntil >= today && !['Accepted', 'Rejected'].includes(q.status) && daysBetween(today, q.validUntil) <= 3).forEach((q) => {
         const d = daysBetween(today, q.validUntil)
-        notifs.push({ id: `qt-exp-${q.id}`, group: 'Reminder: Quote Expiry', text: `${q.company} — ${q.quoteNo}`, sub: d === 0 ? 'Expires today' : `Expires in ${d} day${d === 1 ? '' : 's'}`, color: 'var(--amber-600)' })
+        notifs.push({ id: `qt-exp-${q.id}`, group: 'Reminder: Quote Expiry', text: `${q.company} — ${q.quoteNo}`, sub: d === 0 ? 'Expires today' : `Expires in ${d} day${d === 1 ? '' : 's'}`, color: 'var(--amber-600)', route: '/quotations' })
       })
 
       // Reminder: sample sent 5+ days ago, still not delivered
       samples.filter((s) => s.status && s.status !== 'Delivered' && s.sent).forEach((s) => {
         const d = daysBetween(s.sent, today)
         if (d >= 5) {
-          notifs.push({ id: `smp-${s.id}`, group: 'Reminder: Sample Follow-up', text: `${s.company}`, sub: `Sent ${d} days ago · still "${s.status}"`, color: 'var(--red-600)' })
+          notifs.push({ id: `smp-${s.id}`, group: 'Reminder: Sample Follow-up', text: `${s.company}`, sub: `Sent ${d} days ago · still "${s.status}"`, color: 'var(--red-600)', route: '/samples' })
         }
       })
 
@@ -425,7 +425,13 @@ export default function Shell({ children }) {
                             {g} <span style={{ fontWeight: 400 }}>({notifications.filter((n) => n.group === g).length})</span>
                           </div>
                           {notifications.filter((n) => n.group === g).map((n) => (
-                            <div key={n.id} style={{ padding: '10px 16px', borderBottom: '1px solid var(--paper-100)', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                            <div
+                              key={n.id}
+                              onClick={() => { setShowNotifs(false); if (n.route) navigate(n.route) }}
+                              style={{ padding: '10px 16px', borderBottom: '1px solid var(--paper-100)', display: 'flex', gap: 10, alignItems: 'flex-start', cursor: n.route ? 'pointer' : 'default' }}
+                              onMouseEnter={(e) => { if (n.route) e.currentTarget.style.background = 'var(--paper-50)' }}
+                              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                            >
                               <span style={{ fontSize: 16, marginTop: 1 }}>{GROUP_ICON[n.group] || '🔔'}</span>
                               <div>
                                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-900)' }}>{n.text}</div>
