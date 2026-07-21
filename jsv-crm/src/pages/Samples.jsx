@@ -12,6 +12,7 @@ import { IconPlus, IconSearch, IconTrash } from '../components/Icons.jsx'
 import { useAuth } from '../lib/AuthContext.jsx'
 import { templates } from '../lib/messaging.js'
 import '../styles/components.css'
+import EmptyState from '../components/EmptyState.jsx'
 
 const STATUSES = ['All statuses', 'Preparing', 'In Transit', 'Delivered']
 const STATUS_TONE = { Preparing: 'gray', 'In Transit': 'amber', Delivered: 'teal' }
@@ -128,7 +129,19 @@ export default function Samples() {
             {loading ? (
               <tr className="empty-row"><td colSpan={(canEdit || canDelete) ? 10 : 9}>Loading samples…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={(canEdit || canDelete) ? 10 : 9}>{samples.length === 0 ? 'No samples yet.' : 'No samples match your filters.'}</td></tr>
+              <tr className="empty-row"><td colSpan={(canEdit || canDelete) ? 10 : 9}>
+                {samples.length === 0 ? (
+                  <EmptyState
+                    icon="🧫"
+                    title="No samples yet"
+                    subtitle="Send your first sample to a prospect and track it here."
+                    actionLabel={canEdit ? 'New Sample' : undefined}
+                    onAction={canEdit ? () => setShowModal(true) : undefined}
+                  />
+                ) : (
+                  <EmptyState icon="🔍" title="No samples match your filters" subtitle="Try adjusting your search or filters." />
+                )}
+              </td></tr>
             ) : filtered.map((s) => {
               const t = templates.sample(s)
               return (

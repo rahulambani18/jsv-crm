@@ -8,6 +8,7 @@ import Modal from '../components/Modal.jsx'
 import { IconPlus, IconShield, IconUsers, IconKey } from '../components/Icons.jsx'
 import { useAuth } from '../lib/AuthContext.jsx'
 import '../styles/components.css'
+import EmptyState from '../components/EmptyState.jsx'
 import '../styles/users.css'
 
 function emptyUserForm() {
@@ -249,7 +250,15 @@ export default function UsersAndRoles() {
               </thead>
               <tbody>
                 {users.length === 0 ? (
-                  <tr className="empty-row"><td colSpan={canEdit ? 6 : 5}>No users yet.</td></tr>
+                  <tr className="empty-row"><td colSpan={canEdit ? 6 : 5}>
+                    <EmptyState
+                      icon="👤"
+                      title="No users yet"
+                      subtitle="Add teammates and assign them a role to get them into the CRM."
+                      actionLabel={canEdit ? 'Add User' : undefined}
+                      onAction={canEdit ? () => setShowUserModal(true) : undefined}
+                    />
+                  </td></tr>
                 ) : users.map((u) => (
                   <tr key={u.id}>
                     <td className="cell-strong">

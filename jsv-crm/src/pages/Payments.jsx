@@ -7,6 +7,7 @@ import Modal from '../components/Modal.jsx'
 import ExportBar from '../components/ExportBar.jsx'
 import TallyImportButton from '../components/TallyImportButton.jsx'
 import { IconPlus, IconSearch, IconTrash } from '../components/Icons.jsx'
+import EmptyState from '../components/EmptyState.jsx'
 import '../styles/components.css'
 
 const PAYMENT_MODES = ['NEFT', 'RTGS', 'Cheque', 'Cash', 'UPI', 'Bank Transfer']
@@ -145,7 +146,19 @@ export default function Payments() {
             {loading ? (
               <tr className="empty-row"><td colSpan={canDelete ? 9 : 8}>Loading payments…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={canDelete ? 9 : 8}>No payments recorded yet.</td></tr>
+              <tr className="empty-row"><td colSpan={canDelete ? 9 : 8}>
+                {payments.length === 0 ? (
+                  <EmptyState
+                    icon="💳"
+                    title="No payments recorded yet"
+                    subtitle="Record a payment to track what's been received against invoices."
+                    actionLabel={canEdit ? 'Record Payment' : undefined}
+                    onAction={canEdit ? () => { setForm(emptyForm()); setShowModal(true) } : undefined}
+                  />
+                ) : (
+                  <EmptyState icon="🔍" title="No payments match your filters" subtitle="Try adjusting your search or filters." />
+                )}
+              </td></tr>
             ) : filtered.map((p) => {
               const inv = invoices.find((i) => i.id === p.invoiceId)
               return (

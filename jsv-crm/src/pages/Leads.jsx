@@ -15,6 +15,7 @@ import { useAuth } from '../lib/AuthContext.jsx'
 import { showToast } from '../lib/toast.js'
 import { exportCSV } from '../lib/exportUtils.js'
 import '../styles/components.css'
+import EmptyState from '../components/EmptyState.jsx'
 
 const STATUSES = ['All statuses', ...PIPELINE_STAGES]
 
@@ -236,7 +237,19 @@ export default function Leads() {
             {loading ? (
               <tr className="empty-row"><td colSpan={8 + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>Loading leads…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={8 + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>{leads.length === 0 ? 'No leads found.' : 'No leads match your filters.'}</td></tr>
+              <tr className="empty-row"><td colSpan={8 + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>
+                {leads.length === 0 ? (
+                  <EmptyState
+                    icon="🎯"
+                    title="No leads yet"
+                    subtitle="Add your first lead to start building your pipeline."
+                    actionLabel={canEdit ? 'New Lead' : undefined}
+                    onAction={canEdit ? () => setShowModal(true) : undefined}
+                  />
+                ) : (
+                  <EmptyState icon="🔍" title="No leads match your filters" subtitle="Try adjusting your search or filters." />
+                )}
+              </td></tr>
             ) : filtered.map((l) => (
               <tr key={l.id}>
                 {canEdit && (

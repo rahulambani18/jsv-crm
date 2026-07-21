@@ -14,6 +14,7 @@ import { useAuth } from '../lib/AuthContext.jsx'
 import { showToast } from '../lib/toast.js'
 import { exportCSV } from '../lib/exportUtils.js'
 import '../styles/components.css'
+import EmptyState from '../components/EmptyState.jsx'
 
 const MOVEMENT_TYPES = ['Received', 'Dispatched', 'Adjustment', 'Return']
 
@@ -280,7 +281,19 @@ export default function Inventory() {
             {loading ? (
               <tr className="empty-row"><td colSpan={7 + (canEdit ? 1 : 0)}>Loading inventory…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={7 + (canEdit ? 1 : 0)}>{stock.length === 0 ? 'No stock tracked yet. Log a stock entry to get started.' : 'No stock matches your filters.'}</td></tr>
+              <tr className="empty-row"><td colSpan={7 + (canEdit ? 1 : 0)}>
+                {stock.length === 0 ? (
+                  <EmptyState
+                    icon="📦"
+                    title="No stock tracked yet"
+                    subtitle="Log a stock entry to start tracking what's on hand at each warehouse."
+                    actionLabel={canEdit ? 'Stock Entry' : undefined}
+                    onAction={canEdit ? () => { setEntryForm(emptyEntryForm()); setShowEntryModal(true) } : undefined}
+                  />
+                ) : (
+                  <EmptyState icon="🔍" title="No stock matches your filters" subtitle="Try adjusting your search or warehouse filter." />
+                )}
+              </td></tr>
             ) : filtered.map((s) => {
               const status = statusFor(s)
               return (

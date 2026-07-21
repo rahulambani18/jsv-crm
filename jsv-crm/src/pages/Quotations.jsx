@@ -9,6 +9,7 @@ import SendButtons from '../components/SendButtons.jsx'
 import { IconPlus, IconTrash, IconSearch } from '../components/Icons.jsx'
 import { templates } from '../lib/messaging.js'
 import '../styles/components.css'
+import EmptyState from '../components/EmptyState.jsx'
 
 function emptyLineItem() {
   return { product: '', qty: '', packingSize: '', price: '' }
@@ -123,7 +124,19 @@ export default function Quotations() {
             {loading ? (
               <tr className="empty-row"><td colSpan={7}>Loading quotations…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={7}>{quotations.length === 0 ? 'No quotations yet.' : 'No quotations match your search.'}</td></tr>
+              <tr className="empty-row"><td colSpan={7}>
+                {quotations.length === 0 ? (
+                  <EmptyState
+                    icon="📄"
+                    title="No quotations yet"
+                    subtitle="Create your first quotation to send a customer pricing and terms."
+                    actionLabel="New Quotation"
+                    onAction={() => setShowModal(true)}
+                  />
+                ) : (
+                  <EmptyState icon="🔍" title="No quotations match your search" subtitle="Try adjusting your search or filters." />
+                )}
+              </td></tr>
             ) : filtered.map((q) => {
               const customer = customers.find((c) => c.company === q.company)
               const t = templates.quotation(q)

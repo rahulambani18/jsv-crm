@@ -6,6 +6,7 @@ import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
 import { IconPlus, IconSearch, IconEdit, IconTrash } from '../components/Icons.jsx'
 import '../styles/components.css'
+import EmptyState from '../components/EmptyState.jsx'
 
 const DOC_TYPES = ['COA', 'MSDS', 'TDS', 'Certificate', 'Contract', 'Invoice', 'Purchase Order', 'Email', 'Other']
 
@@ -134,7 +135,19 @@ export default function Documents() {
             {loading ? (
               <tr className="empty-row"><td colSpan={(canEdit || canDelete) ? 8 : 7}>Loading documents…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={(canEdit || canDelete) ? 8 : 7}>{docs.length === 0 ? 'No documents yet. Add COAs, MSDS sheets, contracts and more.' : 'No documents match.'}</td></tr>
+              <tr className="empty-row"><td colSpan={(canEdit || canDelete) ? 8 : 7}>
+                {docs.length === 0 ? (
+                  <EmptyState
+                    icon="📁"
+                    title="No documents yet"
+                    subtitle="Add COAs, MSDS sheets, contracts and more."
+                    actionLabel={canEdit ? 'Add Document' : undefined}
+                    onAction={canEdit ? () => setShowModal(true) : undefined}
+                  />
+                ) : (
+                  <EmptyState icon="🔍" title="No documents match" subtitle="Try adjusting your search or filters." />
+                )}
+              </td></tr>
             ) : filtered.map((d) => (
               <tr key={d.id}>
                 <td>

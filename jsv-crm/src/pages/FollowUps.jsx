@@ -7,6 +7,7 @@ import Modal from '../components/Modal.jsx'
 import SendButtons from '../components/SendButtons.jsx'
 import { IconPlus } from '../components/Icons.jsx'
 import { templates } from '../lib/messaging.js'
+import EmptyState from '../components/EmptyState.jsx'
 import '../styles/components.css'
 
 const TABS = ['Today', 'Upcoming', 'Overdue', 'Completed', 'All']
@@ -96,7 +97,15 @@ export default function FollowUps() {
             {loading ? (
               <tr className="empty-row"><td colSpan={7}>Loading follow-ups…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={7}>No follow-ups in this view.</td></tr>
+              <tr className="empty-row"><td colSpan={7}>
+                <EmptyState
+                  icon="⏰"
+                  title="No follow-ups in this view"
+                  subtitle="Switch tabs to see other follow-ups, or schedule a new one."
+                  actionLabel="Schedule Follow-up"
+                  onAction={() => setShowModal(true)}
+                />
+              </td></tr>
             ) : filtered.map((f) => {
               const { phone, email } = contactInfoFor(f)
               const t = templates.followUp(f)

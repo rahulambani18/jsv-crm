@@ -9,6 +9,7 @@ import Modal from '../components/Modal.jsx'
 import { IconPlus, IconSearch, IconUpload, IconEdit, IconTrash } from '../components/Icons.jsx'
 import ExportBar from '../components/ExportBar.jsx'
 import '../styles/components.css'
+import EmptyState from '../components/EmptyState.jsx'
 
 const PRODUCT_FIELD_MAP = {
   name: ['name', 'product', 'productname'],
@@ -191,7 +192,19 @@ export default function Products() {
             {loading ? (
               <tr className="empty-row"><td colSpan={(canEdit || canDelete) ? 9 : 8}>Loading products…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={(canEdit || canDelete) ? 9 : 8}>No products match.</td></tr>
+              <tr className="empty-row"><td colSpan={(canEdit || canDelete) ? 9 : 8}>
+                {products.length === 0 ? (
+                  <EmptyState
+                    icon="🧪"
+                    title="No products yet"
+                    subtitle="Add your first product to build your catalog."
+                    actionLabel={canEdit ? 'New Product' : undefined}
+                    onAction={canEdit ? openCreate : undefined}
+                  />
+                ) : (
+                  <EmptyState icon="🔍" title="No products match" subtitle="Try adjusting your search or filters." />
+                )}
+              </td></tr>
             ) : filtered.map((p) => (
               <tr key={p.id} style={{ opacity: p.status === 'Inactive' ? 0.55 : 1 }}>
                 <td className="cell-strong">{p.name}</td>

@@ -12,6 +12,7 @@ import { IconPlus, IconSearch, IconEdit, IconTrash } from '../components/Icons.j
 import Dropdown from '../components/Dropdown.jsx'
 import { templates } from '../lib/messaging.js'
 import '../styles/components.css'
+import EmptyState from '../components/EmptyState.jsx'
 
 const GST_RATE = 18
 
@@ -477,7 +478,17 @@ export default function Invoices() {
             {loading ? (
               <tr className="empty-row"><td colSpan={9}>Loading invoices…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={9}>No invoices yet. Generate one from an order above.</td></tr>
+              <tr className="empty-row"><td colSpan={9}>
+                {invoices.length === 0 ? (
+                  <EmptyState
+                    icon="🧾"
+                    title="No invoices yet"
+                    subtitle="Generate one from an order using the panel above."
+                  />
+                ) : (
+                  <EmptyState icon="🔍" title="No invoices match your filters" subtitle="Try adjusting your search or filters." />
+                )}
+              </td></tr>
             ) : filtered.map((inv) => {
               const customer = customers.find((c) => c.company === inv.company)
               const t = templates.invoice(inv)

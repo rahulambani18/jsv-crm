@@ -19,6 +19,7 @@ import { exportCSV } from '../lib/exportUtils.js'
 import { outstandingForCustomer } from '../lib/credit.js'
 import { templates } from '../lib/messaging.js'
 import '../styles/components.css'
+import EmptyState from '../components/EmptyState.jsx'
 
 function emptyForm() {
   return {
@@ -289,7 +290,19 @@ export default function Customers() {
             {loading ? (
               <tr className="empty-row"><td colSpan={10 + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>Loading customers…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={10 + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>{customers.length === 0 ? 'No customers yet.' : 'No customers match your search.'}</td></tr>
+              <tr className="empty-row"><td colSpan={10 + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>
+                {customers.length === 0 ? (
+                  <EmptyState
+                    icon="👥"
+                    title="No customers yet"
+                    subtitle="Add your first customer to start tracking their orders and account details."
+                    actionLabel={canEdit ? 'New Customer' : undefined}
+                    onAction={canEdit ? openCreate : undefined}
+                  />
+                ) : (
+                  <EmptyState icon="🔍" title="No customers match your search" subtitle="Try adjusting your search." />
+                )}
+              </td></tr>
             ) : filtered.map((c) => {
               const outstanding = outstandingByCompany[c.company] || 0
               const overLimit = Number(c.creditLimit) > 0 && outstanding > Number(c.creditLimit)

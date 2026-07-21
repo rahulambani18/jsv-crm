@@ -15,6 +15,7 @@ import { showToast } from '../lib/toast.js'
 import { exportCSV } from '../lib/exportUtils.js'
 import { outstandingForCustomer } from '../lib/credit.js'
 import '../styles/components.css'
+import EmptyState from '../components/EmptyState.jsx'
 
 const STATUSES = ['All statuses', 'Processing', 'Dispatched', 'Delivered', 'Cancelled']
 const PAYMENT_TERMS = ['Net 15', 'Net 30', 'Net 45', 'Net 60', 'Custom']
@@ -354,7 +355,19 @@ export default function Orders() {
             {loading ? (
               <tr className="empty-row"><td colSpan={9 + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>Loading orders…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={9 + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>{orders.length === 0 ? 'No orders yet.' : 'No orders match your filters.'}</td></tr>
+              <tr className="empty-row"><td colSpan={9 + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>
+                {orders.length === 0 ? (
+                  <EmptyState
+                    icon="🛒"
+                    title="No orders yet"
+                    subtitle="Create your first order to start tracking dispatch and payment."
+                    actionLabel={canEdit ? 'New Order' : undefined}
+                    onAction={canEdit ? openCreate : undefined}
+                  />
+                ) : (
+                  <EmptyState icon="🔍" title="No orders match your filters" subtitle="Try adjusting your search or filters." />
+                )}
+              </td></tr>
             ) : filtered.map((o) => (
               <tr key={o.id}>
                 {canEdit && (
