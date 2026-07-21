@@ -5,7 +5,7 @@
 import { supabase, isMock, db as mock } from './supabaseClient.js'
 import { mockAuth } from './mockDb.js'
 
-const TABLES = ['products', 'leads', 'customers', 'samples', 'quotations', 'orders', 'followUps', 'roles', 'users', 'tasks', 'meetings', 'documents', 'invoices', 'payments', 'stock', 'stockMovements']
+const TABLES = ['products', 'leads', 'customers', 'samples', 'quotations', 'orders', 'followUps', 'roles', 'users', 'tasks', 'meetings', 'documents', 'invoices', 'payments', 'stock', 'stockMovements', 'warehouses']
 const SQL_TABLE_NAME = {
   products: 'products',
   leads: 'leads',
@@ -23,6 +23,7 @@ const SQL_TABLE_NAME = {
   payments: 'payments',
   stock: 'stock',
   stockMovements: 'stock_movements',
+  warehouses: 'warehouses',
 }
 
 // Pages write/read plain camelCase fields (estValue, nextFollowUp,
@@ -53,7 +54,7 @@ const MODULE_LABEL = {
   products: 'Product', leads: 'Lead', customers: 'Customer', samples: 'Sample',
   quotations: 'Quotation', orders: 'Order', followUps: 'Follow-up', tasks: 'Task',
   meetings: 'Meeting', documents: 'Document', invoices: 'Invoice', payments: 'Payment',
-  stock: 'Stock', stockMovements: 'Stock Movement',
+  stock: 'Stock', stockMovements: 'Stock Movement', warehouses: 'Warehouse',
 }
 
 function pickLabel(record) {

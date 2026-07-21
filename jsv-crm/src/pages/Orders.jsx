@@ -15,7 +15,6 @@ import { exportCSV } from '../lib/exportUtils.js'
 import { outstandingForCustomer } from '../lib/credit.js'
 import '../styles/components.css'
 
-const WAREHOUSE_FILTERS = ['All warehouses', ...WAREHOUSES]
 const STATUSES = ['All statuses', 'Processing', 'Dispatched', 'Delivered', 'Cancelled']
 const PAYMENT_TERMS = ['Net 15', 'Net 30', 'Net 45', 'Net 60', 'Custom']
 
@@ -67,11 +66,21 @@ export default function Orders() {
   const [invoices, setInvoices] = useState([])
   const [payments, setPayments] = useState([])
   const [stock, setStock] = useState([])
+  const [warehouseNames, setWarehouseNames] = useState(WAREHOUSES)
 
   useEffect(() => { refresh() }, [])
   useEffect(() => { api.users.list().then(setUsers).catch(() => {}) }, [])
   useEffect(() => { Promise.all([api.invoices.list(), api.payments.list()]).then(([inv, pay]) => { setInvoices(inv); setPayments(pay) }).catch(() => {}) }, [])
   useEffect(() => { api.stock.list().then(setStock).catch(() => { /* Inventory not set up yet — stock warnings just won't show */ }) }, [])
+  useEffect(() => {
+    api.warehouses.list().then((rows) => {
+      const active = rows.filter((w) => w.status === 'Active').map((w) => w.name)
+      if (active.length > 0) setWarehouseNames(active)
+      // else: Warehouses module not set up yet — fall back to the static list
+    }).catch(() => { /* fall back to the static list */ })
+  }, [])
+
+  const WAREHOUSE_FILTERS = useMemo(() => ['All warehouses', ...warehouseNames], [warehouseNames])
 
   function refresh() {
     setLoading(true)
@@ -419,7 +428,7 @@ export default function Orders() {
             <div className="field">
               <label>Warehouse</label>
               <select value={form.warehouse} onChange={(e) => setForm({ ...form, warehouse: e.target.value })}>
-                {WAREHOUSES.map((w) => <option key={w}>{w}</option>)}
+                {warehouseNames.map((w) => <option key={w}>{w}</option>)}
               </select>
             </div>
             <div className="field-row">

@@ -62,6 +62,31 @@ export const WAREHOUSES = [
   'Chennai (Ambattur Road)',
 ]
 
+// Full warehouse records — the Warehouses module manages these. The
+// `name` here is the same string used everywhere else (Orders,
+// Inventory) so nothing else needs to change when a warehouse is
+// added or renamed through the module.
+export const seedWarehouses = [
+  {
+    id: 'wh1', name: 'Mumbai (Bhiwandi)', code: 'WH-MUM', type: 'Own',
+    address: 'Plot 22, Bhiwandi Industrial Estate', city: 'Bhiwandi', state: 'Maharashtra',
+    manager: 'Suresh Rane', phone: '+91 98200 44551', email: 'suresh@jsvingredient.com',
+    capacity: 5000, capacityUnit: 'sq ft', status: 'Active', notes: 'Primary distribution hub for West India.',
+  },
+  {
+    id: 'wh2', name: 'Delhi (Siraspur)', code: 'WH-DEL', type: 'Own',
+    address: 'Khasra No. 112, Siraspur Industrial Area', city: 'Delhi', state: 'Delhi',
+    manager: 'Vikram Chawla', phone: '+91 98110 22987', email: 'vikram@jsvingredient.com',
+    capacity: 3200, capacityUnit: 'sq ft', status: 'Active', notes: 'Serves North India — Punjab, Haryana, UP.',
+  },
+  {
+    id: 'wh3', name: 'Chennai (Ambattur Road)', code: 'WH-CHN', type: '3PL',
+    address: 'No. 8, Ambattur Industrial Estate Road', city: 'Chennai', state: 'Tamil Nadu',
+    manager: 'Divya Krishnan', phone: '+91 94440 78123', email: 'divya@3plpartner.in',
+    capacity: 2400, capacityUnit: 'sq ft', status: 'Active', notes: '3PL-managed — billed monthly per pallet.',
+  },
+]
+
 export const COURIERS = [
   'Blue Dart', 'DTDC', 'Delhivery', 'India Post', 'FedEx', 'Professional Courier',
 ]
@@ -164,6 +189,7 @@ export const MODULES = [
   { key: 'quotations', label: 'Quotations' },
   { key: 'orders', label: 'Orders' },
   { key: 'inventory', label: 'Inventory' },
+  { key: 'warehouses', label: 'Warehouses' },
   { key: 'products', label: 'Products' },
   { key: 'reports', label: 'Reports' },
   { key: 'tasks', label: 'Tasks' },

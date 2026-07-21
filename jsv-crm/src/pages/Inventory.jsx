@@ -51,8 +51,15 @@ export default function Inventory() {
 
   const [historyRow, setHistoryRow] = useState(null)
   const [selected, setSelected] = useState(new Set())
+  const [warehouseNames, setWarehouseNames] = useState(WAREHOUSES)
 
   useEffect(() => { refresh() }, [])
+  useEffect(() => {
+    api.warehouses.list().then((rows) => {
+      const active = rows.filter((w) => w.status === 'Active').map((w) => w.name)
+      if (active.length > 0) setWarehouseNames(active)
+    }).catch(() => { /* fall back to the static list */ })
+  }, [])
 
   async function refresh() {
     setLoading(true)
@@ -234,7 +241,7 @@ export default function Inventory() {
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search product, warehouse…" />
         </div>
         <Dropdown
-          options={['All', ...WAREHOUSES]}
+          options={['All', ...warehouseNames]}
           value={warehouseFilter}
           onChange={setWarehouseFilter}
         />
@@ -340,7 +347,7 @@ export default function Inventory() {
               <div className="field">
                 <label>Warehouse</label>
                 <Dropdown
-                  options={WAREHOUSES}
+                  options={warehouseNames}
                   value={entryForm.warehouse}
                   onChange={(v) => setEntryForm({ ...entryForm, warehouse: v })}
                 />
