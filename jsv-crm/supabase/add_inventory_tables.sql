@@ -11,6 +11,7 @@ create table if not exists stock (
   qty_on_hand numeric default 0,
   reorder_level numeric default 0,
   updated_at timestamptz default now(),
+  created_at timestamptz default now(),
   unique (workspace_id, product, warehouse)
 );
 
