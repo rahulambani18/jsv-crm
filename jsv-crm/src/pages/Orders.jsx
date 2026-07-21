@@ -244,6 +244,23 @@ export default function Orders() {
     }
   }
 
+  // Inline Status/Payment dropdowns in the table — deliberately available
+  // to everyone who can see this page, not just users with full "edit"
+  // rights. Editing the rest of an order (products, amounts, dates) still
+  // requires the edit permission via the pencil icon; this only ever
+  // patches the one field, so it's safe to hand to reps who shouldn't be
+  // able to change order contents.
+  async function handleQuickUpdate(orderId, field, value) {
+    const prev = orders
+    setOrders((os) => os.map((o) => (o.id === orderId ? { ...o, [field]: value } : o)))
+    try {
+      await api.orders.update(orderId, { [field]: value })
+    } catch (err) {
+      setOrders(prev)
+      showToast('Could not update: ' + (err.message || 'Unknown error'), 'error')
+    }
+  }
+
   async function handleSave(e) {
     e.preventDefault()
     setSaving(true)
@@ -388,8 +405,24 @@ export default function Orders() {
                   {formatINR(o.total)}
                   <br /><span className="cell-mono cell-muted" style={{ fontSize: 11, fontWeight: 400 }}>{formatINR(o.subtotal)} + GST {formatINR(o.gstAmount)} ({o.gstRate || 18}%)</span>
                 </td>
-                <td><Pill>{o.status}</Pill></td>
-                <td><Pill>{o.payment}</Pill></td>
+                <td>
+                  <select
+                    className={`pill-select pill-${{ Processing: 'navy', Dispatched: 'amber', Delivered: 'teal', Cancelled: 'red' }[o.status] || 'gray'}`}
+                    value={o.status}
+                    onChange={(e) => handleQuickUpdate(o.id, 'status', e.target.value)}
+                  >
+                    <option>Processing</option><option>Dispatched</option><option>Delivered</option><option>Cancelled</option>
+                  </select>
+                </td>
+                <td>
+                  <select
+                    className={`pill-select pill-${{ Pending: 'amber', Partial: 'amber', Paid: 'teal' }[o.payment] || 'gray'}`}
+                    value={o.payment}
+                    onChange={(e) => handleQuickUpdate(o.id, 'payment', e.target.value)}
+                  >
+                    <option>Pending</option><option>Partial</option><option>Paid</option>
+                  </select>
+                </td>
                 {(canEdit || canDelete) && (
                   <td>
                     <div style={{ display: 'flex', gap: 4 }}>
