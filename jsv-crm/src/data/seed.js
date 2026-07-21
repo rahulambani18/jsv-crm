@@ -57,10 +57,9 @@ export const INDIAN_STATES = [
 ]
 
 export const WAREHOUSES = [
-  'Mumbai – Bhiwandi',
-  'Delhi – Siraspur',
-  'Delhi – Bhiwadi',
-  'Chennai – Sriperumbudur',
+  'Mumbai (Bhiwandi)',
+  'Delhi (Siraspur)',
+  'Chennai (Ambattur Road)',
 ]
 
 export const COURIERS = [
@@ -107,7 +106,7 @@ export const seedQuotations = [
 
 export const seedOrders = [
   {
-    id: 'o1', orderNo: 'ORD-2026-0301', customerId: 'c1', company: 'Patel Agro Industries', warehouse: 'Mumbai – Bhiwandi',
+    id: 'o1', orderNo: 'ORD-2026-0301', customerId: 'c1', company: 'Patel Agro Industries', warehouse: 'Mumbai (Bhiwandi)',
     orderDate: '2026-06-10', delivery: '2026-06-18',
     lineItems: [
       { product: 'Citric Acid', qty: 500, unit: 'kg', unitPrice: 220, lineTotal: 110000 },
@@ -117,7 +116,7 @@ export const seedOrders = [
     status: 'Delivered', payment: 'Paid',
   },
   {
-    id: 'o2', orderNo: 'ORD-2026-0302', customerId: 'c2', company: 'Himalaya Dairy Co.', warehouse: 'Delhi – Bhiwadi',
+    id: 'o2', orderNo: 'ORD-2026-0302', customerId: 'c2', company: 'Himalaya Dairy Co.', warehouse: 'Delhi (Siraspur)',
     orderDate: '2026-06-21', delivery: '2026-06-29',
     lineItems: [
       { product: 'Carrageenan', qty: 80, unit: 'kg', unitPrice: 950, lineTotal: 76000 },
@@ -129,21 +128,21 @@ export const seedOrders = [
 ]
 
 export const seedStock = [
-  { id: 'st1', product: 'Citric Acid', warehouse: 'Mumbai – Bhiwandi', unit: 'kg', qtyOnHand: 1200, reorderLevel: 500 },
-  { id: 'st2', product: 'Sodium Benzoate', warehouse: 'Mumbai – Bhiwandi', unit: 'kg', qtyOnHand: 180, reorderLevel: 200 },
-  { id: 'st3', product: 'Carrageenan', warehouse: 'Delhi – Bhiwadi', unit: 'kg', qtyOnHand: 320, reorderLevel: 100 },
-  { id: 'st4', product: 'Calcium Lactate', warehouse: 'Delhi – Bhiwadi', unit: 'kg', qtyOnHand: 40, reorderLevel: 50 },
-  { id: 'st5', product: 'Xanthan Gum', warehouse: 'Mumbai – Bhiwandi', unit: 'kg', qtyOnHand: 90, reorderLevel: 75 },
-  { id: 'st6', product: 'Guar Gum', warehouse: 'Chennai – Sriperumbudur', unit: 'kg', qtyOnHand: 0, reorderLevel: 50 },
-  { id: 'st7', product: 'Ascorbic Acid', warehouse: 'Delhi – Siraspur', unit: 'kg', qtyOnHand: 610, reorderLevel: 150 },
+  { id: 'st1', product: 'Citric Acid', warehouse: 'Mumbai (Bhiwandi)', unit: 'kg', qtyOnHand: 1200, reorderLevel: 500 },
+  { id: 'st2', product: 'Sodium Benzoate', warehouse: 'Mumbai (Bhiwandi)', unit: 'kg', qtyOnHand: 180, reorderLevel: 200 },
+  { id: 'st3', product: 'Carrageenan', warehouse: 'Delhi (Siraspur)', unit: 'kg', qtyOnHand: 320, reorderLevel: 100 },
+  { id: 'st4', product: 'Calcium Lactate', warehouse: 'Delhi (Siraspur)', unit: 'kg', qtyOnHand: 40, reorderLevel: 50 },
+  { id: 'st5', product: 'Xanthan Gum', warehouse: 'Mumbai (Bhiwandi)', unit: 'kg', qtyOnHand: 90, reorderLevel: 75 },
+  { id: 'st6', product: 'Guar Gum', warehouse: 'Chennai (Ambattur Road)', unit: 'kg', qtyOnHand: 0, reorderLevel: 50 },
+  { id: 'st7', product: 'Ascorbic Acid', warehouse: 'Delhi (Siraspur)', unit: 'kg', qtyOnHand: 610, reorderLevel: 150 },
 ]
 
 export const seedStockMovements = [
-  { id: 'sm1', product: 'Citric Acid', warehouse: 'Mumbai – Bhiwandi', type: 'Received', qty: 1500, reference: 'PO-4471', notes: 'From RZBC', date: '2026-06-05' },
-  { id: 'sm2', product: 'Citric Acid', warehouse: 'Mumbai – Bhiwandi', type: 'Dispatched', qty: 500, reference: 'ORD-2026-0301', notes: '', date: '2026-06-18' },
-  { id: 'sm3', product: 'Sodium Benzoate', warehouse: 'Mumbai – Bhiwandi', type: 'Received', qty: 280, reference: 'PO-4488', notes: 'From Emerald Kalama', date: '2026-06-08' },
-  { id: 'sm4', product: 'Sodium Benzoate', warehouse: 'Mumbai – Bhiwandi', type: 'Dispatched', qty: 100, reference: 'ORD-2026-0301', notes: '', date: '2026-06-18' },
-  { id: 'sm5', product: 'Calcium Lactate', warehouse: 'Delhi – Bhiwadi', type: 'Adjustment', qty: -5, reference: '', notes: 'Damaged bag, written off', date: '2026-06-27' },
+  { id: 'sm1', product: 'Citric Acid', warehouse: 'Mumbai (Bhiwandi)', type: 'Received', qty: 1500, reference: 'PO-4471', notes: 'From RZBC', date: '2026-06-05' },
+  { id: 'sm2', product: 'Citric Acid', warehouse: 'Mumbai (Bhiwandi)', type: 'Dispatched', qty: 500, reference: 'ORD-2026-0301', notes: '', date: '2026-06-18' },
+  { id: 'sm3', product: 'Sodium Benzoate', warehouse: 'Mumbai (Bhiwandi)', type: 'Received', qty: 280, reference: 'PO-4488', notes: 'From Emerald Kalama', date: '2026-06-08' },
+  { id: 'sm4', product: 'Sodium Benzoate', warehouse: 'Mumbai (Bhiwandi)', type: 'Dispatched', qty: 100, reference: 'ORD-2026-0301', notes: '', date: '2026-06-18' },
+  { id: 'sm5', product: 'Calcium Lactate', warehouse: 'Delhi (Siraspur)', type: 'Adjustment', qty: -5, reference: '', notes: 'Damaged bag, written off', date: '2026-06-27' },
 ]
 
 export const seedFollowUps = [
