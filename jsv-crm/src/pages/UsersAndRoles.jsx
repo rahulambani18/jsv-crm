@@ -48,6 +48,15 @@ export default function UsersAndRoles() {
   const [permState, setPermState] = useState({}) // { [moduleKey]: { custom, view, edit, delete } }
   const [savingPerms, setSavingPerms] = useState(false)
 
+  // Roles & Permissions tab can be viewed two ways: "role" (the old
+  // shared-per-role grid) or "user" (per-person overrides, inline on
+  // this same screen instead of buried in a modal on the Users tab).
+  const [permsViewMode, setPermsViewMode] = useState('role') // 'role' | 'user'
+  const [selectedPermUserId, setSelectedPermUserId] = useState(null)
+  const [inlinePermState, setInlinePermState] = useState({}) // same shape as permState
+  const [inlinePermLoading, setInlinePermLoading] = useState(false)
+  const [savingInlinePerms, setSavingInlinePerms] = useState(false)
+
   useEffect(() => { refresh() }, [])
 
   function refresh() {
@@ -260,6 +269,56 @@ export default function UsersAndRoles() {
     showToast(`Custom permissions saved for ${permTarget.name}`)
   }
 
+  // Same idea as openUserPermissions/togglePermCustom/updatePermField/
+  // handleSavePermissions above, but driving the inline grid on the
+  // Roles & Permissions tab (per-user mode) instead of the modal that
+  // opens from the Users tab. Kept separate so switching between roles
+  // and users on this screen can't clobber the modal's state.
+  async function selectPermUser(userId) {
+    setSelectedPermUserId(userId)
+    setInlinePermLoading(true)
+    const user = users.find((u) => u.id === userId)
+    const role = user ? roleById[user.roleId] : null
+    const overrides = await api.userPermissions.get(userId)
+    const next = {}
+    MODULES.forEach((m) => {
+      const roleDefault = role?.permissions?.[m.key] || { view: false, edit: false, delete: false }
+      const override = overrides[m.key]
+      next[m.key] = override
+        ? { custom: true, view: override.view, edit: override.edit, delete: override.delete }
+        : { custom: false, view: roleDefault.view, edit: roleDefault.edit, delete: roleDefault.delete }
+    })
+    setInlinePermState(next)
+    setInlinePermLoading(false)
+  }
+
+  function toggleInlinePermCustom(moduleKey) {
+    setInlinePermState((s) => ({ ...s, [moduleKey]: { ...s[moduleKey], custom: !s[moduleKey].custom } }))
+  }
+
+  function updateInlinePermField(moduleKey, field, value) {
+    setInlinePermState((s) => {
+      const current = s[moduleKey]
+      const updated = { ...current, [field]: value }
+      if ((field === 'edit' || field === 'delete') && value) updated.view = true
+      if (field === 'view' && !value) { updated.edit = false; updated.delete = false }
+      return { ...s, [moduleKey]: updated }
+    })
+  }
+
+  async function handleSaveInlinePermissions() {
+    if (!selectedPermUserId) return
+    setSavingInlinePerms(true)
+    const overrides = {}
+    Object.entries(inlinePermState).forEach(([key, v]) => {
+      if (v.custom) overrides[key] = { view: v.view, edit: v.edit, delete: v.delete }
+    })
+    await api.userPermissions.update(selectedPermUserId, overrides)
+    setSavingInlinePerms(false)
+    const user = users.find((u) => u.id === selectedPermUserId)
+    showToast(`Custom permissions saved for ${user?.name || 'user'}`)
+  }
+
   if (loading) return <div className="loading-screen">Loading users &amp; roles…</div>
 
   return (
@@ -386,6 +445,111 @@ export default function UsersAndRoles() {
       )}
 
       {tab === 'roles' && (
+        <>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+            <button
+              className={`btn btn-sm ${permsViewMode === 'role' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setPermsViewMode('role')}
+            >
+              By Role
+            </button>
+            <button
+              className={`btn btn-sm ${permsViewMode === 'user' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => {
+                setPermsViewMode('user')
+                if (!selectedPermUserId && users.length) selectPermUser(users[0].id)
+              }}
+            >
+              By User
+            </button>
+          </div>
+
+          {permsViewMode === 'user' ? (
+            <div className="panel-row" style={{ gridTemplateColumns: '280px 1fr' }}>
+              <div>
+                {users.map((u) => (
+                  <div
+                    key={u.id}
+                    className="role-pill-row"
+                    style={{ cursor: 'pointer', borderColor: selectedPermUserId === u.id ? 'var(--navy-700)' : 'var(--paper-200)' }}
+                    onClick={() => selectPermUser(u.id)}
+                  >
+                    <div className="role-meta">
+                      <div className="role-badge-icon"><IconUsers width={15} height={15} /></div>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 13.5 }}>{u.name}</div>
+                        <div style={{ fontSize: 11.5, color: 'var(--ink-500)' }}>
+                          {roleById[u.roleId]?.name || 'No role'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {users.length === 0 && (
+                  <p style={{ fontSize: 12.5, color: 'var(--ink-500)' }}>No users yet — add one from the Users tab.</p>
+                )}
+              </div>
+
+              <div>
+                {selectedPermUserId && (
+                  <>
+                    {(() => {
+                      const su = users.find((u) => u.id === selectedPermUserId)
+                      return (
+                        <>
+                          <p className="panel-title" style={{ marginBottom: 4 }}>{su?.name} permissions</p>
+                          <p style={{ fontSize: 12.5, color: 'var(--ink-500)', marginBottom: 14 }}>
+                            By default this person follows their <strong>{roleById[su?.roleId]?.name || 'role'}</strong>'s permissions.
+                            Switch a module to <strong>Custom</strong> to set access just for {su?.name} — it'll stop
+                            following that role's future changes for that module only.
+                          </p>
+                        </>
+                      )
+                    })()}
+                    {canEdit && (
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+                        <button className="btn btn-primary btn-sm" onClick={handleSaveInlinePermissions} disabled={savingInlinePerms || inlinePermLoading}>
+                          {savingInlinePerms ? 'Saving…' : 'Save permissions'}
+                        </button>
+                      </div>
+                    )}
+                    {inlinePermLoading ? (
+                      <div style={{ padding: '30px 0', textAlign: 'center', color: 'var(--ink-300)', fontSize: 13 }}>Loading…</div>
+                    ) : (
+                      <div className="perm-grid" style={{ gridTemplateColumns: '1fr 70px 70px 70px 70px' }}>
+                        <div className="perm-grid-header">
+                          <div>Module</div><div>Custom</div><div>View</div><div>Edit</div><div>Delete</div>
+                        </div>
+                        {MODULES.map((m) => {
+                          const p = inlinePermState[m.key] || { custom: false, view: false, edit: false, delete: false }
+                          return (
+                            <div className="perm-grid-row module-name" key={m.key}>
+                              <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.label}</div>
+                              <div>
+                                <input type="checkbox" disabled={!canEdit} checked={p.custom} onChange={() => toggleInlinePermCustom(m.key)} />
+                              </div>
+                              <div>
+                                <input type="checkbox" disabled={!canEdit || !p.custom} checked={p.view}
+                                  onChange={(e) => updateInlinePermField(m.key, 'view', e.target.checked)} />
+                              </div>
+                              <div>
+                                <input type="checkbox" disabled={!canEdit || !p.custom} checked={p.edit}
+                                  onChange={(e) => updateInlinePermField(m.key, 'edit', e.target.checked)} />
+                              </div>
+                              <div>
+                                <input type="checkbox" disabled={!canEdit || !p.custom} checked={p.delete}
+                                  onChange={(e) => updateInlinePermField(m.key, 'delete', e.target.checked)} />
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          ) : (
         <div className="panel-row" style={{ gridTemplateColumns: '280px 1fr' }}>
           <div>
             {roles.map((r) => (
@@ -471,6 +635,8 @@ export default function UsersAndRoles() {
             )}
           </div>
         </div>
+          )}
+        </>
       )}
 
       {tab === 'audit' && (
