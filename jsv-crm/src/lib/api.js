@@ -156,6 +156,34 @@ const realRolesTable = {
 // instead from the `profiles_with_email` view (created in schema.sql as
 // a security_invoker view, so it still respects each table's RLS) so the
 // Users & Roles page can show email.
+// Per-user permission overrides — layered on top of role permissions.
+// A user with no rows here simply inherits everything from their role.
+const realUserPermissions = {
+  async get(userId) {
+    const { data, error } = await supabase
+      .from('user_permissions')
+      .select('module_key, can_view, can_edit, can_delete')
+      .eq('user_id', userId)
+    if (error) throw error
+    return Object.fromEntries(
+      (data || []).map((p) => [p.module_key, { view: p.can_view, edit: p.can_edit, delete: p.can_delete }])
+    )
+  },
+  // Replaces the full override set for this user: modules present in
+  // `overrides` are written/kept, everything else is cleared back to
+  // "inherit from role".
+  async update(userId, overrides) {
+    await supabase.from('user_permissions').delete().eq('user_id', userId)
+    const rows = Object.entries(overrides || {}).map(([key, v]) => ({
+      user_id: userId, module_key: key, can_view: !!v.view, can_edit: !!v.edit, can_delete: !!v.delete,
+    }))
+    if (rows.length) {
+      const { error } = await supabase.from('user_permissions').insert(rows)
+      if (error) throw error
+    }
+  },
+}
+
 const realUsersTable = {
   async list() {
     const { data, error } = await supabase.from('profiles_with_email').select('*')
@@ -178,9 +206,12 @@ const realUsersTable = {
 export const api = Object.fromEntries(
   TABLES.map((t) => [t, isMock ? mock[t] : makeRealTable(t)])
 )
-if (!isMock) {
+if (isMock) {
+  api.userPermissions = mock.userPermissions
+} else {
   api.roles = realRolesTable
   api.users = realUsersTable
+  api.userPermissions = realUserPermissions
 }
 
 // Real, permanent, shared Audit Log — replaces the old localStorage-based
@@ -287,6 +318,16 @@ async function buildUserObject(authUser, profile) {
       (perms || []).map((p) => [p.module_key, { view: p.can_view, edit: p.can_edit, delete: p.can_delete }])
     )
   }
+
+  // Per-user overrides — take priority over the role's default for
+  // whichever modules an Admin has explicitly customized for this person.
+  const { data: userPerms } = await supabase
+    .from('user_permissions')
+    .select('module_key, can_view, can_edit, can_delete')
+    .eq('user_id', authUser.id)
+  ;(userPerms || []).forEach((p) => {
+    permissions[p.module_key] = { view: p.can_view, edit: p.can_edit, delete: p.can_delete }
+  })
 
   // Admin always gets full access regardless of permission rows
   const ALL_MODULES = ['dashboard','leads','follow_ups','customers','samples','quotations','orders','inventory','products','reports','users','tasks','meetings','documents','invoices','payments']

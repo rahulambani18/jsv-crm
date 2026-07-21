@@ -26,6 +26,7 @@ const store = {
   payments: [...seedPayments],
   stock: [...seedStock],
   stockMovements: [...seedStockMovements],
+  userPermissions: {}, // { [userId]: { [moduleKey]: { view, edit, delete } } }
 }
 
 const delay = (ms = 150) => new Promise((res) => setTimeout(res, ms))
@@ -80,6 +81,16 @@ export const mockDb = {
   payments: table('payments'),
   stock: table('stock'),
   stockMovements: table('stockMovements'),
+  userPermissions: {
+    async get(userId) {
+      await delay(80)
+      return { ...(store.userPermissions[userId] || {}) }
+    },
+    async update(userId, overrides) {
+      await delay(150)
+      store.userPermissions[userId] = { ...(overrides || {}) }
+    },
+  },
 }
 
 // Simple demo auth — accepts any email/password, signs in as the
@@ -90,13 +101,14 @@ let currentUser = null
 function resolveUserWithRole(userRecord) {
   if (!userRecord) return null
   const role = store.roles.find((r) => r.id === userRecord.roleId)
+  const permissions = { ...(role?.permissions || {}), ...(store.userPermissions[userRecord.id] || {}) }
   return {
     id: userRecord.id,
     email: userRecord.email,
     name: userRecord.name,
     title: role?.name || 'Sales Executive',
     role: role?.name || 'Sales Executive',
-    permissions: role?.permissions || {},
+    permissions,
   }
 }
 

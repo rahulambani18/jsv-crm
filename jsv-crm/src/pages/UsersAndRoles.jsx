@@ -7,6 +7,7 @@ import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
 import { IconPlus, IconShield, IconUsers, IconKey } from '../components/Icons.jsx'
 import { useAuth } from '../lib/AuthContext.jsx'
+import { showToast } from '../lib/toast.js'
 import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 import '../styles/users.css'
@@ -42,6 +43,10 @@ export default function UsersAndRoles() {
   const [resetError, setResetError] = useState('')
 
   const [activeRoleId, setActiveRoleId] = useState(null)
+
+  const [permTarget, setPermTarget] = useState(null) // the user whose overrides are being edited
+  const [permState, setPermState] = useState({}) // { [moduleKey]: { custom, view, edit, delete } }
+  const [savingPerms, setSavingPerms] = useState(false)
 
   useEffect(() => { refresh() }, [])
 
@@ -209,6 +214,52 @@ export default function UsersAndRoles() {
     refresh()
   }
 
+  // Per-user permission overrides — a module starts as "inherited" (grey,
+  // showing the role's current value) until the admin flips it to
+  // "Custom", at which point it becomes an explicit override for just
+  // this person and stops tracking future changes to the role.
+  async function openUserPermissions(user) {
+    setPermTarget(user)
+    const role = roleById[user.roleId]
+    const overrides = await api.userPermissions.get(user.id)
+    const next = {}
+    MODULES.forEach((m) => {
+      const roleDefault = role?.permissions?.[m.key] || { view: false, edit: false, delete: false }
+      const override = overrides[m.key]
+      next[m.key] = override
+        ? { custom: true, view: override.view, edit: override.edit, delete: override.delete }
+        : { custom: false, view: roleDefault.view, edit: roleDefault.edit, delete: roleDefault.delete }
+    })
+    setPermState(next)
+  }
+
+  function togglePermCustom(moduleKey) {
+    setPermState((s) => ({ ...s, [moduleKey]: { ...s[moduleKey], custom: !s[moduleKey].custom } }))
+  }
+
+  function updatePermField(moduleKey, field, value) {
+    setPermState((s) => {
+      const current = s[moduleKey]
+      const updated = { ...current, [field]: value }
+      if ((field === 'edit' || field === 'delete') && value) updated.view = true
+      if (field === 'view' && !value) { updated.edit = false; updated.delete = false }
+      return { ...s, [moduleKey]: updated }
+    })
+  }
+
+  async function handleSavePermissions() {
+    if (!permTarget) return
+    setSavingPerms(true)
+    const overrides = {}
+    Object.entries(permState).forEach(([key, v]) => {
+      if (v.custom) overrides[key] = { view: v.view, edit: v.edit, delete: v.delete }
+    })
+    await api.userPermissions.update(permTarget.id, overrides)
+    setSavingPerms(false)
+    setPermTarget(null)
+    showToast(`Custom permissions saved for ${permTarget.name}`)
+  }
+
   if (loading) return <div className="loading-screen">Loading users &amp; roles…</div>
 
   return (
@@ -291,6 +342,14 @@ export default function UsersAndRoles() {
                     {canEdit && (
                       <td>
                         <div style={{ display: 'flex', gap: 4 }}>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            style={{ fontSize: 11.5 }}
+                            onClick={() => openUserPermissions(u)}
+                            title="Give this person different permissions than the rest of their role"
+                          >
+                            🔧 Permissions
+                          </button>
                           <button
                             className="btn btn-ghost btn-sm"
                             style={{ fontSize: 11.5 }}
@@ -506,6 +565,55 @@ export default function UsersAndRoles() {
             </div>
             {resetError && <p style={{ color: 'var(--red-600)', fontSize: 13, marginTop: 4 }}>{resetError}</p>}
           </form>
+        </Modal>
+      )}
+
+      {permTarget && (
+        <Modal
+          title={`${permTarget.name} — custom permissions`}
+          onClose={() => setPermTarget(null)}
+          footer={
+            <>
+              <button className="btn btn-secondary" onClick={() => setPermTarget(null)}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleSavePermissions} disabled={savingPerms}>
+                {savingPerms ? 'Saving…' : 'Save permissions'}
+              </button>
+            </>
+          }
+        >
+          <p style={{ fontSize: 12.5, color: 'var(--ink-500)', marginTop: 0, marginBottom: 14 }}>
+            By default this person follows their <strong>{roleById[permTarget.roleId]?.name || 'role'}</strong>'s permissions.
+            Switch a module to <strong>Custom</strong> to set access just for {permTarget.name} — it'll stop
+            following that role's future changes for that module only.
+          </p>
+          <div className="perm-grid" style={{ gridTemplateColumns: '1fr 70px 70px 70px 70px' }}>
+            <div className="perm-grid-header">
+              <div>Module</div><div>Custom</div><div>View</div><div>Edit</div><div>Delete</div>
+            </div>
+            {MODULES.map((m) => {
+              const p = permState[m.key] || { custom: false, view: false, edit: false, delete: false }
+              return (
+                <div className="perm-grid-row module-name" key={m.key}>
+                  <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.label}</div>
+                  <div>
+                    <input type="checkbox" checked={p.custom} onChange={() => togglePermCustom(m.key)} />
+                  </div>
+                  <div>
+                    <input type="checkbox" disabled={!p.custom} checked={p.view}
+                      onChange={(e) => updatePermField(m.key, 'view', e.target.checked)} />
+                  </div>
+                  <div>
+                    <input type="checkbox" disabled={!p.custom} checked={p.edit}
+                      onChange={(e) => updatePermField(m.key, 'edit', e.target.checked)} />
+                  </div>
+                  <div>
+                    <input type="checkbox" disabled={!p.custom} checked={p.delete}
+                      onChange={(e) => updatePermField(m.key, 'delete', e.target.checked)} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </Modal>
       )}
 
