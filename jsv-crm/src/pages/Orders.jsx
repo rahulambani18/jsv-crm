@@ -66,10 +66,12 @@ export default function Orders() {
   const [users, setUsers] = useState([])
   const [invoices, setInvoices] = useState([])
   const [payments, setPayments] = useState([])
+  const [stock, setStock] = useState([])
 
   useEffect(() => { refresh() }, [])
   useEffect(() => { api.users.list().then(setUsers).catch(() => {}) }, [])
   useEffect(() => { Promise.all([api.invoices.list(), api.payments.list()]).then(([inv, pay]) => { setInvoices(inv); setPayments(pay) }).catch(() => {}) }, [])
+  useEffect(() => { api.stock.list().then(setStock).catch(() => {}) }, [])
 
   function refresh() {
     setLoading(true)
@@ -99,6 +101,24 @@ export default function Orders() {
     }
     return null
   }, [selectedCustomer, invoices, payments, totals.total, editingId])
+
+  const stockByKey = useMemo(() => {
+    const map = {}
+    stock.forEach((s) => { map[`${s.product}|${s.warehouse}`] = Number(s.qtyOnHand) })
+    return map
+  }, [stock])
+
+  const stockShortages = useMemo(() => {
+    return form.lineItems
+      .map((li) => {
+        if (!li.product || !form.warehouse) return null
+        const available = stockByKey[`${li.product}|${form.warehouse}`]
+        if (available === undefined) return null // not tracked in Inventory — nothing to check
+        if (Number(li.qty) > available) return { product: li.product, ordered: Number(li.qty), available }
+        return null
+      })
+      .filter(Boolean)
+  }, [form.lineItems, form.warehouse, stockByKey])
 
   function updateLineItem(index, patch) {
     setForm((f) => {
@@ -391,6 +411,11 @@ export default function Orders() {
                 ⚠️ {creditWarning}
               </div>
             )}
+            {stockShortages.length > 0 && (
+              <div style={{ background: 'var(--red-100)', color: 'var(--red-600)', border: '1px solid var(--red-600)', borderRadius: 'var(--radius-sm)', padding: '10px 12px', fontSize: 12.5, marginBottom: 14, fontWeight: 600 }}>
+                ⚠️ Not enough stock at {form.warehouse}: {stockShortages.map((s) => `${s.product} (ordering ${s.ordered}, only ${s.available} on hand)`).join('; ')}
+              </div>
+            )}
             <div className="field">
               <label>Warehouse</label>
               <select value={form.warehouse} onChange={(e) => setForm({ ...form, warehouse: e.target.value })}>
@@ -462,7 +487,10 @@ export default function Orders() {
                     </tr>
                   </thead>
                   <tbody>
-                    {form.lineItems.map((li, i) => (
+                    {form.lineItems.map((li, i) => {
+                      const available = li.product && form.warehouse ? stockByKey[`${li.product}|${form.warehouse}`] : undefined
+                      const short = available !== undefined && Number(li.qty) > available
+                      return (
                       <tr key={i} style={{ borderTop: '1px solid var(--paper-100)' }}>
                         <td style={{ padding: 6 }}>
                           <select value={li.product} onChange={(e) => updateLineItem(i, { product: e.target.value })} style={{ width: '100%', fontSize: 12.5, padding: '6px 8px' }}>
@@ -471,7 +499,12 @@ export default function Orders() {
                           </select>
                         </td>
                         <td style={{ padding: 6 }}>
-                          <input type="number" min="0" value={li.qty} onChange={(e) => updateLineItem(i, { qty: e.target.value })} style={{ width: '100%', fontSize: 12.5, padding: '6px 8px' }} />
+                          <input
+                            type="number" min="0" value={li.qty}
+                            onChange={(e) => updateLineItem(i, { qty: e.target.value })}
+                            style={{ width: '100%', fontSize: 12.5, padding: '6px 8px', borderColor: short ? 'var(--red-600)' : undefined }}
+                          />
+                          {short && <div style={{ color: 'var(--red-600)', fontSize: 10.5, marginTop: 2 }}>only {available} in stock</div>}
                         </td>
                         <td style={{ padding: 6 }}>
                           <select value={li.unit} onChange={(e) => updateLineItem(i, { unit: e.target.value })} style={{ width: '100%', fontSize: 12.5, padding: '6px 8px' }}>
@@ -493,7 +526,8 @@ export default function Orders() {
                           </button>
                         </td>
                       </tr>
-                    ))}
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>

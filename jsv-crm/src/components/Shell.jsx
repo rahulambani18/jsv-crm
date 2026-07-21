@@ -5,6 +5,7 @@ import {
   IconGrid, IconUsers, IconClock, IconUserCheck, IconFlask,
   IconFile, IconCart, IconBox, IconChart, IconLogout, IconPanel, IconShield,
   IconCheckSquare, IconCalendar, IconFolder, IconReceipt, IconCreditCard, IconSearch,
+  IconLayers,
 } from './Icons.jsx'
 import { api } from '../lib/api.js'
 import jsvMark from '../assets/jsv-mark.png'
@@ -18,6 +19,7 @@ const NAV = [
   { to: '/samples', label: 'Samples', icon: IconFlask, key: 'samples' },
   { to: '/quotations', label: 'Quotations', icon: IconFile, key: 'quotations' },
   { to: '/orders', label: 'Orders', icon: IconCart, key: 'orders' },
+  { to: '/inventory', label: 'Inventory', icon: IconLayers, key: 'inventory' },
   { to: '/products', label: 'Products', icon: IconBox, key: 'products' },
   { to: '/reports', label: 'Reports', icon: IconChart, key: 'reports' },
   { to: '/tasks', label: 'Tasks', icon: IconCheckSquare, key: 'tasks' },
@@ -208,6 +210,7 @@ export default function Shell({ children }) {
     { table: 'quotations', label: 'Quotation', path: '/quotations', match: (r) => [r.quoteNo, r.company] },
     { table: 'invoices', label: 'Invoice', path: '/invoices', match: (r) => [r.invoiceNo, r.company] },
     { table: 'products', label: 'Product', path: '/products', match: (r) => [r.name, r.category, r.supplier] },
+    { table: 'stock', label: 'Stock', path: '/inventory', match: (r) => [r.product, r.warehouse] },
     { table: 'samples', label: 'Sample', path: '/samples', match: (r) => [r.code, r.company, r.tracking] },
   ]
 
@@ -223,7 +226,7 @@ export default function Shell({ children }) {
             const hits = allResults[i]
               .filter((r) => t.match(r).some((v) => String(v || '').toLowerCase().includes(q)))
               .slice(0, 5)
-            hits.forEach((r) => grouped.push({ type: t.label, path: t.path, id: r.id, title: r.company || r.name || r.orderNo || r.invoiceNo || r.quoteNo || r.code, sub: t.match(r).filter(Boolean).join(' · ') }))
+            hits.forEach((r) => grouped.push({ type: t.label, path: t.path, id: r.id, title: r.company || r.name || r.product || r.orderNo || r.invoiceNo || r.quoteNo || r.code, sub: t.match(r).filter(Boolean).join(' · ') }))
           })
           setSearchResults(grouped.slice(0, 25))
         })

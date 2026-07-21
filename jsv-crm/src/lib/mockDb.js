@@ -6,7 +6,7 @@ import {
   seedProducts, seedLeads, seedCustomers, seedSamples,
   seedQuotations, seedOrders, seedFollowUps, seedRoles, seedUsers,
   seedTasks, seedMeetings, seedDocuments,
-  seedInvoices, seedPayments,
+  seedInvoices, seedPayments, seedStock, seedStockMovements,
 } from '../data/seed.js'
 
 const store = {
@@ -24,6 +24,8 @@ const store = {
   documents: [...seedDocuments],
   invoices: [...seedInvoices],
   payments: [...seedPayments],
+  stock: [...seedStock],
+  stockMovements: [...seedStockMovements],
 }
 
 const delay = (ms = 150) => new Promise((res) => setTimeout(res, ms))

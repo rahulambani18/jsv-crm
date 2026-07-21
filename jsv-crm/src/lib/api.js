@@ -5,7 +5,7 @@
 import { supabase, isMock, db as mock } from './supabaseClient.js'
 import { mockAuth } from './mockDb.js'
 
-const TABLES = ['products', 'leads', 'customers', 'samples', 'quotations', 'orders', 'followUps', 'roles', 'users', 'tasks', 'meetings', 'documents', 'invoices', 'payments']
+const TABLES = ['products', 'leads', 'customers', 'samples', 'quotations', 'orders', 'followUps', 'roles', 'users', 'tasks', 'meetings', 'documents', 'invoices', 'payments', 'stock', 'stockMovements']
 const SQL_TABLE_NAME = {
   products: 'products',
   leads: 'leads',
@@ -21,6 +21,8 @@ const SQL_TABLE_NAME = {
   documents: 'documents',
   invoices: 'invoices',
   payments: 'payments',
+  stock: 'stock',
+  stockMovements: 'stock_movements',
 }
 
 // Pages write/read plain camelCase fields (estValue, nextFollowUp,
@@ -51,6 +53,7 @@ const MODULE_LABEL = {
   products: 'Product', leads: 'Lead', customers: 'Customer', samples: 'Sample',
   quotations: 'Quotation', orders: 'Order', followUps: 'Follow-up', tasks: 'Task',
   meetings: 'Meeting', documents: 'Document', invoices: 'Invoice', payments: 'Payment',
+  stock: 'Stock', stockMovements: 'Stock Movement',
 }
 
 function pickLabel(record) {
@@ -286,7 +289,7 @@ async function buildUserObject(authUser, profile) {
   }
 
   // Admin always gets full access regardless of permission rows
-  const ALL_MODULES = ['dashboard','leads','follow_ups','customers','samples','quotations','orders','products','reports','users','tasks','meetings','documents','invoices','payments']
+  const ALL_MODULES = ['dashboard','leads','follow_ups','customers','samples','quotations','orders','inventory','products','reports','users','tasks','meetings','documents','invoices','payments']
   if (roleName === 'Admin') {
     ALL_MODULES.forEach((m) => { permissions[m] = { view: true, edit: true, delete: true } })
   }

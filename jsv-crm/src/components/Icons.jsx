@@ -27,6 +27,9 @@ export const IconCart = (p) => (
 export const IconBox = (p) => (
   <svg {...base} {...p}><path d="M21 8.5L12 3 3 8.5 12 14l9-5.5z"/><path d="M3 8.5V16l9 5 9-5V8.5"/><path d="M12 14v7"/></svg>
 )
+export const IconLayers = (p) => (
+  <svg {...base} {...p}><path d="M12 3l8.5 4.5L12 12 3.5 7.5 12 3z"/><path d="M3.5 12l8.5 4.5 8.5-4.5"/><path d="M3.5 16.5L12 21l8.5-4.5"/></svg>
+)
 export const IconChart = (p) => (
   <svg {...base} {...p}><path d="M4 20V10M11 20V4M18 20v-7"/><path d="M3 20h18"/></svg>
 )

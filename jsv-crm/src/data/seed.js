@@ -128,6 +128,24 @@ export const seedOrders = [
   },
 ]
 
+export const seedStock = [
+  { id: 'st1', product: 'Citric Acid', warehouse: 'Mumbai – Bhiwandi', unit: 'kg', qtyOnHand: 1200, reorderLevel: 500 },
+  { id: 'st2', product: 'Sodium Benzoate', warehouse: 'Mumbai – Bhiwandi', unit: 'kg', qtyOnHand: 180, reorderLevel: 200 },
+  { id: 'st3', product: 'Carrageenan', warehouse: 'Delhi – Bhiwadi', unit: 'kg', qtyOnHand: 320, reorderLevel: 100 },
+  { id: 'st4', product: 'Calcium Lactate', warehouse: 'Delhi – Bhiwadi', unit: 'kg', qtyOnHand: 40, reorderLevel: 50 },
+  { id: 'st5', product: 'Xanthan Gum', warehouse: 'Mumbai – Bhiwandi', unit: 'kg', qtyOnHand: 90, reorderLevel: 75 },
+  { id: 'st6', product: 'Guar Gum', warehouse: 'Chennai – Sriperumbudur', unit: 'kg', qtyOnHand: 0, reorderLevel: 50 },
+  { id: 'st7', product: 'Ascorbic Acid', warehouse: 'Delhi – Siraspur', unit: 'kg', qtyOnHand: 610, reorderLevel: 150 },
+]
+
+export const seedStockMovements = [
+  { id: 'sm1', product: 'Citric Acid', warehouse: 'Mumbai – Bhiwandi', type: 'Received', qty: 1500, reference: 'PO-4471', notes: 'From RZBC', date: '2026-06-05' },
+  { id: 'sm2', product: 'Citric Acid', warehouse: 'Mumbai – Bhiwandi', type: 'Dispatched', qty: 500, reference: 'ORD-2026-0301', notes: '', date: '2026-06-18' },
+  { id: 'sm3', product: 'Sodium Benzoate', warehouse: 'Mumbai – Bhiwandi', type: 'Received', qty: 280, reference: 'PO-4488', notes: 'From Emerald Kalama', date: '2026-06-08' },
+  { id: 'sm4', product: 'Sodium Benzoate', warehouse: 'Mumbai – Bhiwandi', type: 'Dispatched', qty: 100, reference: 'ORD-2026-0301', notes: '', date: '2026-06-18' },
+  { id: 'sm5', product: 'Calcium Lactate', warehouse: 'Delhi – Bhiwadi', type: 'Adjustment', qty: -5, reference: '', notes: 'Damaged bag, written off', date: '2026-06-27' },
+]
+
 export const seedFollowUps = [
   { id: 'f1', date: '2026-06-28', type: 'Call', lead: 'Greenleaf Organics', contact: 'Tara Bose', notes: 'Confirm sample feedback on Xanthan Gum viscosity', status: 'Upcoming' },
   { id: 'f2', date: '2026-06-29', type: 'Meeting', lead: 'Devansh Foods Pvt Ltd', contact: 'Anand Mehta', notes: 'Final price negotiation — site visit requested', status: 'Today' },
@@ -146,6 +164,7 @@ export const MODULES = [
   { key: 'samples', label: 'Samples' },
   { key: 'quotations', label: 'Quotations' },
   { key: 'orders', label: 'Orders' },
+  { key: 'inventory', label: 'Inventory' },
   { key: 'products', label: 'Products' },
   { key: 'reports', label: 'Reports' },
   { key: 'tasks', label: 'Tasks' },
@@ -198,6 +217,7 @@ export const seedRoles = [
       samples: { view: true, edit: true },
       quotations: { view: true, edit: true },
       orders: { view: true, edit: true },
+      inventory: { view: true, edit: false },
       products: { view: true, edit: false },
       reports: { view: true, edit: false },
       tasks: { view: true, edit: true },
