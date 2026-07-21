@@ -6,7 +6,6 @@ import {
   IconFile, IconCart, IconBox, IconChart, IconLogout, IconPanel, IconShield,
   IconCheckSquare, IconCalendar, IconFolder, IconReceipt, IconCreditCard, IconSearch,
   IconLayers,
-  IconTruck,
 } from './Icons.jsx'
 import { api } from '../lib/api.js'
 import jsvMark from '../assets/jsv-mark.png'
@@ -21,7 +20,6 @@ const NAV = [
   { to: '/quotations', label: 'Quotations', icon: IconFile, key: 'quotations' },
   { to: '/orders', label: 'Orders', icon: IconCart, key: 'orders' },
   { to: '/inventory', label: 'Inventory', icon: IconLayers, key: 'inventory' },
-  { to: '/warehouses', label: 'Warehouses', icon: IconTruck, key: 'warehouses' },
   { to: '/products', label: 'Products', icon: IconBox, key: 'products' },
   { to: '/reports', label: 'Reports', icon: IconChart, key: 'reports' },
   { to: '/tasks', label: 'Tasks', icon: IconCheckSquare, key: 'tasks' },
@@ -213,7 +211,6 @@ export default function Shell({ children }) {
     { table: 'invoices', label: 'Invoice', path: '/invoices', match: (r) => [r.invoiceNo, r.company] },
     { table: 'products', label: 'Product', path: '/products', match: (r) => [r.name, r.category, r.supplier] },
     { table: 'stock', label: 'Stock', path: '/inventory', match: (r) => [r.product, r.warehouse] },
-    { table: 'warehouses', label: 'Warehouse', path: '/warehouses', match: (r) => [r.name, r.code, r.city, r.manager] },
     { table: 'samples', label: 'Sample', path: '/samples', match: (r) => [r.code, r.company, r.tracking] },
   ]
 

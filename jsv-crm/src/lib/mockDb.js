@@ -6,7 +6,7 @@ import {
   seedProducts, seedLeads, seedCustomers, seedSamples,
   seedQuotations, seedOrders, seedFollowUps, seedRoles, seedUsers,
   seedTasks, seedMeetings, seedDocuments,
-  seedInvoices, seedPayments, seedStock, seedStockMovements, seedWarehouses,
+  seedInvoices, seedPayments, seedStock, seedStockMovements,
 } from '../data/seed.js'
 
 const store = {
@@ -26,7 +26,6 @@ const store = {
   payments: [...seedPayments],
   stock: [...seedStock],
   stockMovements: [...seedStockMovements],
-  warehouses: [...seedWarehouses],
 }
 
 const delay = (ms = 150) => new Promise((res) => setTimeout(res, ms))
@@ -81,7 +80,6 @@ export const mockDb = {
   payments: table('payments'),
   stock: table('stock'),
   stockMovements: table('stockMovements'),
-  warehouses: table('warehouses'),
 }
 
 // Simple demo auth — accepts any email/password, signs in as the

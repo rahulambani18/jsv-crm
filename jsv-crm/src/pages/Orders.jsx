@@ -8,6 +8,7 @@ import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
 import { IconPlus, IconTrash, IconEdit, IconSearch } from '../components/Icons.jsx'
 import Dropdown from '../components/Dropdown.jsx'
+import ComboField from '../components/ComboField.jsx'
 import BulkActionsBar from '../components/BulkActionsBar.jsx'
 import { useAuth } from '../lib/AuthContext.jsx'
 import { showToast } from '../lib/toast.js'
@@ -66,19 +67,21 @@ export default function Orders() {
   const [invoices, setInvoices] = useState([])
   const [payments, setPayments] = useState([])
   const [stock, setStock] = useState([])
-  const [warehouseNames, setWarehouseNames] = useState(WAREHOUSES)
 
   useEffect(() => { refresh() }, [])
   useEffect(() => { api.users.list().then(setUsers).catch(() => {}) }, [])
   useEffect(() => { Promise.all([api.invoices.list(), api.payments.list()]).then(([inv, pay]) => { setInvoices(inv); setPayments(pay) }).catch(() => {}) }, [])
   useEffect(() => { api.stock.list().then(setStock).catch(() => { /* Inventory not set up yet — stock warnings just won't show */ }) }, [])
-  useEffect(() => {
-    api.warehouses.list().then((rows) => {
-      const active = rows.filter((w) => w.status === 'Active').map((w) => w.name)
-      if (active.length > 0) setWarehouseNames(active)
-      // else: Warehouses module not set up yet — fall back to the static list
-    }).catch(() => { /* fall back to the static list */ })
-  }, [])
+
+  // Location/godown suggestions: the starter list plus any locations
+  // already in use across stock and orders — grows on its own as
+  // people type new ones, no separate warehouse master to manage.
+  const warehouseNames = useMemo(() => {
+    const names = new Set(WAREHOUSES)
+    stock.forEach((s) => { if (s.warehouse) names.add(s.warehouse) })
+    orders.forEach((o) => { if (o.warehouse) names.add(o.warehouse) })
+    return [...names]
+  }, [stock, orders])
 
   const WAREHOUSE_FILTERS = useMemo(() => ['All warehouses', ...warehouseNames], [warehouseNames])
 
@@ -426,10 +429,13 @@ export default function Orders() {
               </div>
             )}
             <div className="field">
-              <label>Warehouse</label>
-              <select value={form.warehouse} onChange={(e) => setForm({ ...form, warehouse: e.target.value })}>
-                {warehouseNames.map((w) => <option key={w}>{w}</option>)}
-              </select>
+              <label>Dispatch Location</label>
+              <ComboField
+                options={warehouseNames}
+                value={form.warehouse}
+                onChange={(v) => setForm({ ...form, warehouse: v })}
+                placeholder="Select location…"
+              />
             </div>
             <div className="field-row">
               <div className="field">

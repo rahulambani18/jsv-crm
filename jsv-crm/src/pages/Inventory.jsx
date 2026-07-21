@@ -7,6 +7,7 @@ import Modal from '../components/Modal.jsx'
 import Pill from '../components/Pill.jsx'
 import StatCard from '../components/StatCard.jsx'
 import Dropdown from '../components/Dropdown.jsx'
+import ComboField from '../components/ComboField.jsx'
 import BulkActionsBar from '../components/BulkActionsBar.jsx'
 import { IconPlus, IconSearch, IconLayers, IconTrash, IconClock } from '../components/Icons.jsx'
 import { useAuth } from '../lib/AuthContext.jsx'
@@ -51,15 +52,17 @@ export default function Inventory() {
 
   const [historyRow, setHistoryRow] = useState(null)
   const [selected, setSelected] = useState(new Set())
-  const [warehouseNames, setWarehouseNames] = useState(WAREHOUSES)
 
   useEffect(() => { refresh() }, [])
-  useEffect(() => {
-    api.warehouses.list().then((rows) => {
-      const active = rows.filter((w) => w.status === 'Active').map((w) => w.name)
-      if (active.length > 0) setWarehouseNames(active)
-    }).catch(() => { /* fall back to the static list */ })
-  }, [])
+
+  // Location/godown suggestions: the starter list plus any locations
+  // already in use across stock, so the list grows on its own as
+  // people type new ones — no separate warehouse master to manage.
+  const warehouseNames = useMemo(() => {
+    const names = new Set(WAREHOUSES)
+    stock.forEach((s) => { if (s.warehouse) names.add(s.warehouse) })
+    return [...names]
+  }, [stock])
 
   async function refresh() {
     setLoading(true)
@@ -345,11 +348,12 @@ export default function Inventory() {
                 />
               </div>
               <div className="field">
-                <label>Warehouse</label>
-                <Dropdown
+                <label>Location / Godown</label>
+                <ComboField
                   options={warehouseNames}
                   value={entryForm.warehouse}
                   onChange={(v) => setEntryForm({ ...entryForm, warehouse: v })}
+                  placeholder="Select location…"
                 />
               </div>
             </div>

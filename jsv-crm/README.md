@@ -100,4 +100,4 @@ supabase/
 - **Branding**: colors, fonts, and spacing are all defined as CSS variables
   in `src/styles/tokens.css` — change the palette there and it propagates
   everywhere.
-- **Warehouses**: edit the `WAREHOUSES` array in `src/pages/Orders.jsx`.
+- **Locations/godowns**: edit the `WAREHOUSES` array in `src/data/seed.js` for the starter suggestions — new locations typed into Orders or Inventory are picked up automatically after that, no separate warehouse master to maintain.
