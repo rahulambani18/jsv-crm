@@ -1,6 +1,6 @@
 import { IconChevronLeft, IconChevronRight } from './Icons.jsx'
 
-const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 500, 1000]
 
 export default function Pagination({ page, pageSize, total, onPageChange, onPageSizeChange }) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
