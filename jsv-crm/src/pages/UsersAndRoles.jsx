@@ -191,7 +191,7 @@ export default function UsersAndRoles() {
   function updatePermField(moduleKey, field, value) {
     setPermState((s) => {
       const current = s[moduleKey]
-      const updated = { ...current, [field]: value }
+      const updated = { ...current, [field]: value, custom: true }
       if ((field === 'edit' || field === 'delete') && value) updated.view = true
       if (field === 'view' && !value) { updated.edit = false; updated.delete = false }
       return { ...s, [moduleKey]: updated }
@@ -241,7 +241,7 @@ export default function UsersAndRoles() {
   function updateInlinePermField(moduleKey, field, value) {
     setInlinePermState((s) => {
       const current = s[moduleKey]
-      const updated = { ...current, [field]: value }
+      const updated = { ...current, [field]: value, custom: true }
       if ((field === 'edit' || field === 'delete') && value) updated.view = true
       if (field === 'view' && !value) { updated.edit = false; updated.delete = false }
       return { ...s, [moduleKey]: updated }
@@ -448,18 +448,18 @@ export default function UsersAndRoles() {
                         <div className="perm-grid-row module-name" key={m.key}>
                           <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.label}</div>
                           <div>
-                            <input type="checkbox" disabled={!canEdit} checked={p.custom} onChange={() => toggleInlinePermCustom(m.key)} />
+                            <input type="checkbox" disabled={!canEdit} checked={p.custom} onChange={() => toggleInlinePermCustom(m.key)} title="Untick to go back to following the role's default for this module" />
                           </div>
                           <div>
-                            <input type="checkbox" disabled={!canEdit || !p.custom} checked={p.view}
+                            <input type="checkbox" disabled={!canEdit} checked={p.view}
                               onChange={(e) => updateInlinePermField(m.key, 'view', e.target.checked)} />
                           </div>
                           <div>
-                            <input type="checkbox" disabled={!canEdit || !p.custom} checked={p.edit}
+                            <input type="checkbox" disabled={!canEdit} checked={p.edit}
                               onChange={(e) => updateInlinePermField(m.key, 'edit', e.target.checked)} />
                           </div>
                           <div>
-                            <input type="checkbox" disabled={!canEdit || !p.custom} checked={p.delete}
+                            <input type="checkbox" disabled={!canEdit} checked={p.delete}
                               onChange={(e) => updateInlinePermField(m.key, 'delete', e.target.checked)} />
                           </div>
                         </div>
@@ -623,18 +623,18 @@ export default function UsersAndRoles() {
                 <div className="perm-grid-row module-name" key={m.key}>
                   <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.label}</div>
                   <div>
-                    <input type="checkbox" checked={p.custom} onChange={() => togglePermCustom(m.key)} />
+                    <input type="checkbox" checked={p.custom} onChange={() => togglePermCustom(m.key)} title="Untick to go back to following the role's default for this module" />
                   </div>
                   <div>
-                    <input type="checkbox" disabled={!p.custom} checked={p.view}
+                    <input type="checkbox" checked={p.view}
                       onChange={(e) => updatePermField(m.key, 'view', e.target.checked)} />
                   </div>
                   <div>
-                    <input type="checkbox" disabled={!p.custom} checked={p.edit}
+                    <input type="checkbox" checked={p.edit}
                       onChange={(e) => updatePermField(m.key, 'edit', e.target.checked)} />
                   </div>
                   <div>
-                    <input type="checkbox" disabled={!p.custom} checked={p.delete}
+                    <input type="checkbox" checked={p.delete}
                       onChange={(e) => updatePermField(m.key, 'delete', e.target.checked)} />
                   </div>
                 </div>
