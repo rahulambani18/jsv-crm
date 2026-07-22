@@ -96,6 +96,9 @@ export const IconShield = (p) => (
 export const IconChevronRight = (p) => (
   <svg {...base} {...p}><path d="M9 6l6 6-6 6"/></svg>
 )
+export const IconChevronLeft = (p) => (
+  <svg {...base} {...p}><path d="M15 6l-6 6 6 6"/></svg>
+)
 export const IconUpload = (p) => (
   <svg {...base} {...p}><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 002 2h12a2 2 0 002-2v-3"/></svg>
 )

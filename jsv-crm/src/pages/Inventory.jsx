@@ -9,6 +9,7 @@ import StatCard from '../components/StatCard.jsx'
 import Dropdown from '../components/Dropdown.jsx'
 import ComboField from '../components/ComboField.jsx'
 import BulkActionsBar from '../components/BulkActionsBar.jsx'
+import Pagination from '../components/Pagination.jsx'
 import { IconPlus, IconSearch, IconLayers, IconTrash, IconClock } from '../components/Icons.jsx'
 import { useAuth } from '../lib/AuthContext.jsx'
 import { showToast } from '../lib/toast.js'
@@ -92,6 +93,11 @@ export default function Inventory() {
       return matchesSearch && matchesWarehouse
     })
   }, [stock, search, warehouseFilter])
+
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+  useEffect(() => { setPage(1) }, [search, warehouseFilter])
+  const paged = useMemo(() => filtered.slice((page - 1) * pageSize, page * pageSize), [filtered, page, pageSize])
 
   const stats = useMemo(() => {
     const lowStock = stock.filter((s) => statusFor(s) === 'Low Stock').length
@@ -294,7 +300,7 @@ export default function Inventory() {
                   <EmptyState icon="🔍" title="No stock matches your filters" subtitle="Try adjusting your search or warehouse filter." />
                 )}
               </td></tr>
-            ) : filtered.map((s) => {
+            ) : paged.map((s) => {
               const status = statusFor(s)
               return (
                 <tr key={s.id}>
@@ -337,6 +343,8 @@ export default function Inventory() {
           </tbody>
         </table>
       </div>
+
+      <Pagination page={page} pageSize={pageSize} total={filtered.length} onPageChange={setPage} onPageSizeChange={(n) => { setPageSize(n); setPage(1) }} />
 
       {showEntryModal && (
         <Modal

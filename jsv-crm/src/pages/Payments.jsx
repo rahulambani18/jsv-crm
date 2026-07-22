@@ -6,7 +6,9 @@ import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
 import ExportBar from '../components/ExportBar.jsx'
 import TallyImportButton from '../components/TallyImportButton.jsx'
-import { IconPlus, IconSearch, IconTrash } from '../components/Icons.jsx'
+import { IconPlus, IconSearch, IconTrash, IconDollarSign, IconCalendar, IconReceipt } from '../components/Icons.jsx'
+import StatCard from '../components/StatCard.jsx'
+import Pagination from '../components/Pagination.jsx'
 import EmptyState from '../components/EmptyState.jsx'
 import '../styles/components.css'
 
@@ -85,6 +87,11 @@ export default function Payments() {
     return matchSearch && matchMode
   }), [payments, search, modeFilter])
 
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+  useEffect(() => { setPage(1) }, [search, modeFilter])
+  const paged = useMemo(() => filtered.slice((page - 1) * pageSize, page * pageSize), [filtered, page, pageSize])
+
   async function handleDelete(payment) {
     if (!confirm(`Delete payment "${payment.paymentNo}"? This cannot be undone.`)) return
     try {
@@ -120,10 +127,10 @@ export default function Payments() {
         }
       />
 
-      <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 20 }}>
-        <div className="stat-card"><div><p className="stat-label">Total Received</p><p className="stat-value mono" style={{ color: 'var(--teal-700)' }}>{formatINR(totalReceived)}</p></div></div>
-        <div className="stat-card"><div><p className="stat-label">This Month</p><p className="stat-value mono">{formatINR(payments.filter((p) => (p.date || '').startsWith('2026-07')).reduce((s, p) => s + Number(p.amount || 0), 0))}</p></div></div>
-        <div className="stat-card"><div><p className="stat-label">Payments Count</p><p className="stat-value">{payments.length}</p></div></div>
+      <div className="stat-grid">
+        <StatCard icon={IconDollarSign} tone="teal" label="Total Received" value={formatINR(totalReceived)} mono />
+        <StatCard icon={IconCalendar} tone="blue" label="This Month" value={formatINR(payments.filter((p) => (p.date || '').startsWith('2026-07')).reduce((s, p) => s + Number(p.amount || 0), 0))} mono />
+        <StatCard icon={IconReceipt} tone="blue" label="Payments Count" value={payments.length} />
       </div>
 
       <div className="filters-bar">
@@ -159,7 +166,7 @@ export default function Payments() {
                   <EmptyState icon="🔍" title="No payments match your filters" subtitle="Try adjusting your search or filters." />
                 )}
               </td></tr>
-            ) : filtered.map((p) => {
+            ) : paged.map((p) => {
               const inv = invoices.find((i) => i.id === p.invoiceId)
               return (
                 <tr key={p.id}>
@@ -173,7 +180,7 @@ export default function Payments() {
                   <td><Pill>{p.status}</Pill></td>
                   {canDelete && (
                     <td>
-                      <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(p)}><IconTrash width={13} height={13} /></button>
+                      <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(p)} title="Delete"><IconTrash width={13} height={13} /></button>
                     </td>
                   )}
                 </tr>
@@ -182,6 +189,8 @@ export default function Payments() {
           </tbody>
         </table>
       </div>
+
+      <Pagination page={page} pageSize={pageSize} total={filtered.length} onPageChange={setPage} onPageSizeChange={(n) => { setPageSize(n); setPage(1) }} />
 
       {showModal && (
         <Modal

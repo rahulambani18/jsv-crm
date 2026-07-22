@@ -8,6 +8,7 @@ import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
 import { IconPlus, IconSearch, IconUpload, IconEdit, IconTrash } from '../components/Icons.jsx'
 import ExportBar from '../components/ExportBar.jsx'
+import Pagination from '../components/Pagination.jsx'
 import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 
@@ -56,6 +57,11 @@ export default function Products() {
     const matchesCategory = categoryFilter === 'All categories' || p.category === categoryFilter
     return matchesSearch && matchesCategory
   }), [products, search, categoryFilter])
+
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+  useEffect(() => { setPage(1) }, [search, categoryFilter])
+  const paged = useMemo(() => filtered.slice((page - 1) * pageSize, page * pageSize), [filtered, page, pageSize])
 
   function openCreate() {
     setEditingId(null)
@@ -205,7 +211,7 @@ export default function Products() {
                   <EmptyState icon="🔍" title="No products match" subtitle="Try adjusting your search or filters." />
                 )}
               </td></tr>
-            ) : filtered.map((p) => (
+            ) : paged.map((p) => (
               <tr key={p.id} style={{ opacity: p.status === 'Inactive' ? 0.55 : 1 }}>
                 <td className="cell-strong">{p.name}</td>
                 <td>{p.category}</td>
@@ -241,6 +247,8 @@ export default function Products() {
           </tbody>
         </table>
       </div>
+
+      <Pagination page={page} pageSize={pageSize} total={filtered.length} onPageChange={setPage} onPageSizeChange={(n) => { setPageSize(n); setPage(1) }} />
 
       {showModal && (
         <Modal

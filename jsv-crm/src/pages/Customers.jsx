@@ -8,6 +8,7 @@ import Modal from '../components/Modal.jsx'
 import TallyImportButton from '../components/TallyImportButton.jsx'
 import Pill from '../components/Pill.jsx'
 import SendButtons from '../components/SendButtons.jsx'
+import Pagination from '../components/Pagination.jsx'
 import CustomerTimelineModal from '../components/CustomerTimelineModal.jsx'
 import { IconPlus, IconSearch, IconTrash, IconEdit } from '../components/Icons.jsx'
 import ComboField from '../components/ComboField.jsx'
@@ -101,6 +102,11 @@ export default function Customers() {
   const filtered = useMemo(() => {
     return customers.filter((c) => !search || [c.company, c.contact, c.mobile, c.gst, c.city].some((v) => (v || '').toLowerCase().includes(search.toLowerCase())))
   }, [customers, search])
+
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+  useEffect(() => { setPage(1) }, [search])
+  const paged = useMemo(() => filtered.slice((page - 1) * pageSize, page * pageSize), [filtered, page, pageSize])
 
   function openEdit(customer) {
     setEditingId(customer.id)
@@ -303,7 +309,7 @@ export default function Customers() {
                   <EmptyState icon="🔍" title="No customers match your search" subtitle="Try adjusting your search." />
                 )}
               </td></tr>
-            ) : filtered.map((c) => {
+            ) : paged.map((c) => {
               const outstanding = outstandingByCompany[c.company] || 0
               const overLimit = Number(c.creditLimit) > 0 && outstanding > Number(c.creditLimit)
               const t = templates.paymentReminder(c.company, outstanding)
@@ -342,6 +348,8 @@ export default function Customers() {
           </tbody>
         </table>
       </div>
+
+      <Pagination page={page} pageSize={pageSize} total={filtered.length} onPageChange={setPage} onPageSizeChange={(n) => { setPageSize(n); setPage(1) }} />
 
       {showModal && (
         <Modal

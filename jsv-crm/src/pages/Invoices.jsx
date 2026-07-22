@@ -8,7 +8,9 @@ import Modal from '../components/Modal.jsx'
 import ExportBar from '../components/ExportBar.jsx'
 import TallyImportButton from '../components/TallyImportButton.jsx'
 import SendButtons from '../components/SendButtons.jsx'
-import { IconPlus, IconSearch, IconEdit, IconTrash } from '../components/Icons.jsx'
+import Pagination from '../components/Pagination.jsx'
+import { IconPlus, IconSearch, IconEdit, IconTrash, IconReceipt, IconDollarSign, IconFlame, IconClock } from '../components/Icons.jsx'
+import StatCard from '../components/StatCard.jsx'
 import Dropdown from '../components/Dropdown.jsx'
 import { templates } from '../lib/messaging.js'
 import '../styles/components.css'
@@ -405,8 +407,14 @@ export default function Invoices() {
     return matchSearch && matchStatus
   }), [invoices, search, statusFilter])
 
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+  useEffect(() => { setPage(1) }, [search, statusFilter])
+  const paged = useMemo(() => filtered.slice((page - 1) * pageSize, page * pageSize), [filtered, page, pageSize])
+
   const totalPaid = invoices.filter((i) => i.status === 'Paid').reduce((s, i) => s + Number(i.total || 0), 0)
-  const totalPending = invoices.filter((i) => i.status !== 'Paid' && i.status !== 'Cancelled').reduce((s, i) => s + Number(i.total || 0), 0)
+  const totalOverdue = invoices.filter((i) => i.status === 'Overdue').reduce((s, i) => s + Number(i.total || 0), 0)
+  const totalPending = invoices.filter((i) => i.status !== 'Paid' && i.status !== 'Cancelled' && i.status !== 'Overdue').reduce((s, i) => s + Number(i.total || 0), 0)
 
   return (
     <div>
@@ -432,10 +440,11 @@ export default function Invoices() {
       />
 
       {/* Summary cards */}
-      <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 20 }}>
-        <div className="stat-card"><div><p className="stat-label">Total Invoiced</p><p className="stat-value mono">{formatINR(invoices.reduce((s, i) => s + Number(i.total || 0), 0))}</p></div></div>
-        <div className="stat-card"><div><p className="stat-label">Paid</p><p className="stat-value mono" style={{ color: 'var(--teal-700)' }}>{formatINR(totalPaid)}</p></div></div>
-        <div className="stat-card"><div><p className="stat-label">Pending / Overdue</p><p className="stat-value mono" style={{ color: 'var(--amber-600)' }}>{formatINR(totalPending)}</p></div></div>
+      <div className="stat-grid">
+        <StatCard icon={IconReceipt} tone="blue" label="Total Invoiced" value={formatINR(invoices.reduce((s, i) => s + Number(i.total || 0), 0))} mono />
+        <StatCard icon={IconDollarSign} tone="teal" label="Paid" value={formatINR(totalPaid)} mono />
+        <StatCard icon={IconClock} tone="amber" label="Pending" value={formatINR(totalPending)} mono />
+        <StatCard icon={IconFlame} tone="red" label="Overdue" value={formatINR(totalOverdue)} mono />
       </div>
 
       {/* Auto-generate from order */}
@@ -489,7 +498,7 @@ export default function Invoices() {
                   <EmptyState icon="🔍" title="No invoices match your filters" subtitle="Try adjusting your search or filters." />
                 )}
               </td></tr>
-            ) : filtered.map((inv) => {
+            ) : paged.map((inv) => {
               const customer = customers.find((c) => c.company === inv.company)
               const t = templates.invoice(inv)
               return (
@@ -506,16 +515,18 @@ export default function Invoices() {
                 <td className="cell-mono cell-strong">{formatINR(inv.total)}</td>
                 <td><Pill>{inv.status}</Pill></td>
                 <td style={{ display: 'flex', gap: 4 }}>
-                  {canEdit && <button className="btn btn-ghost btn-sm" onClick={() => openEdit(inv)}><IconEdit width={13} height={13} /></button>}
+                  {canEdit && <button className="btn btn-ghost btn-sm" onClick={() => openEdit(inv)} title="Edit"><IconEdit width={13} height={13} /></button>}
                   <SendButtons phone={customer?.mobile} email={customer?.email} whatsappMessage={t.whatsapp} mailSubject={t.subject} mailBody={t.body} />
-                  <button className="btn btn-ghost btn-sm" onClick={() => printInvoice(inv, orders.find((o) => o.id === inv.orderId))}>🖨 Print</button>
-                  {canDelete && <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(inv)}><IconTrash width={13} height={13} /></button>}
+                  <button className="btn btn-ghost btn-sm" onClick={() => printInvoice(inv, orders.find((o) => o.id === inv.orderId))} title="Print invoice">🖨 Print</button>
+                  {canDelete && <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(inv)} title="Delete"><IconTrash width={13} height={13} /></button>}
                 </td>
               </tr>
             )})}
           </tbody>
         </table>
       </div>
+
+      <Pagination page={page} pageSize={pageSize} total={filtered.length} onPageChange={setPage} onPageSizeChange={(n) => { setPageSize(n); setPage(1) }} />
 
       {showModal && (
         <Modal

@@ -6,6 +6,7 @@ import ExportBar from '../components/ExportBar.jsx'
 import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
 import SendButtons from '../components/SendButtons.jsx'
+import Pagination from '../components/Pagination.jsx'
 import { IconPlus, IconTrash, IconSearch } from '../components/Icons.jsx'
 import { templates } from '../lib/messaging.js'
 import '../styles/components.css'
@@ -45,6 +46,11 @@ export default function Quotations() {
   const filtered = useMemo(() => quotations.filter((q) =>
     !search || [q.quoteNo, q.company].some((v) => (v || '').toLowerCase().includes(search.toLowerCase()))
   ), [quotations, search])
+
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+  useEffect(() => { setPage(1) }, [search])
+  const paged = useMemo(() => filtered.slice((page - 1) * pageSize, page * pageSize), [filtered, page, pageSize])
 
   function updateLineItem(i, patch) {
     const items = [...form.lineItems]
@@ -137,7 +143,7 @@ export default function Quotations() {
                   <EmptyState icon="🔍" title="No quotations match your search" subtitle="Try adjusting your search or filters." />
                 )}
               </td></tr>
-            ) : filtered.map((q) => {
+            ) : paged.map((q) => {
               const customer = customers.find((c) => c.company === q.company)
               const t = templates.quotation(q)
               return (
@@ -157,6 +163,8 @@ export default function Quotations() {
           </tbody>
         </table>
       </div>
+
+      <Pagination page={page} pageSize={pageSize} total={filtered.length} onPageChange={setPage} onPageSizeChange={(n) => { setPageSize(n); setPage(1) }} />
 
       {showModal && (
         <Modal

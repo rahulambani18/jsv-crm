@@ -10,6 +10,7 @@ import { IconPlus, IconTrash, IconEdit, IconSearch } from '../components/Icons.j
 import Dropdown from '../components/Dropdown.jsx'
 import ComboField from '../components/ComboField.jsx'
 import BulkActionsBar from '../components/BulkActionsBar.jsx'
+import Pagination from '../components/Pagination.jsx'
 import { useAuth } from '../lib/AuthContext.jsx'
 import { showToast } from '../lib/toast.js'
 import { exportCSV } from '../lib/exportUtils.js'
@@ -101,6 +102,11 @@ export default function Orders() {
     const matchesSearch = !search || [o.orderNo, o.company, o.poNumber].some((v) => (v || '').toLowerCase().includes(search.toLowerCase()))
     return matchesWarehouse && matchesStatus && matchesSearch
   }), [orders, warehouseFilter, statusFilter, search])
+
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+  useEffect(() => { setPage(1) }, [warehouseFilter, statusFilter, search])
+  const paged = useMemo(() => filtered.slice((page - 1) * pageSize, page * pageSize), [filtered, page, pageSize])
 
   const totals = useMemo(() => calcOrderTotals(form.lineItems), [form.lineItems])
 
@@ -385,7 +391,7 @@ export default function Orders() {
                   <EmptyState icon="🔍" title="No orders match your filters" subtitle="Try adjusting your search or filters." />
                 )}
               </td></tr>
-            ) : filtered.map((o) => (
+            ) : paged.map((o) => (
               <tr key={o.id}>
                 {canEdit && (
                   <td className="row-checkbox-cell">
@@ -436,6 +442,8 @@ export default function Orders() {
           </tbody>
         </table>
       </div>
+
+      <Pagination page={page} pageSize={pageSize} total={filtered.length} onPageChange={setPage} onPageSizeChange={(n) => { setPageSize(n); setPage(1) }} />
 
       {showModal && (
         <Modal

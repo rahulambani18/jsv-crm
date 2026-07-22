@@ -128,7 +128,7 @@ export default function Dashboard() {
         <StatCard icon={IconFlame} tone="red" label="Hot Leads" value={stats.hotLeads} />
         <StatCard icon={IconUserCheck} tone="blue" label="Active Customers" value={stats.activeCustomers} />
         <StatCard icon={IconFile} tone="teal" label="Quotations Sent" value={stats.quotationsSent} />
-        <StatCard icon={IconCart} tone="amber" label="Orders Received" value={stats.ordersReceived} />
+        <StatCard icon={IconCart} tone="blue" label="Orders Received" value={stats.ordersReceived} />
         <StatCard icon={IconRupee} tone="red" label="Pending Payments" value={formatINR(stats.pendingPayments)} mono />
       </div>
 

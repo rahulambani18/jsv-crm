@@ -8,6 +8,7 @@ import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
 import MultiComboField from '../components/MultiComboField.jsx'
 import SendButtons from '../components/SendButtons.jsx'
+import Pagination from '../components/Pagination.jsx'
 import { IconPlus, IconSearch, IconTrash } from '../components/Icons.jsx'
 import { useAuth } from '../lib/AuthContext.jsx'
 import { templates } from '../lib/messaging.js'
@@ -51,6 +52,11 @@ export default function Samples() {
     const matchesStatus = statusFilter === 'All statuses' || s.status === statusFilter
     return matchesSearch && matchesStatus
   }), [samples, search, statusFilter])
+
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+  useEffect(() => { setPage(1) }, [search, statusFilter])
+  const paged = useMemo(() => filtered.slice((page - 1) * pageSize, page * pageSize), [filtered, page, pageSize])
 
   async function handleCreate(e) {
     e.preventDefault()
@@ -142,7 +148,7 @@ export default function Samples() {
                   <EmptyState icon="🔍" title="No samples match your filters" subtitle="Try adjusting your search or filters." />
                 )}
               </td></tr>
-            ) : filtered.map((s) => {
+            ) : paged.map((s) => {
               const t = templates.sample(s)
               return (
               <tr key={s.id}>
@@ -175,7 +181,7 @@ export default function Samples() {
                   <td>
                     <div style={{ display: 'flex', gap: 4 }}>
                       <SendButtons phone={s.phone} email={s.email} whatsappMessage={t.whatsapp} mailSubject={t.subject} mailBody={t.body} />
-                      {canDelete && <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(s)}><IconTrash width={13} height={13} /></button>}
+                      {canDelete && <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(s)} title="Delete"><IconTrash width={13} height={13} /></button>}
                     </div>
                   </td>
                 )}
@@ -184,6 +190,8 @@ export default function Samples() {
           </tbody>
         </table>
       </div>
+
+      <Pagination page={page} pageSize={pageSize} total={filtered.length} onPageChange={setPage} onPageSizeChange={(n) => { setPageSize(n); setPage(1) }} />
 
       {showModal && (
         <Modal

@@ -10,6 +10,7 @@ import ComboField from '../components/ComboField.jsx'
 import MultiComboField from '../components/MultiComboField.jsx'
 import BulkActionsBar from '../components/BulkActionsBar.jsx'
 import SendButtons from '../components/SendButtons.jsx'
+import Pagination from '../components/Pagination.jsx'
 import { IconPlus, IconSearch, IconTrash } from '../components/Icons.jsx'
 import { useAuth } from '../lib/AuthContext.jsx'
 import { showToast } from '../lib/toast.js'
@@ -58,6 +59,11 @@ export default function Leads() {
       return matchesSearch && matchesStatus
     })
   }, [leads, search, statusFilter])
+
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+  useEffect(() => { setPage(1) }, [search, statusFilter])
+  const paged = useMemo(() => filtered.slice((page - 1) * pageSize, page * pageSize), [filtered, page, pageSize])
 
   async function handleCreate(e) {
     e.preventDefault()
@@ -250,7 +256,7 @@ export default function Leads() {
                   <EmptyState icon="🔍" title="No leads match your filters" subtitle="Try adjusting your search or filters." />
                 )}
               </td></tr>
-            ) : filtered.map((l) => (
+            ) : paged.map((l) => (
               <tr key={l.id}>
                 {canEdit && (
                   <td className="row-checkbox-cell">
@@ -284,6 +290,8 @@ export default function Leads() {
           </tbody>
         </table>
       </div>
+
+      <Pagination page={page} pageSize={pageSize} total={filtered.length} onPageChange={setPage} onPageSizeChange={(n) => { setPageSize(n); setPage(1) }} />
 
       {showModal && (
         <Modal
