@@ -7,9 +7,9 @@ import ExportBar from '../components/ExportBar.jsx'
 import Modal from '../components/Modal.jsx'
 import TallyImportButton from '../components/TallyImportButton.jsx'
 import Pill from '../components/Pill.jsx'
-import SendButtons from '../components/SendButtons.jsx'
 import Pagination from '../components/Pagination.jsx'
 import CustomerTimelineModal from '../components/CustomerTimelineModal.jsx'
+import RowActionsMenu from '../components/RowActionsMenu.jsx'
 import { IconPlus, IconSearch, IconTrash, IconEdit, IconUpload } from '../components/Icons.jsx'
 import ComboField from '../components/ComboField.jsx'
 import Dropdown from '../components/Dropdown.jsx'
@@ -18,7 +18,7 @@ import { useAuth } from '../lib/AuthContext.jsx'
 import { showToast } from '../lib/toast.js'
 import { exportCSV } from '../lib/exportUtils.js'
 import { outstandingForCustomer } from '../lib/credit.js'
-import { templates } from '../lib/messaging.js'
+import { templates, waLink, mailtoLink } from '../lib/messaging.js'
 import { readSpreadsheetFile, normalizeRow } from '../lib/fileImport.js'
 import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
@@ -370,15 +370,15 @@ export default function Customers() {
                   />
                 </th>
               )}
-              <th>Code</th><th>Company</th><th>Contact</th><th>City</th><th>GST</th>
-              <th>Type</th><th>Industry</th><th>Application</th><th>Credit Limit</th><th>Outstanding</th>{(canEdit || canDelete) && <th>Actions</th>}
+              <th>Code</th><th>Company</th><th>Contact Person</th><th>Mobile</th><th>City</th><th>GST</th>
+              <th>Type</th><th>Industry</th><th>Credit / Outstanding</th>{(canEdit || canDelete) && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={10 + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>Loading customers…</td></tr>
+              <tr className="empty-row"><td colSpan={9 + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>Loading customers…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={10 + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>
+              <tr className="empty-row"><td colSpan={9 + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>
                 {customers.length === 0 ? (
                   <EmptyState
                     icon="👥"
@@ -404,25 +404,48 @@ export default function Customers() {
                 )}
                 <td className="cell-mono">{c.code}</td>
                 <td className="cell-strong">{c.company}</td>
-                <td>{c.contact}<br /><span className="cell-mono cell-muted" style={{ fontSize: 11.5 }}>{c.mobile}</span></td>
+                <td>{c.contact || <span className="cell-muted">—</span>}</td>
+                <td className="cell-mono" style={{ fontSize: 11.5 }}>{c.mobile || <span className="cell-muted">—</span>}</td>
                 <td>{c.city}</td>
                 <td className="cell-mono" style={{ fontSize: 11.5 }}>{c.gst}</td>
                 <td>{c.businessType ? <span className="pill pill-navy">{c.businessType}</span> : <span className="cell-muted">—</span>}</td>
-                <td>{c.industry}</td>
-                <td>{c.application}</td>
-                <td className="cell-mono">{c.creditLimit ? formatINR(c.creditLimit) : <span className="cell-muted">—</span>}</td>
+                <td>
+                  {c.industry || <span className="cell-muted">—</span>}
+                  {c.application && <><br /><span className="cell-muted" style={{ fontSize: 11.5 }}>{c.application}</span></>}
+                </td>
                 <td className="cell-mono">
-                  {formatINR(outstanding)}
+                  {c.creditLimit ? formatINR(c.creditLimit) : <span className="cell-muted">—</span>}
+                  <br />
+                  <span style={{ fontSize: 11.5, color: overLimit ? 'var(--red-600)' : 'var(--ink-500)' }}>
+                    {formatINR(outstanding)} outstanding
+                  </span>
                   {overLimit && <><br /><Pill tone="red">Over limit</Pill></>}
                 </td>
                 {(canEdit || canDelete) && (
                   <td>
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      {canEdit && <button className="btn btn-ghost btn-sm" onClick={() => openEdit(c)} title="Edit"><IconEdit width={13} height={13} /></button>}
-                      <button className="btn btn-ghost btn-sm" onClick={() => setTimelineFor(c)} title="View activity timeline">🕘</button>
-                      <SendButtons phone={c.mobile} email={c.email} whatsappMessage={t.whatsapp} mailSubject={t.subject} mailBody={t.body} />
-                      {canDelete && <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(c)}><IconTrash width={13} height={13} /></button>}
-                    </div>
+                    <RowActionsMenu
+                      items={[
+                        canEdit && { label: 'Edit', icon: <IconEdit width={13} height={13} />, onClick: () => openEdit(c) },
+                        { label: 'View timeline', icon: '🕘', onClick: () => setTimelineFor(c) },
+                        'divider',
+                        {
+                          label: 'Send WhatsApp',
+                          icon: '💬',
+                          disabled: !waLink(c.mobile, t.whatsapp),
+                          disabledReason: 'No phone number on file',
+                          onClick: () => window.open(waLink(c.mobile, t.whatsapp), '_blank', 'noopener'),
+                        },
+                        {
+                          label: 'Send Email',
+                          icon: '✉️',
+                          disabled: !mailtoLink(c.email, t.subject, t.body),
+                          disabledReason: 'No email on file',
+                          onClick: () => { window.location.href = mailtoLink(c.email, t.subject, t.body) },
+                        },
+                        canDelete && 'divider',
+                        canDelete && { label: 'Delete', icon: <IconTrash width={13} height={13} />, danger: true, onClick: () => handleDelete(c) },
+                      ].filter(Boolean)}
+                    />
                   </td>
                 )}
               </tr>
