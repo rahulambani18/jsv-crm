@@ -14,7 +14,6 @@ import Pagination from '../components/Pagination.jsx'
 import { useAuth } from '../lib/AuthContext.jsx'
 import { showToast } from '../lib/toast.js'
 import { exportCSV } from '../lib/exportUtils.js'
-import { outstandingForCustomer } from '../lib/credit.js'
 import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 
@@ -110,16 +109,6 @@ export default function Orders() {
 
   const totals = useMemo(() => calcOrderTotals(form.lineItems), [form.lineItems])
 
-  const selectedCustomer = useMemo(() => customers.find((c) => c.id === form.customerId), [customers, form.customerId])
-  const creditWarning = useMemo(() => {
-    if (!selectedCustomer || !Number(selectedCustomer.creditLimit)) return null
-    const outstanding = outstandingForCustomer(selectedCustomer.company, invoices, payments)
-    const projected = outstanding + (editingId ? 0 : totals.total)
-    if (projected > Number(selectedCustomer.creditLimit)) {
-      return `${selectedCustomer.company} already owes ₹${outstanding.toLocaleString('en-IN')} against a ₹${Number(selectedCustomer.creditLimit).toLocaleString('en-IN')} credit limit — this order would put them over.`
-    }
-    return null
-  }, [selectedCustomer, invoices, payments, totals.total, editingId])
 
   const stockByKey = useMemo(() => {
     const map = {}
@@ -472,11 +461,6 @@ export default function Orders() {
                 <input required value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} placeholder="Auto-fills from customer" />
               </div>
             </div>
-            {creditWarning && (
-              <div style={{ background: 'var(--red-100)', color: 'var(--red-600)', border: '1px solid var(--red-600)', borderRadius: 'var(--radius-sm)', padding: '10px 12px', fontSize: 12.5, marginBottom: 14, fontWeight: 600 }}>
-                ⚠️ {creditWarning}
-              </div>
-            )}
             {stockShortages.length > 0 && (
               <div style={{ background: 'var(--red-100)', color: 'var(--red-600)', border: '1px solid var(--red-600)', borderRadius: 'var(--radius-sm)', padding: '10px 12px', fontSize: 12.5, marginBottom: 14, fontWeight: 600 }}>
                 ⚠️ Not enough stock at {form.warehouse}: {stockShortages.map((s) => `${s.product} (ordering ${s.ordered}, only ${s.available} on hand)`).join('; ')}

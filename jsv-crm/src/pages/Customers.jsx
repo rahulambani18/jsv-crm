@@ -36,7 +36,6 @@ const CUSTOMER_FIELD_MAP = {
   state: ['state'],
   billingAddress: ['billingaddress', 'address', 'billing'],
   shippingAddress: ['shippingaddress', 'shipping'],
-  creditLimit: ['creditlimit', 'credit'],
 }
 
 function emptyForm() {
@@ -44,7 +43,6 @@ function emptyForm() {
     company: '', contact: '', mobile: '', email: '', gst: '',
     businessType: '', industry: '', application: '',
     city: '', state: '', billingAddress: '', shippingAddress: '',
-    creditLimit: '',
   }
 }
 
@@ -144,7 +142,6 @@ export default function Customers() {
         try {
           await api.customers.insert({
             ...r,
-            creditLimit: r.creditLimit ? Number(r.creditLimit) || '' : '',
             code: `CUST-${String(customers.length + imported + 1).padStart(4, '0')}`,
           })
           imported++
@@ -171,7 +168,7 @@ export default function Customers() {
 
   function openEdit(customer) {
     setEditingId(customer.id)
-    setForm({ ...emptyForm(), ...customer, creditLimit: customer.creditLimit ?? '' })
+    setForm({ ...emptyForm(), ...customer })
     setSameAsBilling(customer.billingAddress === customer.shippingAddress)
     setShowModal(true)
   }
@@ -188,7 +185,6 @@ export default function Customers() {
     setSaving(true)
     const record = {
       ...form,
-      creditLimit: Number(form.creditLimit) || 0,
       shippingAddress: sameAsBilling ? form.billingAddress : form.shippingAddress,
     }
     try {
@@ -371,7 +367,7 @@ export default function Customers() {
                 </th>
               )}
               <th>Code</th><th>Company</th><th>Contact Person</th><th>Mobile</th><th>City</th><th>GST</th>
-              <th>Type</th><th>Industry</th><th>Credit / Outstanding</th>{(canEdit || canDelete) && <th>Actions</th>}
+              <th>Type</th><th>Industry</th><th>Outstanding</th>{(canEdit || canDelete) && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
@@ -393,7 +389,6 @@ export default function Customers() {
               </td></tr>
             ) : paged.map((c) => {
               const outstanding = outstandingByCompany[c.company] || 0
-              const overLimit = Number(c.creditLimit) > 0 && outstanding > Number(c.creditLimit)
               const t = templates.paymentReminder(c.company, outstanding)
               return (
               <tr key={c.id}>
@@ -413,14 +408,7 @@ export default function Customers() {
                   {c.industry || <span className="cell-muted">—</span>}
                   {c.application && <><br /><span className="cell-muted" style={{ fontSize: 11.5 }}>{c.application}</span></>}
                 </td>
-                <td className="cell-mono">
-                  {c.creditLimit ? formatINR(c.creditLimit) : <span className="cell-muted">—</span>}
-                  <br />
-                  <span style={{ fontSize: 11.5, color: overLimit ? 'var(--red-600)' : 'var(--ink-500)' }}>
-                    {formatINR(outstanding)} outstanding
-                  </span>
-                  {overLimit && <><br /><Pill tone="red">Over limit</Pill></>}
-                </td>
+                <td className="cell-mono">{formatINR(outstanding)}</td>
                 {(canEdit || canDelete) && (
                   <td>
                     <RowActionsMenu
@@ -509,15 +497,9 @@ export default function Customers() {
                 <ComboField options={INDUSTRY_OPTIONS} value={form.industry} onChange={(v) => setForm({ ...form, industry: v })} placeholder="Select industry…" />
               </div>
             </div>
-            <div className="field-row">
-              <div className="field">
-                <label>Application</label>
-                <input value={form.application} onChange={(e) => setForm({ ...form, application: e.target.value })} placeholder="e.g. Flavoured Milk" />
-              </div>
-              <div className="field">
-                <label>Credit limit (₹)</label>
-                <input type="number" min="0" value={form.creditLimit} onChange={(e) => setForm({ ...form, creditLimit: e.target.value })} placeholder="e.g. 500000" />
-              </div>
+            <div className="field">
+              <label>Application</label>
+              <input value={form.application} onChange={(e) => setForm({ ...form, application: e.target.value })} placeholder="e.g. Flavoured Milk" />
             </div>
             <div className="field-row">
               <div className="field">
