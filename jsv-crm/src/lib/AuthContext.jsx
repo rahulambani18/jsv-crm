@@ -14,6 +14,28 @@ export function AuthProvider({ children }) {
     })
   }, [])
 
+  // Permissions are only fetched at login/page-load and then kept in
+  // memory for the session — so if an admin changes someone's access
+  // while their tab stays open, they'd otherwise keep seeing modules
+  // they've since been locked out of (or vice versa) until they happen
+  // to reload. Quietly re-fetch whenever the tab regains focus/becomes
+  // visible again, plus every few minutes as a safety net, so access
+  // changes take effect without anyone needing to log out and back in.
+  useEffect(() => {
+    function refreshUser() {
+      if (document.visibilityState !== 'visible') return
+      auth.getUser().then((u) => { if (u) setUser(u) }).catch(() => {})
+    }
+    window.addEventListener('focus', refreshUser)
+    document.addEventListener('visibilitychange', refreshUser)
+    const interval = setInterval(refreshUser, 5 * 60 * 1000)
+    return () => {
+      window.removeEventListener('focus', refreshUser)
+      document.removeEventListener('visibilitychange', refreshUser)
+      clearInterval(interval)
+    }
+  }, [])
+
   async function signIn(email, password) {
     const u = await auth.signIn(email, password)
     setUser(u)
