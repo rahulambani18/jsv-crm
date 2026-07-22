@@ -487,9 +487,9 @@ export default function UsersAndRoles() {
           ) : auditEntries.map((entry, i) => (
             <div key={i} className="audit-row">
               <div className="cell-mono" style={{ fontSize: 12 }}>{new Date(entry.ts).toLocaleString('en-IN')}</div>
-              <div style={{ fontWeight: 600 }}>{entry.user}</div>
+              <div style={{ fontWeight: 600 }} title={entry.user}>{entry.user}</div>
               <div><span className="pill pill-navy" style={{ fontSize: 11 }}>{entry.table ? `${entry.action} · ${entry.table}` : entry.action}</span></div>
-              <div style={{ color: 'var(--ink-500)', fontSize: 12.5 }}>{entry.detail}</div>
+              <div style={{ color: 'var(--ink-500)', fontSize: 12.5 }} title={entry.detail}>{entry.detail}</div>
             </div>
           ))}
         </div>

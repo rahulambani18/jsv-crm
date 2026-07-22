@@ -117,12 +117,18 @@
 /* ---------- Audit log ---------- */
 .audit-row {
   display: grid;
-  grid-template-columns: 140px 100px 1fr 160px;
-  gap: 12px;
+  grid-template-columns: 150px 190px 220px 1fr;
+  gap: 16px;
   align-items: center;
   padding: 10px 16px;
   border-bottom: 1px solid var(--paper-100);
   font-size: 13px;
+}
+.audit-row > div:nth-child(2),
+.audit-row > div:nth-child(4) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .audit-row:last-child { border-bottom: none; }
 .audit-row:hover { background: var(--paper-0); }
@@ -134,6 +140,9 @@
   color: var(--ink-500);
   background: var(--paper-0);
   border-bottom: 1px solid var(--paper-200);
+}
+@media (max-width: 900px) {
+  .audit-row { grid-template-columns: 120px 140px 170px 1fr; font-size: 12.5px; }
 }
 
 @media (max-width: 480px) {
