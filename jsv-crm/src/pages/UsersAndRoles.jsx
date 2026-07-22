@@ -41,6 +41,8 @@ export default function UsersAndRoles() {
   const [resetPassword, setResetPassword] = useState('')
   const [resettingPassword, setResettingPassword] = useState(false)
   const [resetError, setResetError] = useState('')
+  const [resetSuccess, setResetSuccess] = useState(null) // { name, password } — shown after a successful reset
+  const [copiedPassword, setCopiedPassword] = useState(false)
 
   const [activeRoleId, setActiveRoleId] = useState(null)
 
@@ -101,16 +103,15 @@ export default function UsersAndRoles() {
     }
   }
 
-  async function handleViewPassword(userId, userName) {
+  async function handleViewUsername(userId, userName) {
     const u = users.find((u) => u.id === userId)
     const displayUsername = u?.email?.endsWith('@jsv.internal')
       ? u.email.replace('@jsv.internal', '')
       : u?.email || '—'
     alert(
-      `Login credentials for ${userName}:\n\n` +
-      `Username: ${displayUsername}\n\n` +
-      `⚠️ Passwords are encrypted and cannot be displayed.\n` +
-      `Use the "Reset Password" button to set a new one for them.`
+      `Username for ${userName}:\n\n` +
+      `${displayUsername}\n\n` +
+      `Passwords can't be viewed — use "Reset Password" to set a new one for them.`
     )
   }
 
@@ -126,13 +127,24 @@ export default function UsersAndRoles() {
     try {
       await auth.adminResetPassword(resetTarget.id, resetPassword)
       logAudit('Password reset', resetTarget.name)
-      alert(`✅ Password updated for "${resetTarget.name}".\n\nNew password: ${resetPassword}\n\nShare this with them securely.`)
+      setResetSuccess({ name: resetTarget.name, password: resetPassword })
       setResetTarget(null)
       setResetPassword('')
     } catch (err) {
       setResetError(err.message || 'Could not reset password.')
     } finally {
       setResettingPassword(false)
+    }
+  }
+
+  async function handleCopyPassword() {
+    if (!resetSuccess) return
+    try {
+      await navigator.clipboard.writeText(resetSuccess.password)
+      setCopiedPassword(true)
+      setTimeout(() => setCopiedPassword(false), 2000)
+    } catch {
+      showToast('Could not copy — select and copy the password manually.', 'error')
     }
   }
 
@@ -412,10 +424,10 @@ export default function UsersAndRoles() {
                           <button
                             className="btn btn-ghost btn-sm"
                             style={{ fontSize: 11.5 }}
-                            onClick={() => handleViewPassword(u.id, u.name)}
-                            title="View login credentials"
+                            onClick={() => handleViewUsername(u.id, u.name)}
+                            title="View this person's login username"
                           >
-                            👁 Credentials
+                            👁 View Username
                           </button>
                           <button
                             className="btn btn-ghost btn-sm"
@@ -731,6 +743,33 @@ export default function UsersAndRoles() {
             </div>
             {resetError && <p style={{ color: 'var(--red-600)', fontSize: 13, marginTop: 4 }}>{resetError}</p>}
           </form>
+        </Modal>
+      )}
+
+      {resetSuccess && (
+        <Modal
+          title={`Password updated — ${resetSuccess.name}`}
+          onClose={() => setResetSuccess(null)}
+          footer={
+            <button className="btn btn-primary" onClick={() => setResetSuccess(null)} style={{ width: '100%', justifyContent: 'center' }}>
+              Done
+            </button>
+          }
+        >
+          <p style={{ fontSize: 12.5, color: 'var(--ink-500)', marginTop: 0, marginBottom: 12 }}>
+            Share this new password with {resetSuccess.name} securely. It won't be shown again once you close this.
+          </p>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10, background: 'var(--paper-50)',
+            border: '1px solid var(--paper-200)', borderRadius: 8, padding: '10px 14px', marginBottom: 4,
+          }}>
+            <span className="cell-mono" style={{ fontSize: 15, fontWeight: 700, flex: 1, letterSpacing: 0.3 }}>
+              {resetSuccess.password}
+            </span>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={handleCopyPassword}>
+              {copiedPassword ? '✓ Copied' : '📋 Copy new password'}
+            </button>
+          </div>
         </Modal>
       )}
 
