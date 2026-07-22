@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api.js'
 import { INDUSTRY_OPTIONS, INDIAN_STATES } from '../data/seed.js'
@@ -10,7 +10,7 @@ import Pill from '../components/Pill.jsx'
 import SendButtons from '../components/SendButtons.jsx'
 import Pagination from '../components/Pagination.jsx'
 import CustomerTimelineModal from '../components/CustomerTimelineModal.jsx'
-import { IconPlus, IconSearch, IconTrash, IconEdit } from '../components/Icons.jsx'
+import { IconPlus, IconSearch, IconTrash, IconEdit, IconUpload } from '../components/Icons.jsx'
 import ComboField from '../components/ComboField.jsx'
 import Dropdown from '../components/Dropdown.jsx'
 import BulkActionsBar from '../components/BulkActionsBar.jsx'
@@ -19,8 +19,25 @@ import { showToast } from '../lib/toast.js'
 import { exportCSV } from '../lib/exportUtils.js'
 import { outstandingForCustomer } from '../lib/credit.js'
 import { templates } from '../lib/messaging.js'
+import { readSpreadsheetFile, normalizeRow } from '../lib/fileImport.js'
 import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
+
+const CUSTOMER_FIELD_MAP = {
+  company: ['company', 'companyname', 'customer', 'customername', 'name'],
+  contact: ['contact', 'contactperson', 'contactname'],
+  mobile: ['mobile', 'phone', 'mobilenumber', 'phonenumber'],
+  email: ['email', 'emailaddress'],
+  gst: ['gst', 'gstin', 'gstnumber'],
+  businessType: ['businesstype', 'type'],
+  industry: ['industry'],
+  application: ['application'],
+  city: ['city'],
+  state: ['state'],
+  billingAddress: ['billingaddress', 'address', 'billing'],
+  shippingAddress: ['shippingaddress', 'shipping'],
+  creditLimit: ['creditlimit', 'credit'],
+}
 
 function emptyForm() {
   return {
@@ -97,6 +114,50 @@ export default function Customers() {
     }
     showToast(`Imported ${imported} customers from Tally successfully`)
     refresh()
+  }
+
+  // Plain CSV/Excel import — separate from Tally XML import above. Any
+  // spreadsheet with a "Company" column (or close variants) works; other
+  // recognized columns are mapped in via CUSTOMER_FIELD_MAP.
+  const fileInputRef = useRef()
+  const [importBusy, setImportBusy] = useState(false)
+  const [importError, setImportError] = useState('')
+
+  async function handleFileSelected(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImportError('')
+    setImportBusy(true)
+    try {
+      const rows = await readSpreadsheetFile(file)
+      const mapped = rows
+        .map((row) => normalizeRow(row, CUSTOMER_FIELD_MAP))
+        .filter((r) => r.company)
+
+      if (mapped.length === 0) {
+        setImportError('No valid rows found. Make sure the file has a "Company" column.')
+        return
+      }
+
+      let imported = 0
+      for (const r of mapped) {
+        try {
+          await api.customers.insert({
+            ...r,
+            creditLimit: r.creditLimit ? Number(r.creditLimit) || '' : '',
+            code: `CUST-${String(customers.length + imported + 1).padStart(4, '0')}`,
+          })
+          imported++
+        } catch {}
+      }
+      showToast(`Imported ${imported} customer${imported === 1 ? '' : 's'} from ${file.name}`)
+      refresh()
+    } catch (err) {
+      setImportError(err.message || 'Could not import this file.')
+    } finally {
+      setImportBusy(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
   }
 
   const filtered = useMemo(() => {
@@ -233,6 +294,16 @@ export default function Customers() {
         actions={
           canEdit && (
             <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                style={{ display: 'none' }}
+                onChange={handleFileSelected}
+              />
+              <button className="btn btn-secondary" onClick={() => fileInputRef.current?.click()} disabled={importBusy}>
+                <IconUpload width={15} height={15} /> {importBusy ? 'Importing…' : 'Import Excel/CSV'}
+              </button>
               <TallyImportButton onImport={handleTallyImport} />
               <ExportBar
                 title="Customers"
@@ -247,6 +318,17 @@ export default function Customers() {
           )
         }
       />
+
+      {importError && (
+        <div style={{
+          background: 'var(--red-100)', color: 'var(--red-600)', borderRadius: 8,
+          padding: '10px 14px', fontSize: 13, marginBottom: 14, display: 'flex',
+          justifyContent: 'space-between', alignItems: 'center', gap: 12,
+        }}>
+          <span>{importError}</span>
+          <button className="btn btn-ghost btn-sm" style={{ fontSize: 12 }} onClick={() => setImportError('')}>Dismiss</button>
+        </div>
+      )}
 
       <div className="filters-bar">
         <div className="search-input">
