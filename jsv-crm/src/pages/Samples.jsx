@@ -11,7 +11,6 @@ import SendButtons from '../components/SendButtons.jsx'
 import Pagination from '../components/Pagination.jsx'
 import { IconPlus, IconSearch, IconTrash } from '../components/Icons.jsx'
 import { useAuth } from '../lib/AuthContext.jsx'
-import { templates } from '../lib/messaging.js'
 import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 
@@ -149,7 +148,6 @@ export default function Samples() {
                 )}
               </td></tr>
             ) : paged.map((s) => {
-              const t = templates.sample(s)
               return (
               <tr key={s.id}>
                 <td className="cell-mono">{s.code}</td>
@@ -180,7 +178,12 @@ export default function Samples() {
                 {(canEdit || canDelete) && (
                   <td>
                     <div style={{ display: 'flex', gap: 4 }}>
-                      <SendButtons phone={s.phone} email={s.email} whatsappMessage={t.whatsapp} mailSubject={t.subject} mailBody={t.body} />
+                      <SendButtons
+                        phone={s.phone}
+                        email={s.email}
+                        category="sample"
+                        vars={{ company: s.company, contact: s.contact, products: (s.products || []).join(', '), courier: s.courier, tracking: s.tracking }}
+                      />
                       {canDelete && <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(s)} title="Delete"><IconTrash width={13} height={13} /></button>}
                     </div>
                   </td>

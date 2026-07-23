@@ -12,7 +12,6 @@ import Pagination from '../components/Pagination.jsx'
 import { IconPlus, IconSearch, IconEdit, IconTrash, IconReceipt, IconDollarSign, IconFlame, IconClock } from '../components/Icons.jsx'
 import StatCard from '../components/StatCard.jsx'
 import Dropdown from '../components/Dropdown.jsx'
-import { templates } from '../lib/messaging.js'
 import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 
@@ -500,7 +499,6 @@ export default function Invoices() {
               </td></tr>
             ) : paged.map((inv) => {
               const customer = customers.find((c) => c.company === inv.company)
-              const t = templates.invoice(inv)
               return (
               <tr key={inv.id}>
                 <td className="cell-mono cell-strong">{inv.invoiceNo}</td>
@@ -516,7 +514,12 @@ export default function Invoices() {
                 <td><Pill>{inv.status}</Pill></td>
                 <td style={{ display: 'flex', gap: 4 }}>
                   {canEdit && <button className="btn btn-ghost btn-sm" onClick={() => openEdit(inv)} title="Edit"><IconEdit width={13} height={13} /></button>}
-                  <SendButtons phone={customer?.mobile} email={customer?.email} whatsappMessage={t.whatsapp} mailSubject={t.subject} mailBody={t.body} />
+                  <SendButtons
+                    phone={customer?.mobile}
+                    email={customer?.email}
+                    category="invoice"
+                    vars={{ company: inv.company, invoiceNo: inv.invoiceNo, total: formatINR(inv.total), dueDate: inv.dueDate }}
+                  />
                   <button className="btn btn-ghost btn-sm" onClick={() => printInvoice(inv, orders.find((o) => o.id === inv.orderId))} title="Print invoice">🖨 Print</button>
                   {canDelete && <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(inv)} title="Delete"><IconTrash width={13} height={13} /></button>}
                 </td>

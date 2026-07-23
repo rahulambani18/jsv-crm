@@ -18,7 +18,7 @@ import { useAuth } from '../lib/AuthContext.jsx'
 import { showToast } from '../lib/toast.js'
 import { exportCSV } from '../lib/exportUtils.js'
 import { outstandingForCustomer } from '../lib/credit.js'
-import { templates, waLink, mailtoLink } from '../lib/messaging.js'
+import TemplatePickerModal from '../components/TemplatePickerModal.jsx'
 import { readSpreadsheetFile, normalizeRow } from '../lib/fileImport.js'
 import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
@@ -64,6 +64,7 @@ export default function Customers() {
   const [meetings, setMeetings] = useState([])
   const [followUps, setFollowUps] = useState([])
   const [timelineFor, setTimelineFor] = useState(null)
+  const [reminderFor, setReminderFor] = useState(null)
   const [loading, setLoading] = useState(true)
   const [searchParams] = useSearchParams()
   const [search, setSearch] = useState(searchParams.get('q') || '')
@@ -389,7 +390,6 @@ export default function Customers() {
               </td></tr>
             ) : paged.map((c) => {
               const outstanding = outstandingByCompany[c.company] || 0
-              const t = templates.paymentReminder(c.company, outstanding)
               return (
               <tr key={c.id}>
                 {canEdit && (
@@ -417,18 +417,11 @@ export default function Customers() {
                         { label: 'View timeline', icon: '🕘', onClick: () => setTimelineFor(c) },
                         'divider',
                         {
-                          label: 'Send WhatsApp',
-                          icon: '💬',
-                          disabled: !waLink(c.mobile, t.whatsapp),
-                          disabledReason: 'No phone number on file',
-                          onClick: () => window.open(waLink(c.mobile, t.whatsapp), '_blank', 'noopener'),
-                        },
-                        {
-                          label: 'Send Email',
-                          icon: '✉️',
-                          disabled: !mailtoLink(c.email, t.subject, t.body),
-                          disabledReason: 'No email on file',
-                          onClick: () => { window.location.href = mailtoLink(c.email, t.subject, t.body) },
+                          label: 'Send payment reminder',
+                          icon: '💰',
+                          disabled: !c.mobile && !c.email,
+                          disabledReason: 'No phone or email on file',
+                          onClick: () => setReminderFor(c),
                         },
                         canDelete && 'divider',
                         canDelete && { label: 'Delete', icon: <IconTrash width={13} height={13} />, danger: true, onClick: () => handleDelete(c) },
@@ -543,6 +536,15 @@ export default function Customers() {
           onClose={() => setTimelineFor(null)}
         />
       )}
+
+      <TemplatePickerModal
+        open={!!reminderFor}
+        onClose={() => setReminderFor(null)}
+        category="paymentReminder"
+        vars={{ company: reminderFor?.company, outstanding: formatINR(outstandingByCompany[reminderFor?.company] || 0) }}
+        phone={reminderFor?.mobile}
+        email={reminderFor?.email}
+      />
     </div>
   )
 }

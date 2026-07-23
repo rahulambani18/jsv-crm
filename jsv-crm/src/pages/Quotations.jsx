@@ -8,7 +8,6 @@ import Modal from '../components/Modal.jsx'
 import SendButtons from '../components/SendButtons.jsx'
 import Pagination from '../components/Pagination.jsx'
 import { IconPlus, IconTrash, IconSearch } from '../components/Icons.jsx'
-import { templates } from '../lib/messaging.js'
 import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 
@@ -145,7 +144,6 @@ export default function Quotations() {
               </td></tr>
             ) : paged.map((q) => {
               const customer = customers.find((c) => c.company === q.company)
-              const t = templates.quotation(q)
               return (
               <tr key={q.id}>
                 <td className="cell-mono">{q.quoteNo}</td>
@@ -155,7 +153,12 @@ export default function Quotations() {
                 <td className="cell-mono">{q.validUntil}</td>
                 <td><Pill>{q.status}</Pill></td>
                 <td style={{ display: 'flex', gap: 4 }}>
-                  <SendButtons phone={customer?.mobile} email={customer?.email} whatsappMessage={t.whatsapp} mailSubject={t.subject} mailBody={t.body} />
+                  <SendButtons
+                    phone={customer?.mobile}
+                    email={customer?.email}
+                    category="quotation"
+                    vars={{ company: q.company, contact: customer?.contact, quoteNo: q.quoteNo, total: fmt(q.total), validUntil: q.validUntil }}
+                  />
                   <button className="btn btn-ghost btn-sm">View</button>
                 </td>
               </tr>

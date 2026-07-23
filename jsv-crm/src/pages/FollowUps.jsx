@@ -6,7 +6,6 @@ import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
 import SendButtons from '../components/SendButtons.jsx'
 import { IconPlus } from '../components/Icons.jsx'
-import { templates } from '../lib/messaging.js'
 import EmptyState from '../components/EmptyState.jsx'
 import '../styles/components.css'
 
@@ -108,7 +107,6 @@ export default function FollowUps() {
               </td></tr>
             ) : filtered.map((f) => {
               const { phone, email } = contactInfoFor(f)
-              const t = templates.followUp(f)
               return (
               <tr key={f.id}>
                 <td className="cell-mono">{f.date}</td>
@@ -118,7 +116,12 @@ export default function FollowUps() {
                 <td style={{ maxWidth: 320 }}>{f.notes}</td>
                 <td><Pill>{f.status}</Pill></td>
                 <td style={{ display: 'flex', gap: 4 }}>
-                  <SendButtons phone={phone} email={email} whatsappMessage={t.whatsapp} mailSubject={t.subject} mailBody={t.body} />
+                  <SendButtons
+                    phone={phone}
+                    email={email}
+                    category="followUp"
+                    vars={{ contact: f.contact, lead: f.lead, notes: f.notes }}
+                  />
                 </td>
               </tr>
             )})}
