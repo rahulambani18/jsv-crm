@@ -9,10 +9,16 @@ import ExportBar from '../components/ExportBar.jsx'
 import TallyImportButton from '../components/TallyImportButton.jsx'
 import TallyExportButton from '../components/TallyExportButton.jsx'
 import SendButtons from '../components/SendButtons.jsx'
+import BulkActionsBar from '../components/BulkActionsBar.jsx'
+import BulkReminderModal from '../components/BulkReminderModal.jsx'
 import Pagination from '../components/Pagination.jsx'
 import { IconPlus, IconSearch, IconEdit, IconTrash, IconReceipt, IconDollarSign, IconFlame, IconClock } from '../components/Icons.jsx'
 import StatCard from '../components/StatCard.jsx'
 import Dropdown from '../components/Dropdown.jsx'
+import { isInvoiceOverdue } from '../lib/overdue.js'
+import { outstandingForCustomer } from '../lib/credit.js'
+import { exportCSV } from '../lib/exportUtils.js'
+import { showToast } from '../lib/toast.js'
 import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 
@@ -304,6 +310,7 @@ export default function Invoices() {
   const [invoices, setInvoices] = useState([])
   const [orders, setOrders] = useState([])
   const [customers, setCustomers] = useState([])
+  const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchParams] = useSearchParams()
   const [search, setSearch] = useState(searchParams.get('q') || '')
@@ -312,13 +319,15 @@ export default function Invoices() {
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyForm())
   const [saving, setSaving] = useState(false)
+  const [selected, setSelected] = useState(new Set())
+  const [showReminderModal, setShowReminderModal] = useState(false)
 
   useEffect(() => { refresh() }, [])
 
   function refresh() {
     setLoading(true)
-    Promise.all([api.invoices.list(), api.orders.list(), api.customers.list()]).then(([inv, ord, cust]) => {
-      setInvoices(inv); setOrders(ord); setCustomers(cust); setLoading(false)
+    Promise.all([api.invoices.list(), api.orders.list(), api.customers.list(), api.payments.list()]).then(([inv, ord, cust, pay]) => {
+      setInvoices(inv); setOrders(ord); setCustomers(cust); setPayments(pay); setLoading(false)
     })
   }
 
@@ -383,6 +392,68 @@ export default function Invoices() {
       alert('Could not delete: ' + (err.message || 'Unknown error'))
     }
   }
+
+  function toggleSelected(id) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    setSelected((prev) =>
+      prev.size === filtered.length ? new Set() : new Set(filtered.map((i) => i.id))
+    )
+  }
+
+  function selectAllOverdue() {
+    setSelected(new Set(invoices.filter((i) => isInvoiceOverdue(i)).map((i) => i.id)))
+  }
+
+  async function handleBulkDelete() {
+    const count = selected.size
+    if (!confirm(`Delete ${count} invoice${count === 1 ? '' : 's'}? This cannot be undone.`)) return
+    try {
+      await Promise.all([...selected].map((id) => api.invoices.remove(id)))
+      setSelected(new Set())
+      refresh()
+      showToast(`${count} invoice${count === 1 ? '' : 's'} deleted`)
+    } catch (err) {
+      showToast('Could not delete selected invoices: ' + (err.message || 'Unknown error'), 'error')
+    }
+  }
+
+  function handleBulkExport() {
+    const rows = filtered.filter((i) => selected.has(i.id))
+    exportCSV(
+      'Invoices',
+      ['Invoice #', 'Company', 'Issue Date', 'Due Date', 'Subtotal', 'CGST', 'SGST', 'Total', 'Status'],
+      rows.map((i) => [i.invoiceNo, i.company, i.issueDate, i.dueDate, i.subtotal, i.cgst, i.sgst, i.total, i.status])
+    )
+  }
+
+  // Builds one row per company (not per invoice) so a customer with
+  // several overdue invoices gets a single reminder covering their full
+  // outstanding balance, using the same math Payments/Customers use.
+  const reminderRows = useMemo(() => {
+    const selectedOverdue = invoices.filter((i) => selected.has(i.id) && isInvoiceOverdue(i))
+    const byCompany = new Map()
+    selectedOverdue.forEach((inv) => {
+      if (!byCompany.has(inv.company)) byCompany.set(inv.company, 0)
+      byCompany.set(inv.company, byCompany.get(inv.company) + 1)
+    })
+    return [...byCompany.entries()].map(([company, invoiceCount]) => {
+      const customer = customers.find((c) => c.company === company)
+      return {
+        company,
+        invoiceCount,
+        phone: customer?.mobile,
+        email: customer?.email,
+        outstanding: outstandingForCustomer(company, invoices, payments),
+      }
+    })
+  }, [invoices, payments, customers, selected])
 
   function recalcGST(subtotal) {
     const sub = Number(subtotal) || 0
@@ -482,21 +553,44 @@ export default function Invoices() {
           <option>All</option>
           {STATUS_OPTIONS.map((s) => <option key={s}>{s}</option>)}
         </select>
+        {invoices.some((i) => isInvoiceOverdue(i)) && (
+          <button type="button" className="btn btn-ghost-light" onClick={selectAllOverdue}>
+            Select all overdue
+          </button>
+        )}
       </div>
+
+      <BulkActionsBar
+        count={selected.size}
+        onClear={() => setSelected(new Set())}
+        onExport={handleBulkExport}
+        onDelete={canDelete ? handleBulkDelete : undefined}
+      >
+        <button type="button" className="btn btn-ghost-light" onClick={() => setShowReminderModal(true)}>
+          📨 Send Payment Reminders
+        </button>
+      </BulkActionsBar>
 
       <div className="table-wrap">
         <table className="data-table">
           <thead>
             <tr>
+              <th className="header-checkbox-cell">
+                <input
+                  type="checkbox"
+                  checked={filtered.length > 0 && selected.size === filtered.length}
+                  onChange={toggleSelectAll}
+                />
+              </th>
               <th>Invoice #</th><th>Company</th><th>Issue Date</th><th>Due Date</th>
               <th>Subtotal</th><th>GST</th><th>Total</th><th>Status</th><th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={9}>Loading invoices…</td></tr>
+              <tr className="empty-row"><td colSpan={10}>Loading invoices…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={9}>
+              <tr className="empty-row"><td colSpan={10}>
                 {invoices.length === 0 ? (
                   <EmptyState
                     icon="🧾"
@@ -511,6 +605,9 @@ export default function Invoices() {
               const customer = customers.find((c) => c.company === inv.company)
               return (
               <tr key={inv.id}>
+                <td className="row-checkbox-cell">
+                  <input type="checkbox" checked={selected.has(inv.id)} onChange={() => toggleSelected(inv.id)} />
+                </td>
                 <td className="cell-mono cell-strong">
                   {inv.invoiceNo}
                   {inv.tallySyncedAt && <span title={`Exported to Tally on ${String(inv.tallySyncedAt).slice(0, 10)}`} style={{ marginLeft: 6, fontSize: 11, color: 'var(--teal-700)' }}>⇄ Tally</span>}
@@ -634,6 +731,13 @@ export default function Invoices() {
           </form>
         </Modal>
       )}
+
+      <BulkReminderModal
+        open={showReminderModal}
+        onClose={() => setShowReminderModal(false)}
+        rows={reminderRows}
+        onDone={() => setSelected(new Set())}
+      />
     </div>
   )
 }
