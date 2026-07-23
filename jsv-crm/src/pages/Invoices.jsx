@@ -7,6 +7,7 @@ import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
 import ExportBar from '../components/ExportBar.jsx'
 import TallyImportButton from '../components/TallyImportButton.jsx'
+import TallyExportButton from '../components/TallyExportButton.jsx'
 import SendButtons from '../components/SendButtons.jsx'
 import Pagination from '../components/Pagination.jsx'
 import { IconPlus, IconSearch, IconEdit, IconTrash, IconReceipt, IconDollarSign, IconFlame, IconClock } from '../components/Icons.jsx'
@@ -336,6 +337,14 @@ export default function Invoices() {
     refresh()
   }
 
+  async function handleTallyExported(ids) {
+    const syncedAt = new Date().toISOString()
+    for (const id of ids) {
+      try { await api.invoices.update(id, { tallySyncedAt: syncedAt }) } catch {}
+    }
+    refresh()
+  }
+
   // Auto-generate invoice from an order
   function generateFromOrder(order) {
     const subtotal = Number(order.subtotal || order.total / 1.18 || 0)
@@ -423,6 +432,7 @@ export default function Invoices() {
         actions={
           <div style={{ display: 'flex', gap: 10 }}>
             <TallyImportButton onImport={handleTallyImport} />
+            {canEdit && <TallyExportButton invoices={invoices} onExported={handleTallyExported} />}
             <ExportBar
               title="Invoices"
               headers={['Invoice #', 'Company', 'Issue Date', 'Due Date', 'Subtotal', 'CGST', 'SGST', 'Total', 'Status']}
@@ -501,7 +511,10 @@ export default function Invoices() {
               const customer = customers.find((c) => c.company === inv.company)
               return (
               <tr key={inv.id}>
-                <td className="cell-mono cell-strong">{inv.invoiceNo}</td>
+                <td className="cell-mono cell-strong">
+                  {inv.invoiceNo}
+                  {inv.tallySyncedAt && <span title={`Exported to Tally on ${String(inv.tallySyncedAt).slice(0, 10)}`} style={{ marginLeft: 6, fontSize: 11, color: 'var(--teal-700)' }}>⇄ Tally</span>}
+                </td>
                 <td className="cell-strong">{inv.company}</td>
                 <td className="cell-mono">{inv.issueDate}</td>
                 <td className="cell-mono" style={{ color: inv.status === 'Overdue' ? 'var(--red-600)' : undefined }}>

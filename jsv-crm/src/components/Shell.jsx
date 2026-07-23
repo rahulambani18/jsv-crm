@@ -70,6 +70,15 @@ export default function Shell({ children }) {
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
   const firstName = (user?.name || '').split(' ')[0]
 
+  // On phones the sidebar becomes an off-canvas overlay (see shell.css'
+  // <900px rule); lock background scroll while it's open so the page
+  // behind it doesn't scroll along with a finger swipe on the overlay.
+  useEffect(() => {
+    const isMobile = window.matchMedia('(max-width: 900px)').matches
+    document.body.style.overflow = navOpen && isMobile ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [navOpen])
+
   const visibleNav = NAV.filter((item) => can(item.key, 'view'))
   const visibleAdminNav = ADMIN_NAV.filter((item) => can(item.key, 'view'))
 
@@ -290,6 +299,7 @@ export default function Shell({ children }) {
 
   return (
     <div className="shell">
+      {navOpen && <div className="sidebar-backdrop" onClick={() => setNavOpen(false)} />}
       <aside className={`sidebar ${navOpen ? 'open' : ''}`}>
         <div className="sidebar-brand">
           <img src={jsvMark} alt="JSV" style={{ height: 30, width: 'auto', flexShrink: 0 }} />
@@ -352,11 +362,11 @@ export default function Shell({ children }) {
             <button className="topbar-toggle" onClick={() => setNavOpen((v) => !v)} aria-label="Toggle navigation">
               <IconPanel width={16} height={16} />
             </button>
-            <div className="topbar-greeting" style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.25 }}>
-              <span style={{ fontWeight: 700, fontSize: 14.5 }}>
+            <div className="topbar-greeting" style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.25, minWidth: 0 }}>
+              <span style={{ fontWeight: 700, fontSize: 14.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {greeting}{firstName ? `, ${firstName}` : ''} 👋
               </span>
-              <span className="topbar-clock" style={{ fontSize: 11.5, color: 'var(--ink-400)', fontFamily: 'var(--font-mono)' }}>
+              <span className="topbar-clock" style={{ fontSize: 11.5, color: 'var(--ink-400)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
                 {'  ·  '}
                 {now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}

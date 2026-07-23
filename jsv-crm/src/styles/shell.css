@@ -183,6 +183,13 @@
   font-weight: 700;
   font-size: 14px;
   color: var(--ink-900);
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.topbar-right {
+  flex-shrink: 0;
 }
 
 .topbar-toggle {
@@ -216,6 +223,21 @@
   .sidebar { position: fixed; z-index: 50; transform: translateX(-100%); transition: transform 0.2s ease; }
   .sidebar.open { transform: translateX(0); }
   .page-content { padding: 20px 16px 48px; }
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 30, 61, 0.45);
+    z-index: 40; /* below .sidebar (50), above page content */
+    animation: backdrop-fade-in 0.15s ease;
+  }
+}
+@media (min-width: 901px) {
+  .sidebar-backdrop { display: none; }
+}
+@keyframes backdrop-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* ---------- Mobile phones ---------- */

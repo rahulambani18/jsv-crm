@@ -18,6 +18,12 @@ const {
   TALLY_COMPANY = '',
   SYNC_DAYS_BACK = '1',
   POLL_INTERVAL_SECONDS = '60',
+  PUSH_TO_TALLY = 'true',
+  TALLY_SALES_LEDGER = 'Sales',
+  TALLY_CGST_LEDGER = 'CGST',
+  TALLY_SGST_LEDGER = 'SGST',
+  TALLY_IGST_LEDGER = 'IGST',
+  PUSH_BATCH_LIMIT = '25',
 } = process.env
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
@@ -134,6 +140,103 @@ function parseInvoicesFromXML(xmlText) {
     .filter((inv) => inv.company && inv.invoice_no && inv.total > 0)
 }
 
+// ── Build outbound Import-Data XML for one CRM invoice → Tally voucher ──
+// Mirrors src/lib/tallyExport.js's browser-side builder; kept as a
+// separate copy here since this file has no bundler and runs standalone
+// with Node's ESM loader, but the XML shape and conventions are the same
+// so a voucher round-trips consistently either way it was sent.
+function buildOutboundVoucherXML(inv) {
+  const entries = []
+  entries.push(`      <LEDGERENTRIES.LIST>
+        <LEDGERNAME>${escapeXML(inv.company)}</LEDGERNAME>
+        <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
+        <AMOUNT>-${Number(inv.total || 0).toFixed(2)}</AMOUNT>
+      </LEDGERENTRIES.LIST>`)
+  if (Number(inv.subtotal) > 0) {
+    entries.push(`      <LEDGERENTRIES.LIST>
+        <LEDGERNAME>${escapeXML(TALLY_SALES_LEDGER)}</LEDGERNAME>
+        <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
+        <AMOUNT>${Number(inv.subtotal).toFixed(2)}</AMOUNT>
+      </LEDGERENTRIES.LIST>`)
+  }
+  if (Number(inv.cgst) > 0) {
+    entries.push(`      <LEDGERENTRIES.LIST>
+        <LEDGERNAME>${escapeXML(TALLY_CGST_LEDGER)}</LEDGERNAME>
+        <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
+        <AMOUNT>${Number(inv.cgst).toFixed(2)}</AMOUNT>
+      </LEDGERENTRIES.LIST>`)
+  }
+  if (Number(inv.sgst) > 0) {
+    entries.push(`      <LEDGERENTRIES.LIST>
+        <LEDGERNAME>${escapeXML(TALLY_SGST_LEDGER)}</LEDGERNAME>
+        <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
+        <AMOUNT>${Number(inv.sgst).toFixed(2)}</AMOUNT>
+      </LEDGERENTRIES.LIST>`)
+  }
+  if (Number(inv.igst) > 0) {
+    entries.push(`      <LEDGERENTRIES.LIST>
+        <LEDGERNAME>${escapeXML(TALLY_IGST_LEDGER)}</LEDGERNAME>
+        <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
+        <AMOUNT>${Number(inv.igst).toFixed(2)}</AMOUNT>
+      </LEDGERENTRIES.LIST>`)
+  }
+
+  const companyTag = TALLY_COMPANY ? `\n     <SVCURRENTCOMPANY>${escapeXML(TALLY_COMPANY)}</SVCURRENTCOMPANY>` : ''
+
+  return `<ENVELOPE>
+ <HEADER>
+  <TALLYREQUEST>Import Data</TALLYREQUEST>
+ </HEADER>
+ <BODY>
+  <IMPORTDATA>
+   <REQUESTDESC>
+    <REPORTNAME>Vouchers</REPORTNAME>
+    <STATICVARIABLES>${companyTag}
+    </STATICVARIABLES>
+   </REQUESTDESC>
+   <REQUESTDATA>
+    <TALLYMESSAGE xmlns:UDF="TallyUDF">
+     <VOUCHER VCHTYPE="Sales" ACTION="Create">
+      <DATE>${(inv.issue_date || '').replace(/-/g, '')}</DATE>
+      <VOUCHERTYPENAME>Sales</VOUCHERTYPENAME>
+      <VOUCHERNUMBER>${escapeXML(inv.invoice_no)}</VOUCHERNUMBER>
+      <PARTYLEDGERNAME>${escapeXML(inv.company)}</PARTYLEDGERNAME>
+      <NARRATION>${escapeXML(inv.notes || `Pushed from JSV CRM — ${inv.invoice_no}`)}</NARRATION>
+${entries.join('\n')}
+     </VOUCHER>
+    </TALLYMESSAGE>
+   </REQUESTDATA>
+  </IMPORTDATA>
+ </BODY>
+</ENVELOPE>`
+}
+
+async function pushVoucherToTally(xml) {
+  const res = await fetch(TALLY_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/xml' },
+    body: xml,
+  })
+  if (!res.ok) {
+    throw new Error(`Tally returned HTTP ${res.status}. Is Tally open with the XML server enabled?`)
+  }
+  const text = await res.text()
+  // Tally's Import Data response looks like:
+  // <RESPONSE><CREATED>1</CREATED><ALTERED>0</ALTERED><ERRORS>0</ERRORS>
+  // <LASTVCHID>123</LASTVCHID><LASTMID>0</LASTMID></RESPONSE>
+  // — with a <LINEERROR> containing the reason when ERRORS > 0.
+  const lineError = /<LINEERROR>(.*?)<\/LINEERROR>/s.exec(text)
+  const errors = /<ERRORS>(\d+)<\/ERRORS>/.exec(text)
+  if (lineError || (errors && Number(errors[1]) > 0)) {
+    throw new Error(lineError ? lineError[1].trim() : 'Tally rejected the voucher (see ERRORS in response)')
+  }
+  const created = /<CREATED>(\d+)<\/CREATED>/.exec(text)
+  if (!created || Number(created[1]) < 1) {
+    throw new Error('Tally did not report the voucher as created — check ledger names match exactly')
+  }
+  return true
+}
+
 // ── Talk to Tally ────────────────────────────────────────────────────
 async function fetchFromTally(fromDate, toDate) {
   const res = await fetch(TALLY_URL, {
@@ -180,6 +283,52 @@ async function insertInvoice(invoice) {
   })
 }
 
+// Invoices created manually in the CRM (source is null/'Manual'), not
+// yet pushed out (tally_synced_at is null), with something worth
+// sending. Invoices that came FROM Tally in the first place (source =
+// 'Tally Import' / 'Tally Sync') are excluded so nothing bounces back
+// and forth.
+async function fetchPendingPushInvoices() {
+  return supabaseFetch(
+    `invoices?tally_synced_at=is.null&total=gt.0&or=(source.is.null,source.eq.Manual)&select=*&order=created_at.asc&limit=${encodeURIComponent(PUSH_BATCH_LIMIT)}`
+  )
+}
+
+async function markInvoiceSynced(id) {
+  await supabaseFetch(`invoices?id=eq.${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ tally_synced_at: new Date().toISOString() }),
+    headers: { Prefer: 'return=minimal' },
+  })
+}
+
+// ── One push pass: CRM → Tally ──────────────────────────────────────
+async function pushPending() {
+  const ts = new Date().toLocaleString('en-IN')
+  try {
+    const pending = await fetchPendingPushInvoices()
+    if (pending.length === 0) return
+
+    let pushed = 0
+    for (const inv of pending) {
+      try {
+        const xml = buildOutboundVoucherXML(inv)
+        await pushVoucherToTally(xml)
+        await markInvoiceSynced(inv.id)
+        pushed++
+        console.log(`[${ts}] + pushed invoice ${inv.invoice_no} — ${inv.company} — ₹${inv.total} to Tally`)
+      } catch (err) {
+        console.error(`[${ts}] could not push invoice ${inv.invoice_no}: ${err.message}`)
+      }
+    }
+    if (pushed === 0) {
+      console.log(`[${ts}] checked ${pending.length} invoice(s) pending push, none succeeded — see errors above`)
+    }
+  } catch (err) {
+    console.error(`[${ts}] push error:`, err.message)
+  }
+}
+
 // ── One sync pass ────────────────────────────────────────────────────
 async function runOnce() {
   const from = todayMinus(Number(SYNC_DAYS_BACK) || 1)
@@ -204,6 +353,10 @@ async function runOnce() {
     }
   } catch (err) {
     console.error(`[${ts}] sync error:`, err.message)
+  }
+
+  if (String(PUSH_TO_TALLY).toLowerCase() !== 'false') {
+    await pushPending()
   }
 }
 

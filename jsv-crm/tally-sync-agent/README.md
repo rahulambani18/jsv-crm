@@ -1,12 +1,24 @@
-# Tally → CRM sync agent
+# JSV CRM ⇄ Tally sync agent (two-way)
 
-This is a small, separate program that runs on your Tally PC. It checks
-Tally every minute for new Sales / Tax Invoice vouchers, and pushes any
-new ones straight into the JSV CRM — no manual export/import needed.
+This is a small, separate program that runs on your Tally PC. It:
+
+- checks Tally every minute for new Sales / Tax Invoice vouchers, and
+  pushes any new ones straight into the JSV CRM (Tally → CRM), and
+- checks the CRM for invoices reps created manually that haven't been
+  sent to Tally yet, and pushes those into Tally (CRM → Tally).
+
+No manual export/import needed either direction — that's what makes
+this "two-way." (There's also a manual fallback for the CRM → Tally
+direction if you'd rather not run this agent: the **Export to Tally**
+button on the Invoices page downloads an importable XML file you bring
+into Tally yourself via Gateway of Tally → Import Data. See "Manual
+export, without the agent" near the bottom.)
 
 It is **not** part of the website — it's a background helper that must
 stay running on the same PC/network as Tally, because Tally has no way
-to send data out on its own; something has to go ask it.
+to send data out on its own, or accept a connection from a browser
+that isn't on the same network — something has to sit next to Tally
+and talk to it directly in both directions.
 
 ## What you'll need
 
@@ -47,6 +59,11 @@ If you haven't already, run `supabase/create_invoices_and_payments_tables.sql`
 in your Supabase SQL Editor — it creates the `invoices` table this
 script writes into. Safe to run even if you're not sure.
 
+Also run `supabase/add_tally_export_tracking_column.sql` — it adds the
+`tally_synced_at` column this agent (and the in-app Export to Tally
+button) use to track which invoices have already been sent to Tally,
+so nothing gets pushed twice.
+
 ## Step 4 — Configure the agent
 
 1. Copy this whole `tally-sync-agent` folder onto the Tally PC (or clone
@@ -64,6 +81,19 @@ script writes into. Safe to run even if you're not sure.
    ```
    Leave `TALLY_COMPANY` blank unless Tally has multiple companies open
    at once — then put the exact company name as shown in Tally.
+
+   For the CRM → Tally push direction, also set the ledger names Tally
+   should book each invoice against — these must match your Tally
+   company's chart of accounts exactly:
+   ```
+   PUSH_TO_TALLY=true
+   TALLY_SALES_LEDGER=Sales
+   TALLY_CGST_LEDGER=CGST
+   TALLY_SGST_LEDGER=SGST
+   TALLY_IGST_LEDGER=IGST
+   ```
+   If you don't want the push direction yet, set `PUSH_TO_TALLY=false`
+   and this agent behaves exactly like the old pull-only version.
 
 ## Step 5 — Test it once
 
@@ -90,6 +120,18 @@ Create a test Sales/Tax Invoice voucher in Tally, save it, then run
 ```
 Check the Invoices page in the CRM — the new invoice should be there.
 
+To test the other direction, create an invoice manually in the CRM
+(Invoices → New Invoice), then run `npm run once` again — you should
+see:
+```
++ pushed invoice INV-2026-0042 — Amrud Snack Limited — ₹45,200 to Tally
+```
+Open Tally and check the Day Book — the voucher should be there. If it
+instead logs a "could not push invoice ..." error, it's almost always
+a ledger name mismatch — double check `TALLY_SALES_LEDGER` /
+`TALLY_CGST_LEDGER` / `TALLY_SGST_LEDGER` / `TALLY_IGST_LEDGER` in
+`.env` match your Tally chart of accounts exactly.
+
 ## Step 6 — Run it continuously
 
 ```
@@ -114,18 +156,45 @@ Easiest option — Task Scheduler:
 
 ## How duplicates are avoided
 
-Before inserting anything, the script checks whether an invoice with
-that same invoice number already exists in the CRM. So it's always
-safe to leave it running, restart it, or run it manually — it will
-never create the same invoice twice.
+**Tally → CRM:** before inserting anything, the script checks whether
+an invoice with that same invoice number already exists in the CRM.
+
+**CRM → Tally:** the script only ever looks at invoices where
+`tally_synced_at` is still empty, and sets it the moment a push
+succeeds. An invoice that failed to push (e.g. a ledger name mismatch)
+is left unmarked so it's retried on the next poll — but nothing that
+already succeeded is ever sent twice.
+
+Either way, it's always safe to leave this running, restart it, or run
+it manually.
 
 ## What gets synced
 
-Only **Sales** and **Tax Invoice** vouchers, mapped to the CRM's
-Invoices module: invoice number, customer name, date, subtotal,
-CGST/SGST/IGST, total. They land with status "Unpaid" and are tagged
-`source: Tally Sync` so you can tell them apart from invoices created
-manually in the CRM.
+**Tally → CRM** (pull): only **Sales** and **Tax Invoice** vouchers,
+mapped to the CRM's Invoices module: invoice number, customer name,
+date, subtotal, CGST/SGST/IGST, total. They land with status "Unpaid"
+and are tagged `source: Tally Sync` so you can tell them apart from
+invoices created manually in the CRM.
+
+**CRM → Tally** (push): any invoice created manually in the CRM
+(`source` is empty or `Manual`) that hasn't been pushed yet, as a
+Sales voucher with the same fields in reverse — invoice number,
+customer name, date, and the tax breakdown split across the ledger
+names configured in `.env`. Invoices that already came *from* Tally
+(`source: Tally Sync` or `Tally Import`) are never pushed back, so
+nothing ping-pongs between the two systems.
 
 Receipts/payments aren't auto-synced yet — you can still bring those in
 manually via the "Import from Tally" button on the Payments page.
+
+## Manual export, without the agent
+
+If you'd rather not run this agent at all, the Invoices page in the
+CRM has its own **Export to Tally** button that does the CRM → Tally
+half on its own: it downloads a `.xml` file for the invoices you pick,
+which you then bring into Tally yourself via **Gateway of Tally →
+Import Data → Vouchers**. It uses the same ledger-name rules described
+above (configured in the export dialog instead of `.env`), and marks
+exported invoices the same way (`tally_synced_at`), so the two paths
+never conflict — an invoice exported manually won't also get pushed
+by this agent, and vice versa.
