@@ -18,6 +18,7 @@ import { useAuth } from '../lib/AuthContext.jsx'
 import { showToast } from '../lib/toast.js'
 import { exportCSV } from '../lib/exportUtils.js'
 import { outstandingForCustomer } from '../lib/credit.js'
+import { findDuplicate, duplicateMessage } from '../lib/duplicateCheck.js'
 import TemplatePickerModal from '../components/TemplatePickerModal.jsx'
 import { readSpreadsheetFile, normalizeRow } from '../lib/fileImport.js'
 import '../styles/components.css'
@@ -181,8 +182,14 @@ export default function Customers() {
     setShowModal(true)
   }
 
+  const duplicateWarning = useMemo(
+    () => findDuplicate(form, [{ records: customers, label: 'customer' }], editingId),
+    [form, customers, editingId]
+  )
+
   async function handleSave(e) {
     e.preventDefault()
+    if (duplicateWarning && !confirm(`${duplicateMessage(duplicateWarning)} Save anyway?`)) return
     setSaving(true)
     const record = {
       ...form,
@@ -455,6 +462,14 @@ export default function Customers() {
               <label>Company name</label>
               <input required value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} />
             </div>
+            {duplicateWarning && (
+              <div style={{
+                background: 'var(--amber-50, #fff8e6)', border: '1px solid var(--amber-600)', borderRadius: 'var(--radius-sm)',
+                padding: '8px 10px', fontSize: 12.5, color: 'var(--amber-700, #92400e)', marginBottom: 12,
+              }}>
+                ⚠ {duplicateMessage(duplicateWarning)}
+              </div>
+            )}
             <div className="field-row">
               <div className="field">
                 <label>Contact person</label>

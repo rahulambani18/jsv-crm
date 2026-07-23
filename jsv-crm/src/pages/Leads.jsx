@@ -15,6 +15,7 @@ import { IconPlus, IconSearch, IconTrash } from '../components/Icons.jsx'
 import { useAuth } from '../lib/AuthContext.jsx'
 import { showToast } from '../lib/toast.js'
 import { exportCSV } from '../lib/exportUtils.js'
+import { findDuplicate, duplicateMessage } from '../lib/duplicateCheck.js'
 import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 
@@ -30,6 +31,7 @@ export default function Leads() {
   const canDelete = can('leads', 'delete')
   const [leads, setLeads] = useState([])
   const [products, setProducts] = useState([])
+  const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchParams] = useSearchParams()
   const [search, setSearch] = useState(searchParams.get('q') || '')
@@ -42,6 +44,7 @@ export default function Leads() {
 
   useEffect(() => { refresh() }, [])
   useEffect(() => { api.users.list().then(setUsers).catch(() => {}) }, [])
+  useEffect(() => { api.customers.list().then(setCustomers).catch(() => {}) }, [])
 
   function refresh() {
     setLoading(true)
@@ -65,8 +68,14 @@ export default function Leads() {
   useEffect(() => { setPage(1) }, [search, statusFilter])
   const paged = useMemo(() => filtered.slice((page - 1) * pageSize, page * pageSize), [filtered, page, pageSize])
 
+  const duplicateWarning = useMemo(
+    () => findDuplicate(form, [{ records: leads, label: 'lead' }, { records: customers, label: 'customer' }], null),
+    [form, leads, customers]
+  )
+
   async function handleCreate(e) {
     e.preventDefault()
+    if (duplicateWarning && !confirm(`${duplicateMessage(duplicateWarning)} Save anyway?`)) return
     setSaving(true)
     const record = { ...form, estValue: Number(form.estValue) || 0 }
     try {
@@ -311,6 +320,14 @@ export default function Leads() {
               <label>Company name</label>
               <input required value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} placeholder="e.g. Patel Agro Industries" />
             </div>
+            {duplicateWarning && (
+              <div style={{
+                background: 'var(--amber-50, #fff8e6)', border: '1px solid var(--amber-600)', borderRadius: 'var(--radius-sm)',
+                padding: '8px 10px', fontSize: 12.5, color: 'var(--amber-700, #92400e)', marginBottom: 12,
+              }}>
+                ⚠ {duplicateMessage(duplicateWarning)}
+              </div>
+            )}
             <div className="field-row">
               <div className="field">
                 <label>Contact person</label>
