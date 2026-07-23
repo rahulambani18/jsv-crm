@@ -4,6 +4,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recha
 import { api } from '../lib/api.js'
 import { useAuth } from '../lib/AuthContext.jsx'
 import { PIPELINE_STAGES } from '../data/seed.js'
+import { APP_TODAY, getOverdueInvoices, daysOverdue } from '../lib/overdue.js'
 import StatCard from '../components/StatCard.jsx'
 import Pill from '../components/Pill.jsx'
 import {
@@ -41,12 +42,14 @@ export default function Dashboard() {
     })
   }, [])
 
-  const today = '2026-06-25'
+  const today = APP_TODAY
+  const overdueInvoices = useMemo(() => getOverdueInvoices(invoices, today), [invoices, today])
   const stats = useMemo(() => {
     const newThisMonth = leads.filter((l) => (l.nextFollowUp || '').startsWith('2026-06') || true).length
     const hotLeads = leads.filter((l) => l.priority === 'High').length
     const followUpsToday = followUps.filter((f) => f.status === 'Today').length
     const pendingPayments = orders.filter((o) => o.payment !== 'Paid').reduce((s, o) => s + (o.total || 0), 0)
+    const overdueAmount = overdueInvoices.reduce((s, i) => s + Number(i.total || 0), 0)
     return {
       totalLeads: leads.length,
       newThisMonth: leads.length,
@@ -56,8 +59,10 @@ export default function Dashboard() {
       quotationsSent: quotations.length,
       ordersReceived: orders.length,
       pendingPayments,
+      overdueCount: overdueInvoices.length,
+      overdueAmount,
     }
-  }, [leads, customers, quotations, orders, followUps])
+  }, [leads, customers, quotations, orders, followUps, overdueInvoices])
 
   const funnelData = useMemo(() => {
     // Stage 0 ("New Lead") always has the highest count, since every later
@@ -98,17 +103,15 @@ export default function Dashboard() {
         route: '/inventory',
       }))
 
-    const overdueInvoices = invoices
-      .filter((i) => i.status !== 'Paid' && i.status !== 'Cancelled' && i.dueDate && i.dueDate < today)
-      .map((i) => ({
-        key: `i-${i.id}`, tone: 'red', icon: IconReceipt,
-        title: i.company,
-        detail: `${i.invoiceNo} · ${formatINR(i.total)} overdue since ${i.dueDate}`,
-        route: '/invoices',
-      }))
+    const overdueInvoiceAlerts = overdueInvoices.map((i) => ({
+      key: `i-${i.id}`, tone: 'red', icon: IconReceipt,
+      title: i.company,
+      detail: `${i.invoiceNo} · ${formatINR(i.total)} · ${daysOverdue(i.dueDate, today)} day${daysOverdue(i.dueDate, today) === 1 ? '' : 's'} overdue (due ${i.dueDate})`,
+      route: '/invoices',
+    }))
 
-    return [...overdueFollowUps, ...overdueInvoices, ...lowStock]
-  }, [followUps, stock, invoices])
+    return [...overdueFollowUps, ...overdueInvoiceAlerts, ...lowStock]
+  }, [followUps, stock, overdueInvoices, today])
 
   if (loading) return <div className="loading-screen">Loading dashboard…</div>
 
@@ -130,6 +133,7 @@ export default function Dashboard() {
         <StatCard icon={IconFile} tone="teal" label="Quotations Sent" value={stats.quotationsSent} />
         <StatCard icon={IconCart} tone="blue" label="Orders Received" value={stats.ordersReceived} />
         <StatCard icon={IconRupee} tone="red" label="Pending Payments" value={formatINR(stats.pendingPayments)} mono />
+        <StatCard icon={IconReceipt} tone="red" label="Overdue Invoices" value={`${stats.overdueCount} · ${formatINR(stats.overdueAmount)}`} mono />
       </div>
 
       {attention.length > 0 && (

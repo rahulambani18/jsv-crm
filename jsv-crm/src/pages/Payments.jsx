@@ -6,10 +6,11 @@ import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
 import ExportBar from '../components/ExportBar.jsx'
 import TallyImportButton from '../components/TallyImportButton.jsx'
-import { IconPlus, IconSearch, IconTrash, IconDollarSign, IconCalendar, IconReceipt } from '../components/Icons.jsx'
+import { IconPlus, IconSearch, IconTrash, IconDollarSign, IconCalendar, IconReceipt, IconFlame, IconChevronRight } from '../components/Icons.jsx'
 import StatCard from '../components/StatCard.jsx'
 import Pagination from '../components/Pagination.jsx'
 import EmptyState from '../components/EmptyState.jsx'
+import { getOverdueInvoices, daysOverdue } from '../lib/overdue.js'
 import '../styles/components.css'
 
 const PAYMENT_MODES = ['NEFT', 'RTGS', 'Cheque', 'Cash', 'UPI', 'Bank Transfer']
@@ -41,6 +42,14 @@ export default function Payments() {
     Promise.all([api.payments.list(), api.invoices.list()]).then(([p, i]) => {
       setPayments(p); setInvoices(i); setLoading(false)
     })
+  }
+
+  const overdueInvoices = useMemo(() => getOverdueInvoices(invoices), [invoices])
+  const overdueAmount = useMemo(() => overdueInvoices.reduce((s, i) => s + Number(i.total || 0), 0), [overdueInvoices])
+
+  function openPaymentForInvoice(inv) {
+    setForm({ ...emptyForm(), invoiceId: inv.id, company: inv.company, amount: inv.total })
+    setShowModal(true)
   }
 
   async function handleTallyImport(records) {
@@ -131,7 +140,39 @@ export default function Payments() {
         <StatCard icon={IconDollarSign} tone="teal" label="Total Received" value={formatINR(totalReceived)} mono />
         <StatCard icon={IconCalendar} tone="blue" label="This Month" value={formatINR(payments.filter((p) => (p.date || '').startsWith('2026-07')).reduce((s, p) => s + Number(p.amount || 0), 0))} mono />
         <StatCard icon={IconReceipt} tone="blue" label="Payments Count" value={payments.length} />
+        <StatCard icon={IconFlame} tone="red" label="Overdue Invoices" value={`${overdueInvoices.length} · ${formatINR(overdueAmount)}`} mono />
       </div>
+
+      {overdueInvoices.length > 0 && (
+        <div className="panel" style={{ marginBottom: 20 }}>
+          <p className="panel-title">Overdue Invoices Needing Follow-up ({overdueInvoices.length})</p>
+          <div className="attention-list">
+            {overdueInvoices
+              .slice()
+              .sort((a, b) => (a.dueDate < b.dueDate ? -1 : 1))
+              .map((inv) => {
+                const days = daysOverdue(inv.dueDate)
+                return (
+                  <button
+                    key={inv.id}
+                    className="attention-row"
+                    onClick={() => canEdit && openPaymentForInvoice(inv)}
+                    disabled={!canEdit}
+                    title={canEdit ? 'Record a payment against this invoice' : undefined}
+                  >
+                    <span className="attention-icon red"><IconReceipt /></span>
+                    <span className="attention-text">
+                      <span className="attention-title">{inv.company} · {inv.invoiceNo}</span>
+                      <span className="attention-detail">{formatINR(inv.total)} · {days} day{days === 1 ? '' : 's'} overdue (due {inv.dueDate})</span>
+                    </span>
+                    <Pill tone="red">Overdue</Pill>
+                    {canEdit && <IconChevronRight />}
+                  </button>
+                )
+              })}
+          </div>
+        </div>
+      )}
 
       <div className="filters-bar">
         <div className="search-input">
@@ -217,9 +258,14 @@ export default function Payments() {
                 setForm({ ...form, invoiceId: e.target.value, company: inv ? inv.company : form.company, amount: inv ? inv.total : form.amount })
               }}>
                 <option value="">— Select invoice —</option>
-                {invoices.filter((i) => i.status !== 'Paid').map((i) => (
-                  <option key={i.id} value={i.id}>{i.invoiceNo} — {i.company} — ₹{Number(i.total).toLocaleString('en-IN')}</option>
-                ))}
+                {invoices.filter((i) => i.status !== 'Paid').map((i) => {
+                  const overdue = overdueInvoices.some((o) => o.id === i.id)
+                  return (
+                    <option key={i.id} value={i.id}>
+                      {overdue ? '⚠ ' : ''}{i.invoiceNo} — {i.company} — ₹{Number(i.total).toLocaleString('en-IN')}{overdue ? ` — ${daysOverdue(i.dueDate)}d overdue` : ''}
+                    </option>
+                  )
+                })}
               </select>
             </div>
             <div className="field-row">
