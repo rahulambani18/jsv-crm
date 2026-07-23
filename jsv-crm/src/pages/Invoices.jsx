@@ -51,6 +51,16 @@ function formatINR(n) {
   return '₹' + Number(n || 0).toLocaleString('en-IN')
 }
 
+// The Status field can be set to "Overdue" by hand (New/Edit Invoice
+// form) independently of dueDate, and that's what the table's red
+// "Overdue" pill actually reflects. Treat an invoice as overdue for
+// reminder purposes if EITHER that manual status says so OR the due
+// date has actually passed — so bulk reminders match what a rep sees
+// in the table, not just the date math.
+function isOverdueForReminder(inv) {
+  return inv.status === 'Overdue' || isInvoiceOverdue(inv)
+}
+
 function numberToWords(n) {
   const ones = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen']
   const tens = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety']
@@ -408,7 +418,7 @@ export default function Invoices() {
   }
 
   function selectAllOverdue() {
-    setSelected(new Set(invoices.filter((i) => isInvoiceOverdue(i)).map((i) => i.id)))
+    setSelected(new Set(invoices.filter((i) => isOverdueForReminder(i)).map((i) => i.id)))
   }
 
   async function handleBulkDelete() {
@@ -437,7 +447,7 @@ export default function Invoices() {
   // several overdue invoices gets a single reminder covering their full
   // outstanding balance, using the same math Payments/Customers use.
   const reminderRows = useMemo(() => {
-    const selectedOverdue = invoices.filter((i) => selected.has(i.id) && isInvoiceOverdue(i))
+    const selectedOverdue = invoices.filter((i) => selected.has(i.id) && isOverdueForReminder(i))
     const byCompany = new Map()
     selectedOverdue.forEach((inv) => {
       if (!byCompany.has(inv.company)) byCompany.set(inv.company, 0)
@@ -553,7 +563,7 @@ export default function Invoices() {
           <option>All</option>
           {STATUS_OPTIONS.map((s) => <option key={s}>{s}</option>)}
         </select>
-        {invoices.some((i) => isInvoiceOverdue(i)) && (
+        {invoices.some((i) => isOverdueForReminder(i)) && (
           <button type="button" className="btn btn-ghost-light" onClick={selectAllOverdue}>
             Select all overdue
           </button>
