@@ -88,6 +88,8 @@ export default function Shell({ children }) {
     'Pending Payments',
     'Overdue Quotations',
     'Overdue Follow-ups',
+    'Out of Stock',
+    'Low Stock',
     'Reminder: Sample Follow-up',
     'Reminder: Payment Due',
     'Reminder: Quote Expiry',
@@ -100,6 +102,8 @@ export default function Shell({ children }) {
     'Pending Payments': '💰',
     'Overdue Quotations': '📄',
     'Overdue Follow-ups': '⏰',
+    'Out of Stock': '📦',
+    'Low Stock': '📉',
     'Reminder: Sample Follow-up': '🧪',
     'Reminder: Payment Due': '💸',
     'Reminder: Quote Expiry': '⏳',
@@ -110,7 +114,8 @@ export default function Shell({ children }) {
     Promise.all([
       api.orders.list(), api.followUps.list(), api.meetings.list(),
       api.tasks.list(), api.quotations.list(), api.samples.list(), api.invoices.list(),
-    ]).then(([orders, followUps, meetings, tasks, quotations, samples, invoices]) => {
+      api.stock.list(),
+    ]).then(([orders, followUps, meetings, tasks, quotations, samples, invoices, stock]) => {
       const today = new Date().toISOString().slice(0, 10)
       const daysBetween = (a, b) => Math.round((new Date(b) - new Date(a)) / 86400000)
       const notifs = []
@@ -186,6 +191,20 @@ export default function Shell({ children }) {
         const d = daysBetween(s.sent, today)
         if (d >= 5) {
           notifs.push({ id: `smp-${s.id}`, group: 'Reminder: Sample Follow-up', text: `${s.company}`, sub: `Sent ${d} days ago · still "${s.status}"`, color: 'var(--red-600)', route: '/samples' })
+        }
+      })
+
+      // 6) Inventory alerts — out of stock first (most urgent), then
+      // low stock (at or below the reorder level). Same thresholds as
+      // the Inventory page's own statusFor(), kept in sync here so the
+      // bell always matches what that page shows.
+      stock.forEach((s) => {
+        const qty = Number(s.qtyOnHand)
+        const reorder = Number(s.reorderLevel)
+        if (qty <= 0) {
+          notifs.push({ id: `stk-out-${s.id}`, group: 'Out of Stock', text: `${s.product} — ${s.warehouse}`, sub: `0 ${s.unit || ''} on hand`, color: 'var(--red-600)', route: '/inventory' })
+        } else if (reorder > 0 && qty <= reorder) {
+          notifs.push({ id: `stk-low-${s.id}`, group: 'Low Stock', text: `${s.product} — ${s.warehouse}`, sub: `${qty} ${s.unit || ''} left · reorder at ${reorder}`, color: 'var(--amber-600)', route: '/inventory' })
         }
       })
 
