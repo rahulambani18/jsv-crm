@@ -18,6 +18,7 @@ import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 
 const STATUSES = ['All statuses', 'Processing', 'Dispatched', 'Delivered', 'Cancelled']
+const PAYMENT_FILTERS = ['All payments', 'Paid', 'Pending']
 const PAYMENT_TERMS = ['Net 15', 'Net 30', 'Net 45', 'Net 60', 'Custom']
 
 function termsToDays(terms) {
@@ -59,6 +60,7 @@ export default function Orders() {
   const [loading, setLoading] = useState(true)
   const [warehouseFilter, setWarehouseFilter] = useState('All warehouses')
   const [statusFilter, setStatusFilter] = useState('All statuses')
+  const [paymentFilter, setPaymentFilter] = useState(searchParams.get('payment') || 'All payments')
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyForm())
@@ -98,13 +100,14 @@ export default function Orders() {
   const filtered = useMemo(() => orders.filter((o) => {
     const matchesWarehouse = warehouseFilter === 'All warehouses' || o.warehouse === warehouseFilter
     const matchesStatus = statusFilter === 'All statuses' || o.status === statusFilter
+    const matchesPayment = paymentFilter === 'All payments' || o.payment === paymentFilter
     const matchesSearch = !search || [o.orderNo, o.company, o.poNumber].some((v) => (v || '').toLowerCase().includes(search.toLowerCase()))
-    return matchesWarehouse && matchesStatus && matchesSearch
-  }), [orders, warehouseFilter, statusFilter, search])
+    return matchesWarehouse && matchesStatus && matchesPayment && matchesSearch
+  }), [orders, warehouseFilter, statusFilter, paymentFilter, search])
 
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
-  useEffect(() => { setPage(1) }, [warehouseFilter, statusFilter, search])
+  useEffect(() => { setPage(1) }, [warehouseFilter, statusFilter, paymentFilter, search])
   const paged = useMemo(() => filtered.slice((page - 1) * pageSize, page * pageSize), [filtered, page, pageSize])
 
   const totals = useMemo(() => calcOrderTotals(form.lineItems), [form.lineItems])
@@ -323,6 +326,9 @@ export default function Orders() {
         </select>
         <select className="select-input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
           {STATUSES.map((s) => <option key={s}>{s}</option>)}
+        </select>
+        <select className="select-input" value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)}>
+          {PAYMENT_FILTERS.map((p) => <option key={p}>{p}</option>)}
         </select>
       </div>
 

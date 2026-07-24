@@ -20,6 +20,7 @@ import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 
 const STATUSES = ['All statuses', ...PIPELINE_STAGES]
+const PRIORITY_FILTERS = ['All priorities', 'High', 'Medium', 'Low']
 
 function emptyForm() {
   return { company: '', contact: '', phone: '', city: '', priority: 'Medium', status: 'New Lead', estValue: '', nextFollowUp: '', industry: '', products: [] }
@@ -35,7 +36,8 @@ export default function Leads() {
   const [loading, setLoading] = useState(true)
   const [searchParams] = useSearchParams()
   const [search, setSearch] = useState(searchParams.get('q') || '')
-  const [statusFilter, setStatusFilter] = useState('All statuses')
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'All statuses')
+  const [priorityFilter, setPriorityFilter] = useState(searchParams.get('priority') || 'All priorities')
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(emptyForm())
   const [saving, setSaving] = useState(false)
@@ -59,13 +61,14 @@ export default function Leads() {
     return leads.filter((l) => {
       const matchesSearch = !search || [l.company, l.contact, l.phone, l.city].some((v) => (v || '').toLowerCase().includes(search.toLowerCase()))
       const matchesStatus = statusFilter === 'All statuses' || l.status === statusFilter
-      return matchesSearch && matchesStatus
+      const matchesPriority = priorityFilter === 'All priorities' || l.priority === priorityFilter
+      return matchesSearch && matchesStatus && matchesPriority
     })
-  }, [leads, search, statusFilter])
+  }, [leads, search, statusFilter, priorityFilter])
 
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
-  useEffect(() => { setPage(1) }, [search, statusFilter])
+  useEffect(() => { setPage(1) }, [search, statusFilter, priorityFilter])
   const paged = useMemo(() => filtered.slice((page - 1) * pageSize, page * pageSize), [filtered, page, pageSize])
 
   const duplicateWarning = useMemo(
@@ -204,6 +207,9 @@ export default function Leads() {
         </div>
         <select className="select-input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
           {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <select className="select-input" value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)}>
+          {PRIORITY_FILTERS.map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
       </div>
 

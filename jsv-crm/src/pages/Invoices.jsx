@@ -325,6 +325,7 @@ export default function Invoices() {
   const [searchParams] = useSearchParams()
   const [search, setSearch] = useState(searchParams.get('q') || '')
   const [statusFilter, setStatusFilter] = useState('All')
+  const [overdueOnly, setOverdueOnly] = useState(searchParams.get('overdue') === '1')
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyForm())
@@ -493,12 +494,13 @@ export default function Invoices() {
   const filtered = useMemo(() => invoices.filter((inv) => {
     const matchSearch = !search || [inv.invoiceNo, inv.company].some((v) => (v || '').toLowerCase().includes(search.toLowerCase()))
     const matchStatus = statusFilter === 'All' || inv.status === statusFilter
-    return matchSearch && matchStatus
-  }), [invoices, search, statusFilter])
+    const matchOverdue = !overdueOnly || isInvoiceOverdue(inv)
+    return matchSearch && matchStatus && matchOverdue
+  }), [invoices, search, statusFilter, overdueOnly])
 
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
-  useEffect(() => { setPage(1) }, [search, statusFilter])
+  useEffect(() => { setPage(1) }, [search, statusFilter, overdueOnly])
   const paged = useMemo(() => filtered.slice((page - 1) * pageSize, page * pageSize), [filtered, page, pageSize])
 
   const totalPaid = invoices.filter((i) => i.status === 'Paid').reduce((s, i) => s + Number(i.total || 0), 0)
@@ -563,6 +565,13 @@ export default function Invoices() {
           <option>All</option>
           {STATUS_OPTIONS.map((s) => <option key={s}>{s}</option>)}
         </select>
+        <button
+          type="button"
+          className={`btn btn-sm ${overdueOnly ? 'btn-primary' : 'btn-ghost-light'}`}
+          onClick={() => setOverdueOnly((v) => !v)}
+        >
+          {overdueOnly ? '✓ Overdue only' : 'Overdue only'}
+        </button>
         {invoices.some((i) => isOverdueForReminder(i)) && (
           <button type="button" className="btn btn-ghost-light" onClick={selectAllOverdue}>
             Select all overdue

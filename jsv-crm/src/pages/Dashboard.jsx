@@ -125,15 +125,15 @@ export default function Dashboard() {
       </div>
 
       <div className="stat-grid">
-        <StatCard icon={IconUsers} tone="blue" label="Total Leads" value={stats.totalLeads} />
-        <StatCard icon={IconTrend} tone="teal" label="New This Month" value={stats.newThisMonth} />
-        <StatCard icon={IconClock} tone="amber" label="Follow-ups Today" value={stats.followUpsToday} />
-        <StatCard icon={IconFlame} tone="red" label="Hot Leads" value={stats.hotLeads} />
-        <StatCard icon={IconUserCheck} tone="blue" label="Active Customers" value={stats.activeCustomers} />
-        <StatCard icon={IconFile} tone="teal" label="Quotations Sent" value={stats.quotationsSent} />
-        <StatCard icon={IconCart} tone="blue" label="Orders Received" value={stats.ordersReceived} />
-        <StatCard icon={IconRupee} tone="red" label="Pending Payments" value={formatINR(stats.pendingPayments)} mono />
-        <StatCard icon={IconReceipt} tone="red" label="Overdue Invoices" value={`${stats.overdueCount} · ${formatINR(stats.overdueAmount)}`} mono />
+        <StatCard icon={IconUsers} tone="blue" label="Total Leads" value={stats.totalLeads} onClick={() => navigate('/leads')} />
+        <StatCard icon={IconTrend} tone="teal" label="New This Month" value={stats.newThisMonth} onClick={() => navigate('/leads')} />
+        <StatCard icon={IconClock} tone="amber" label="Follow-ups Today" value={stats.followUpsToday} onClick={() => navigate('/follow-ups')} />
+        <StatCard icon={IconFlame} tone="red" label="Hot Leads" value={stats.hotLeads} onClick={() => navigate('/leads?priority=High')} />
+        <StatCard icon={IconUserCheck} tone="blue" label="Active Customers" value={stats.activeCustomers} onClick={() => navigate('/customers')} />
+        <StatCard icon={IconFile} tone="teal" label="Quotations Sent" value={stats.quotationsSent} onClick={() => navigate('/quotations')} />
+        <StatCard icon={IconCart} tone="blue" label="Orders Received" value={stats.ordersReceived} onClick={() => navigate('/orders')} />
+        <StatCard icon={IconRupee} tone="red" label="Pending Payments" value={formatINR(stats.pendingPayments)} mono onClick={() => navigate('/orders?payment=Pending')} />
+        <StatCard icon={IconReceipt} tone="red" label="Overdue Invoices" value={`${stats.overdueCount} · ${formatINR(stats.overdueAmount)}`} mono onClick={() => navigate('/invoices?overdue=1')} />
       </div>
 
       {attention.length > 0 && (
@@ -181,7 +181,14 @@ export default function Dashboard() {
           <p className="panel-title">Pipeline by Status</p>
           <div className="funnel">
             {funnelData.map((row) => (
-              <div className="funnel-row" key={row.stage}>
+              <div
+                className="funnel-row clickable"
+                key={row.stage}
+                role="button"
+                tabIndex={0}
+                onClick={() => navigate(`/leads?status=${encodeURIComponent(row.stage)}`)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/leads?status=${encodeURIComponent(row.stage)}`) } }}
+              >
                 <div className="funnel-label">{row.stage}</div>
                 <div className="funnel-track">
                   <div className="funnel-fill" style={{ width: `${row.pct}%` }} />
