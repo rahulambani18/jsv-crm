@@ -4,6 +4,7 @@ import { useAuth } from '../lib/AuthContext.jsx'
 import PageHeader from '../components/PageHeader.jsx'
 import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
+import ExportBar from '../components/ExportBar.jsx'
 import { IconPlus, IconSearch, IconEdit, IconTrash } from '../components/Icons.jsx'
 import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
@@ -108,11 +109,21 @@ export default function Documents() {
       <PageHeader
         title="Documents"
         subtitle={`${docs.length} document${docs.length === 1 ? '' : 's'} — COAs, MSDS, certificates, contracts`}
-        actions={canEdit && (
-          <button className="btn btn-primary" onClick={openCreate}>
-            <IconPlus width={15} height={15} /> Add Document
-          </button>
-        )}
+        actions={
+          <div style={{ display: 'flex', gap: 10 }}>
+            <ExportBar
+              title="Documents"
+              headers={['Document', 'Type', 'Product', 'Tags', 'Added By', 'Date', 'Link']}
+              rows={filtered.map((d) => [d.name, d.type, d.relatedProduct, (d.tags || []).join('; '), d.uploadedBy, d.date, d.url])}
+              count={filtered.length}
+            />
+            {canEdit && (
+              <button className="btn btn-primary" onClick={openCreate}>
+                <IconPlus width={15} height={15} /> Add Document
+              </button>
+            )}
+          </div>
+        }
       />
 
       <div className="filters-bar">

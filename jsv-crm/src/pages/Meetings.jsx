@@ -4,6 +4,7 @@ import { useAuth } from '../lib/AuthContext.jsx'
 import PageHeader from '../components/PageHeader.jsx'
 import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
+import ExportBar from '../components/ExportBar.jsx'
 import { IconPlus, IconSearch, IconEdit, IconTrash } from '../components/Icons.jsx'
 import '../styles/components.css'
 
@@ -84,11 +85,21 @@ export default function Meetings() {
       <PageHeader
         title="Meetings"
         subtitle={`${counts.Scheduled} scheduled`}
-        actions={canEdit && (
-          <button className="btn btn-primary" onClick={openCreate}>
-            <IconPlus width={15} height={15} /> Schedule Meeting
-          </button>
-        )}
+        actions={
+          <div style={{ display: 'flex', gap: 10 }}>
+            <ExportBar
+              title="Meetings"
+              headers={['Title', 'Type', 'Status', 'Company', 'Contact', 'Date', 'Time', 'Location', 'Agenda']}
+              rows={filtered.map((m) => [m.title, m.type, m.status, m.company, m.contact, m.date, m.time, m.location, m.agenda])}
+              count={filtered.length}
+            />
+            {canEdit && (
+              <button className="btn btn-primary" onClick={openCreate}>
+                <IconPlus width={15} height={15} /> Schedule Meeting
+              </button>
+            )}
+          </div>
+        }
       />
 
       <div className="filters-bar">

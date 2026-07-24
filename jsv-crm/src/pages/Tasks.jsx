@@ -4,6 +4,7 @@ import { useAuth } from '../lib/AuthContext.jsx'
 import PageHeader from '../components/PageHeader.jsx'
 import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
+import ExportBar from '../components/ExportBar.jsx'
 import { IconPlus, IconSearch, IconEdit, IconTrash } from '../components/Icons.jsx'
 import '../styles/components.css'
 
@@ -103,11 +104,21 @@ export default function Tasks() {
       <PageHeader
         title="Tasks"
         subtitle={`${tasks.filter((t) => t.status !== 'Completed').length} open task${tasks.filter((t) => t.status !== 'Completed').length === 1 ? '' : 's'}`}
-        actions={canEdit && (
-          <button className="btn btn-primary" onClick={openCreate}>
-            <IconPlus width={15} height={15} /> New Task
-          </button>
-        )}
+        actions={
+          <div style={{ display: 'flex', gap: 10 }}>
+            <ExportBar
+              title="Tasks"
+              headers={['Title', 'Type', 'Priority', 'Status', 'Assigned To', 'Related To', 'Due Date']}
+              rows={filtered.map((t) => [t.title, t.type, t.priority, t.status, t.assignedTo, t.relatedTo, t.dueDate])}
+              count={filtered.length}
+            />
+            {canEdit && (
+              <button className="btn btn-primary" onClick={openCreate}>
+                <IconPlus width={15} height={15} /> New Task
+              </button>
+            )}
+          </div>
+        }
       />
 
       <div className="filters-bar">
