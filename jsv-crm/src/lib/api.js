@@ -3,7 +3,7 @@
 // This is what makes swapping backends a one-file change.
 
 import { supabase, isMock, db as mock } from './supabaseClient.js'
-import { mockAuth } from './mockDb.js'
+import { mockAuth, mockAuditLog } from './mockDb.js'
 
 const TABLES = ['products', 'leads', 'customers', 'samples', 'quotations', 'orders', 'followUps', 'roles', 'users', 'tasks', 'meetings', 'documents', 'invoices', 'payments', 'stock', 'stockMovements']
 const SQL_TABLE_NAME = {
@@ -81,6 +81,22 @@ async function logAuditEntry(tableName, action, record) {
   }
 }
 
+// Same idea as logAuditEntry above, but for mock/demo mode — writes
+// into the in-memory mockAuditLog store instead of Supabase, using the
+// same shape auditLog.list() already expects. Also best-effort/never
+// blocking.
+function logMockAuditEntry(tableName, action, record) {
+  mockAuth.getUser().then((user) => {
+    mockAuditLog.record({
+      ts: new Date().toISOString(),
+      user: user?.email || 'Unknown',
+      action,
+      table: MODULE_LABEL[tableName] || tableName,
+      detail: pickLabel(record),
+    })
+  }).catch(() => {})
+}
+
 function makeRealTable(name) {
   const tableName = SQL_TABLE_NAME[name]
   return {
@@ -113,6 +129,32 @@ function makeRealTable(name) {
       if (error) throw error
       logAuditEntry(name, 'Deleted', { id })
       return true
+    },
+  }
+}
+
+// Wraps a raw mockDb table with the same audit-on-write behavior
+// makeRealTable gets from Supabase, so the Audit Log tab works
+// identically in demo mode — no Supabase project required to see it.
+function makeMockTable(name) {
+  const base = mock[name]
+  return {
+    ...base,
+    async insert(record) {
+      const row = await base.insert(record)
+      logMockAuditEntry(name, 'Created', row)
+      return row
+    },
+    async update(id, patch) {
+      const row = await base.update(id, patch)
+      logMockAuditEntry(name, 'Updated', row || patch)
+      return row
+    },
+    async remove(id) {
+      const existing = await base.get(id)
+      const ok = await base.remove(id)
+      logMockAuditEntry(name, 'Deleted', existing || { id })
+      return ok
     },
   }
 }
@@ -204,7 +246,7 @@ const realUsersTable = {
 }
 
 export const api = Object.fromEntries(
-  TABLES.map((t) => [t, isMock ? mock[t] : makeRealTable(t)])
+  TABLES.map((t) => [t, isMock ? makeMockTable(t) : makeRealTable(t)])
 )
 if (isMock) {
   api.userPermissions = mock.userPermissions
@@ -218,7 +260,7 @@ if (isMock) {
 // version that only existed in one browser and hardcoded the actor's name.
 export const auditLog = {
   async list(limit = 300) {
-    if (isMock) return []
+    if (isMock) return mockAuditLog.list(limit)
     const { data, error } = await supabase.from('audit_log').select('*').order('created_at', { ascending: false }).limit(limit)
     if (error) throw error
     return data.map((r) => ({ ts: r.created_at, user: r.actor_email, action: r.action, detail: r.record_label, table: r.table_name }))
@@ -226,7 +268,11 @@ export const auditLog = {
   // For actions outside the standard tables (user deletion, password
   // resets, role deletion) — same underlying log, called directly.
   async log(action, detail, category = 'Users & Roles') {
-    if (isMock) return
+    if (isMock) {
+      const user = await mockAuth.getUser().catch(() => null)
+      mockAuditLog.record({ ts: new Date().toISOString(), user: user?.email || 'Unknown', action, table: category, detail: String(detail || '').slice(0, 200) })
+      return
+    }
     try {
       const { data: { user } } = await supabase.auth.getUser()
       await supabase.from('audit_log').insert({

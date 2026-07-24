@@ -31,6 +31,25 @@ const store = {
 
 const delay = (ms = 150) => new Promise((res) => setTimeout(res, ms))
 
+// In-memory audit trail for mock/demo mode — mirrors the shape of the
+// real `audit_log` table so api.js's auditLog.list()/log() can read
+// from either backend without the UI knowing the difference. Lives
+// only for this browser tab/session, same as the rest of mockDb.
+const auditStore = []
+
+export const mockAuditLog = {
+  async list(limit = 300) {
+    await delay(80)
+    return auditStore.slice(0, limit)
+  },
+  // Fire-and-forget — called by api.js after every insert/update/remove,
+  // so it never needs to be awaited by the caller.
+  record(entry) {
+    auditStore.unshift(entry)
+    if (auditStore.length > 500) auditStore.length = 500 // cap memory use in a long-running tab
+  },
+}
+
 function makeId(prefix) {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`
 }
