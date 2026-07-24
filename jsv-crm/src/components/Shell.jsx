@@ -34,19 +34,6 @@ const ADMIN_NAV = [
   { to: '/users', label: 'Users & Roles', icon: IconShield, key: 'users' },
 ]
 
-const PAGE_TITLES = {
-  '/': 'Dashboard',
-  '/leads': 'Leads',
-  '/follow-ups': 'Follow-ups',
-  '/customers': 'Customers',
-  '/samples': 'Samples',
-  '/quotations': 'Quotations',
-  '/orders': 'Orders',
-  '/products': 'Products',
-  '/reports': 'Reports',
-  '/users': 'Users & Roles',
-}
-
 export default function Shell({ children }) {
   const { user, signOut, can } = useAuth()
   const [navOpen, setNavOpen] = useState(false)
@@ -59,7 +46,6 @@ export default function Shell({ children }) {
     document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
     localStorage.setItem('jsv_theme', dark ? 'dark' : 'light')
   }, [dark])
-  const title = PAGE_TITLES[location.pathname] || 'JSV CRM'
 
   // Live clock + time-of-day greeting for the top bar
   const [now, setNow] = useState(new Date())

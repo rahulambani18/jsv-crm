@@ -17,8 +17,16 @@ database with two environment variables when you're ready.
 - **Samples** — sample dispatch tracking with courier tracking numbers
 - **Quotations** — quote list with totals and validity
 - **Orders** — orders by warehouse, delivery, payment status
+- **Inventory** — stock on hand by warehouse, reorder levels, expiry tracking
 - **Products** — master catalogue (category, supplier, origin, MOQ, docs)
 - **Reports** — conversion funnel, revenue trend, industry split, orders by warehouse
+- **Tasks** — assignable to-dos linked to leads, customers, or orders
+- **Meetings** — scheduled meetings with reminders on the dashboard
+- **Documents** — file/document library tagged by type and related product
+- **Invoices** — invoice list with line items and payment status
+- **Payments** — payment records against invoices
+- **Reconciliation** — aging buckets tying invoices and payments together
+- **Users & Roles** — team members, roles, and per-module view/edit permissions
 
 ## Run it locally
 
