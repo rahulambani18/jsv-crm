@@ -11,6 +11,7 @@ import TallyExportButton from '../components/TallyExportButton.jsx'
 import SendButtons from '../components/SendButtons.jsx'
 import BulkActionsBar from '../components/BulkActionsBar.jsx'
 import BulkReminderModal from '../components/BulkReminderModal.jsx'
+import RowActionsMenu from '../components/RowActionsMenu.jsx'
 import Pagination from '../components/Pagination.jsx'
 import { IconPlus, IconSearch, IconEdit, IconTrash, IconReceipt, IconDollarSign, IconFlame, IconClock } from '../components/Icons.jsx'
 import StatCard from '../components/StatCard.jsx'
@@ -80,7 +81,7 @@ function numberToWords(n) {
   return words + ' Only'
 }
 
-function printInvoice(inv, order) {
+function buildInvoiceHTML(inv, order) {
   const lineItems = order?.lineItems || []
   const isInterstate = Number(inv.igst || 0) > 0
   const html = `<!DOCTYPE html>
@@ -306,6 +307,11 @@ function printInvoice(inv, order) {
 </div>
 
 </div></body></html>`
+  return html
+}
+
+function printInvoice(inv, order) {
+  const html = buildInvoiceHTML(inv, order)
   const w = window.open('', '_blank')
   w.document.write(html)
   w.document.close()
@@ -332,6 +338,8 @@ export default function Invoices() {
   const [saving, setSaving] = useState(false)
   const [selected, setSelected] = useState(new Set())
   const [showReminderModal, setShowReminderModal] = useState(false)
+  const [previewInvoiceData, setPreviewInvoiceData] = useState(null) // { inv, order }
+  const [historyInvoice, setHistoryInvoice] = useState(null)
 
   useEffect(() => { refresh() }, [])
 
@@ -642,15 +650,22 @@ export default function Invoices() {
                 <td className="cell-mono cell-strong">{formatINR(inv.total)}</td>
                 <td><Pill>{inv.status}</Pill></td>
                 <td style={{ display: 'flex', gap: 4 }}>
-                  {canEdit && <button className="btn btn-ghost btn-sm" onClick={() => openEdit(inv)} title="Edit"><IconEdit width={13} height={13} /></button>}
                   <SendButtons
                     phone={customer?.mobile}
                     email={customer?.email}
                     category="invoice"
                     vars={{ company: inv.company, invoiceNo: inv.invoiceNo, total: formatINR(inv.total), dueDate: inv.dueDate }}
                   />
-                  <button className="btn btn-ghost btn-sm" onClick={() => printInvoice(inv, orders.find((o) => o.id === inv.orderId))} title="Print invoice">🖨 Print</button>
-                  {canDelete && <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(inv)} title="Delete"><IconTrash width={13} height={13} /></button>}
+                  <RowActionsMenu
+                    items={[
+                      canEdit && { label: 'Edit', icon: <IconEdit width={13} height={13} />, onClick: () => openEdit(inv) },
+                      { label: 'Preview PDF', icon: '👁', onClick: () => setPreviewInvoiceData({ inv, order: orders.find((o) => o.id === inv.orderId) }) },
+                      { label: 'Print / Save as PDF', icon: '🖨', onClick: () => printInvoice(inv, orders.find((o) => o.id === inv.orderId)) },
+                      { label: 'Payment history', icon: '📜', onClick: () => setHistoryInvoice(inv) },
+                      canDelete && 'divider',
+                      canDelete && { label: 'Delete', icon: <IconTrash width={13} height={13} />, danger: true, onClick: () => handleDelete(inv) },
+                    ].filter(Boolean)}
+                  />
                 </td>
               </tr>
             )})}
@@ -750,6 +765,69 @@ export default function Invoices() {
           </form>
         </Modal>
       )}
+
+      {previewInvoiceData && (
+        <Modal
+          title={`Preview — ${previewInvoiceData.inv.invoiceNo}`}
+          onClose={() => setPreviewInvoiceData(null)}
+          size="lg"
+          footer={
+            <>
+              <button className="btn btn-secondary" onClick={() => setPreviewInvoiceData(null)}>Close</button>
+              <button
+                className="btn btn-primary"
+                onClick={() => printInvoice(previewInvoiceData.inv, previewInvoiceData.order)}
+              >
+                🖨 Print / Save as PDF
+              </button>
+            </>
+          }
+        >
+          <iframe
+            title="Invoice PDF preview"
+            srcDoc={buildInvoiceHTML(previewInvoiceData.inv, previewInvoiceData.order)}
+            style={{ width: '100%', height: '72vh', border: '1px solid var(--paper-200)', borderRadius: 8, background: '#fff' }}
+          />
+        </Modal>
+      )}
+
+      {historyInvoice && (() => {
+        const invoicePayments = payments
+          .filter((p) => p.invoiceId === historyInvoice.id)
+          .sort((a, b) => (a.date < b.date ? 1 : -1))
+        const totalPaid = invoicePayments.filter((p) => p.status === 'Completed').reduce((s, p) => s + Number(p.amount || 0), 0)
+        const balance = Math.max(0, Number(historyInvoice.total || 0) - totalPaid)
+        return (
+          <Modal title={`Payment History — ${historyInvoice.invoiceNo}`} onClose={() => setHistoryInvoice(null)}>
+            <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 16 }}>
+              <StatCard icon={IconReceipt} tone="blue" label="Invoice Total" value={formatINR(historyInvoice.total)} mono />
+              <StatCard icon={IconDollarSign} tone="teal" label="Paid" value={formatINR(totalPaid)} mono />
+              <StatCard icon={IconClock} tone={balance > 0 ? 'amber' : 'teal'} label="Balance Due" value={formatINR(balance)} mono />
+            </div>
+            {invoicePayments.length === 0 ? (
+              <EmptyState icon="💳" title="No payments recorded yet" subtitle="Payments logged against this invoice from the Payments page will show up here." />
+            ) : (
+              <table className="data-table">
+                <thead>
+                  <tr><th>Payment #</th><th>Date</th><th>Amount</th><th>Mode</th><th>Reference</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                  {invoicePayments.map((p) => (
+                    <tr key={p.id}>
+                      <td className="cell-mono cell-strong">{p.paymentNo}</td>
+                      <td className="cell-mono">{p.date}</td>
+                      <td className="cell-mono">{formatINR(p.amount)}</td>
+                      <td>{p.mode}</td>
+                      <td className="cell-mono">{p.reference || <span className="cell-muted">—</span>}</td>
+                      <td><Pill>{p.status}</Pill></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </Modal>
+        )
+      })()}
 
       <BulkReminderModal
         open={showReminderModal}

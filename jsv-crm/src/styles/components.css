@@ -562,6 +562,7 @@ table.data-table {
   overflow: hidden;
   animation: modalCardScaleIn 200ms ease-out;
 }
+.modal-card-lg { max-width: 900px; }
 @media (prefers-reduced-motion: reduce) {
   .modal-overlay, .modal-card { animation: none; }
 }

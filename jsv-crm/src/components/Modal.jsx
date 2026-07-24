@@ -1,9 +1,9 @@
 import { IconX } from './Icons.jsx'
 
-export default function Modal({ title, onClose, children, footer }) {
+export default function Modal({ title, onClose, children, footer, size = 'md' }) {
   return (
     <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="modal-card">
+      <div className={`modal-card${size === 'lg' ? ' modal-card-lg' : ''}`}>
         <div className="modal-header">
           <h3>{title}</h3>
           <button className="modal-close" onClick={onClose} aria-label="Close">
