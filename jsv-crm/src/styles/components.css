@@ -876,8 +876,8 @@ select::-ms-expand { display: none; }
 }
 .bulk-actions-bar .bulk-count { font-weight: 600; font-size: 13.5px; margin-right: auto; }
 .bulk-actions-bar .btn { font-size: 12.5px; padding: 7px 12px; }
-.bulk-actions-bar .btn-danger { background: #d64545; border-color: #d64545; color: #fff; }
-.bulk-actions-bar .btn-danger:hover { background: #b83838; }
+.bulk-actions-bar .btn-danger { background: var(--red-600); border-color: var(--red-600); color: #fff; }
+.bulk-actions-bar .btn-danger:hover { background: #8f1c12; }
 .bulk-actions-bar .btn-ghost-light {
   background: rgba(255,255,255,0.1);
   border: 1px solid rgba(255,255,255,0.2);

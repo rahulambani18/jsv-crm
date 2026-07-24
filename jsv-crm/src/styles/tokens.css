@@ -27,8 +27,10 @@
   --red-100: #fbe9e7;
 
   --ink-900: #14181f;
+  --ink-800: #262b35;
   --ink-700: #3c4452;
   --ink-500: #6b7280;
+  --ink-400: #86909f;
   --ink-300: #a3a9b3;
 
   /* ---- Type ---- */
@@ -85,8 +87,10 @@ button {
   --paper-100: #2b303a;
   --paper-200: #3a404c;
   --ink-900: #e8eaed;
+  --ink-800: #d4d9e0;
   --ink-700: #c0c5ce;
   --ink-500: #8f96a3;
+  --ink-400: #7a818f;
   --ink-300: #5f6672;
   --navy-900: #26314f;
   --navy-950: #1c2540;
@@ -191,6 +195,13 @@ button {
 
 [data-theme="dark"] .modal-overlay {
   background: rgba(0,0,0,0.55);
+}
+
+[data-theme="dark"] .stat-card,
+[data-theme="dark"] .dropdown-trigger,
+[data-theme="dark"] .dropdown-panel,
+[data-theme="dark"] .pagination-size select {
+  background: var(--paper-50);
 }
 
 @media (prefers-reduced-motion: reduce) {
