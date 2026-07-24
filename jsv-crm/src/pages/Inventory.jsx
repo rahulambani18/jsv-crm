@@ -14,6 +14,7 @@ import { IconPlus, IconSearch, IconLayers, IconTrash, IconClock } from '../compo
 import { useAuth } from '../lib/AuthContext.jsx'
 import { showToast } from '../lib/toast.js'
 import { exportCSV } from '../lib/exportUtils.js'
+import { expiryStatus } from '../lib/expiry.js'
 import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 
@@ -27,6 +28,7 @@ function emptyEntryForm() {
   return {
     product: '', warehouse: WAREHOUSES[0] || '', type: 'Received',
     qty: '', reference: '', notes: '', date: new Date().toISOString().slice(0, 10),
+    expiryDate: '',
   }
 }
 
@@ -103,7 +105,8 @@ export default function Inventory() {
     const lowStock = stock.filter((s) => statusFor(s) === 'Low Stock').length
     const outOfStock = stock.filter((s) => statusFor(s) === 'Out of Stock').length
     const totalValue = stock.reduce((sum, s) => sum + Number(s.qtyOnHand || 0) * (priceByProduct[s.product] || 0), 0)
-    return { totalSkus: stock.length, lowStock, outOfStock, totalValue }
+    const expiring = stock.filter((s) => Number(s.qtyOnHand) > 0 && ['Expired', 'Expiring Soon'].includes(expiryStatus(s))).length
+    return { totalSkus: stock.length, lowStock, outOfStock, totalValue, expiring }
   }, [stock, priceByProduct])
 
   async function handleLogMovement(e) {
@@ -127,11 +130,16 @@ export default function Inventory() {
       }
 
       if (existing) {
-        await api.stock.update(existing.id, { qtyOnHand: nextQty })
+        const patch = { qtyOnHand: nextQty }
+        // A fresh Received entry replaces the tracked expiry with the new
+        // batch's date; other movement types leave the existing date alone.
+        if (entryForm.type === 'Received' && entryForm.expiryDate) patch.expiryDate = entryForm.expiryDate
+        await api.stock.update(existing.id, patch)
       } else {
         await api.stock.insert({
           product: entryForm.product, warehouse: entryForm.warehouse,
           unit: 'kg', qtyOnHand: Math.max(0, signedDelta), reorderLevel: 0,
+          expiryDate: entryForm.expiryDate || null,
         })
       }
 
@@ -160,6 +168,17 @@ export default function Inventory() {
       refresh()
     } catch (err) {
       showToast('Could not update reorder level: ' + (err.message || 'Unknown error'), 'error')
+    }
+  }
+
+  async function handleExpiryDateBlur(row, value) {
+    const next = value || null
+    if (next === (row.expiryDate || null)) return
+    try {
+      await api.stock.update(row.id, { expiryDate: next })
+      refresh()
+    } catch (err) {
+      showToast('Could not update expiry date: ' + (err.message || 'Unknown error'), 'error')
     }
   }
 
@@ -205,8 +224,8 @@ export default function Inventory() {
     const rows = filtered.filter((s) => selected.has(s.id))
     exportCSV(
       'Inventory',
-      ['Product', 'Warehouse', 'Qty On Hand', 'Unit', 'Reorder Level', 'Status'],
-      rows.map((s) => [s.product, s.warehouse, s.qtyOnHand, s.unit, s.reorderLevel, statusFor(s)])
+      ['Product', 'Warehouse', 'Qty On Hand', 'Unit', 'Reorder Level', 'Status', 'Expiry Date', 'Expiry Status'],
+      rows.map((s) => [s.product, s.warehouse, s.qtyOnHand, s.unit, s.reorderLevel, statusFor(s), s.expiryDate || '', expiryStatus(s) || ''])
     )
   }
 
@@ -225,8 +244,8 @@ export default function Inventory() {
           <>
             <ExportBar
               title="Inventory"
-              headers={['Product', 'Warehouse', 'Qty On Hand', 'Unit', 'Reorder Level', 'Status']}
-              rows={filtered.map((s) => [s.product, s.warehouse, s.qtyOnHand, s.unit, s.reorderLevel, statusFor(s)])}
+              headers={['Product', 'Warehouse', 'Qty On Hand', 'Unit', 'Reorder Level', 'Status', 'Expiry Date', 'Expiry Status']}
+              rows={filtered.map((s) => [s.product, s.warehouse, s.qtyOnHand, s.unit, s.reorderLevel, statusFor(s), s.expiryDate || '', expiryStatus(s) || ''])}
               count={filtered.length}
             />
             {canEdit && (
@@ -242,6 +261,7 @@ export default function Inventory() {
         <StatCard icon={IconLayers} tone="blue" label="SKUs Tracked" value={stats.totalSkus} />
         <StatCard icon={IconClock} tone="amber" label="Low Stock" value={stats.lowStock} />
         <StatCard icon={IconTrash} tone="red" label="Out of Stock" value={stats.outOfStock} />
+        <StatCard icon={IconClock} tone="red" label="Expiring / Expired" value={stats.expiring} />
         <StatCard icon={IconLayers} tone="teal" label="Stock Value (est.)" value={formatINR(stats.totalValue)} mono />
       </div>
 
@@ -280,14 +300,14 @@ export default function Inventory() {
                 </th>
               )}
               <th>Product</th><th>Warehouse</th><th>Qty On Hand</th><th>Unit</th>
-              <th>Reorder Level</th><th>Status</th><th>Actions</th>
+              <th>Reorder Level</th><th>Status</th><th>Expiry Date</th><th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={7 + (canEdit ? 1 : 0)}>Loading inventory…</td></tr>
+              <tr className="empty-row"><td colSpan={8 + (canEdit ? 1 : 0)}>Loading inventory…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={7 + (canEdit ? 1 : 0)}>
+              <tr className="empty-row"><td colSpan={8 + (canEdit ? 1 : 0)}>
                 {stock.length === 0 ? (
                   <EmptyState
                     icon="📦"
@@ -325,6 +345,21 @@ export default function Inventory() {
                     )}
                   </td>
                   <td><Pill tone={status === 'In Stock' ? 'teal' : status === 'Low Stock' ? 'amber' : 'red'}>{status}</Pill></td>
+                  <td className="cell-mono">
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                      {canEdit ? (
+                        <input
+                          type="date" defaultValue={s.expiryDate || ''}
+                          style={{ width: 140 }}
+                          onBlur={(e) => handleExpiryDateBlur(s, e.target.value)}
+                        />
+                      ) : (
+                        s.expiryDate || <span className="cell-muted">—</span>
+                      )}
+                      {expiryStatus(s) === 'Expired' && <Pill tone="red">Expired</Pill>}
+                      {expiryStatus(s) === 'Expiring Soon' && <Pill tone="amber">Expiring Soon</Pill>}
+                    </div>
+                  </td>
                   <td>
                     <div style={{ display: 'flex', gap: 4 }}>
                       <button className="btn btn-ghost btn-sm" onClick={() => setHistoryRow(s)} title="View movement history">
@@ -413,6 +448,17 @@ export default function Inventory() {
                 />
               </div>
             </div>
+            {entryForm.type === 'Received' && (
+              <div className="field-row">
+                <div className="field">
+                  <label>Expiry Date <span className="cell-muted">(optional)</span></label>
+                  <input
+                    type="date" value={entryForm.expiryDate}
+                    onChange={(e) => setEntryForm({ ...entryForm, expiryDate: e.target.value })}
+                  />
+                </div>
+              </div>
+            )}
             <div className="field">
               <label>Notes</label>
               <input

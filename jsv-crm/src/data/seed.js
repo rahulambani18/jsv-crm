@@ -128,13 +128,13 @@ export const seedOrders = [
 ]
 
 export const seedStock = [
-  { id: 'st1', product: 'Citric Acid', warehouse: 'Mumbai (Bhiwandi)', unit: 'kg', qtyOnHand: 1200, reorderLevel: 500 },
-  { id: 'st2', product: 'Sodium Benzoate', warehouse: 'Mumbai (Bhiwandi)', unit: 'kg', qtyOnHand: 180, reorderLevel: 200 },
-  { id: 'st3', product: 'Carrageenan', warehouse: 'Delhi (Siraspur)', unit: 'kg', qtyOnHand: 320, reorderLevel: 100 },
-  { id: 'st4', product: 'Calcium Lactate', warehouse: 'Delhi (Siraspur)', unit: 'kg', qtyOnHand: 40, reorderLevel: 50 },
-  { id: 'st5', product: 'Xanthan Gum', warehouse: 'Mumbai (Bhiwandi)', unit: 'kg', qtyOnHand: 90, reorderLevel: 75 },
-  { id: 'st6', product: 'Guar Gum', warehouse: 'Chennai (Ambattur Road)', unit: 'kg', qtyOnHand: 0, reorderLevel: 50 },
-  { id: 'st7', product: 'Ascorbic Acid', warehouse: 'Delhi (Siraspur)', unit: 'kg', qtyOnHand: 610, reorderLevel: 150 },
+  { id: 'st1', product: 'Citric Acid', warehouse: 'Mumbai (Bhiwandi)', unit: 'kg', qtyOnHand: 1200, reorderLevel: 500, expiryDate: '2027-03-15' },
+  { id: 'st2', product: 'Sodium Benzoate', warehouse: 'Mumbai (Bhiwandi)', unit: 'kg', qtyOnHand: 180, reorderLevel: 200, expiryDate: '2026-07-10' },
+  { id: 'st3', product: 'Carrageenan', warehouse: 'Delhi (Siraspur)', unit: 'kg', qtyOnHand: 320, reorderLevel: 100, expiryDate: '2026-12-01' },
+  { id: 'st4', product: 'Calcium Lactate', warehouse: 'Delhi (Siraspur)', unit: 'kg', qtyOnHand: 40, reorderLevel: 50, expiryDate: '2026-06-18' },
+  { id: 'st5', product: 'Xanthan Gum', warehouse: 'Mumbai (Bhiwandi)', unit: 'kg', qtyOnHand: 5, reorderLevel: 75, expiryDate: '2026-08-05' },
+  { id: 'st6', product: 'Guar Gum', warehouse: 'Chennai (Ambattur Road)', unit: 'kg', qtyOnHand: 0, reorderLevel: 50, expiryDate: '2026-09-01' },
+  { id: 'st7', product: 'Ascorbic Acid', warehouse: 'Delhi (Siraspur)', unit: 'kg', qtyOnHand: 610, reorderLevel: 150, expiryDate: '2026-07-01' },
 ]
 
 export const seedStockMovements = [

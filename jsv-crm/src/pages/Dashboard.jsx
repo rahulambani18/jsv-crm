@@ -5,6 +5,7 @@ import { api } from '../lib/api.js'
 import { useAuth } from '../lib/AuthContext.jsx'
 import { PIPELINE_STAGES } from '../data/seed.js'
 import { APP_TODAY, getOverdueInvoices, daysOverdue } from '../lib/overdue.js'
+import { getExpiringStock, expiryStatus, daysToExpiry } from '../lib/expiry.js'
 import StatCard from '../components/StatCard.jsx'
 import Pill from '../components/Pill.jsx'
 import {
@@ -113,6 +114,16 @@ export default function Dashboard() {
     return [...overdueFollowUps, ...overdueInvoiceAlerts, ...lowStock]
   }, [followUps, stock, overdueInvoices, today])
 
+  // Dedicated warehouse widgets — Low Stock and Expiry Products — so
+  // the day can start from the Dashboard without a trip to Inventory.
+  const lowStockItems = useMemo(() => {
+    return stock
+      .filter((s) => Number(s.reorderLevel) > 0 && Number(s.qtyOnHand) <= Number(s.reorderLevel))
+      .sort((a, b) => Number(a.qtyOnHand) - Number(b.qtyOnHand))
+  }, [stock])
+
+  const expiringItems = useMemo(() => getExpiringStock(stock, today), [stock, today])
+
   if (loading) return <div className="loading-screen">Loading dashboard…</div>
 
   return (
@@ -158,6 +169,62 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      <div className="panel-row">
+        <div className="panel">
+          <p className="panel-title">Low Stock {lowStockItems.length > 0 && `(${lowStockItems.length})`}</p>
+          {lowStockItems.length === 0 ? (
+            <p style={{ color: 'var(--ink-300)', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>Everything is above its reorder level.</p>
+          ) : (
+            <div className="attention-list">
+              {lowStockItems.map((s) => (
+                <button
+                  key={s.id}
+                  className="attention-row"
+                  onClick={() => navigate('/inventory')}
+                >
+                  <span className={`attention-icon ${s.qtyOnHand === 0 ? 'red' : 'amber'}`}><IconBox /></span>
+                  <span className="attention-text">
+                    <span className="attention-title">{s.product}</span>
+                    <span className="attention-detail">{Number(s.qtyOnHand).toLocaleString('en-IN')} {s.unit} · {s.warehouse}</span>
+                  </span>
+                  <span style={{ flex: '0 0 auto', fontSize: 15 }}>{s.qtyOnHand === 0 ? '🚫' : '⚠️'}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="panel">
+          <p className="panel-title">Expiry Products {expiringItems.length > 0 && `(${expiringItems.length})`}</p>
+          {expiringItems.length === 0 ? (
+            <p style={{ color: 'var(--ink-300)', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>No batches expired or expiring soon.</p>
+          ) : (
+            <div className="attention-list">
+              {expiringItems.map((s) => {
+                const expired = expiryStatus(s, today) === 'Expired'
+                const days = daysToExpiry(s.expiryDate, today)
+                return (
+                  <button
+                    key={s.id}
+                    className="attention-row"
+                    onClick={() => navigate('/inventory')}
+                  >
+                    <span className={`attention-icon ${expired ? 'red' : 'amber'}`}><IconClock /></span>
+                    <span className="attention-text">
+                      <span className="attention-title">{s.product}</span>
+                      <span className="attention-detail">
+                        {Number(s.qtyOnHand).toLocaleString('en-IN')} {s.unit} · {s.warehouse} · {expired ? `expired ${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'} ago` : `expires in ${days} day${days === 1 ? '' : 's'}`}
+                      </span>
+                    </span>
+                    <span style={{ flex: '0 0 auto', fontSize: 15 }}>⚠️</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
 
       <div className="panel-row">
         <div className="panel">
