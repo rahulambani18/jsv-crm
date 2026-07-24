@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import QRCode from 'qrcode'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie, Cell, Legend,
@@ -8,7 +10,11 @@ import { api } from '../lib/api.js'
 import { PIPELINE_STAGES } from '../data/seed.js'
 import PageHeader from '../components/PageHeader.jsx'
 import StatCard from '../components/StatCard.jsx'
+import ExportBar from '../components/ExportBar.jsx'
+import ReportShareModal from '../components/ReportShareModal.jsx'
 import { IconUsers, IconTrend, IconCart, IconRupee } from '../components/Icons.jsx'
+import { REPORT_PERIODS, periodRange, isWithinRange, periodLabel } from '../lib/reportPeriods.js'
+import { showToast } from '../lib/toast.js'
 import '../styles/components.css'
 
 const COLORS = ['#0f1e3d', '#0d9488', '#d97706', '#6b81a8', '#b42318', '#a3a9b3']
@@ -21,6 +27,10 @@ export default function Reports() {
   const [leads, setLeads] = useState([])
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [period, setPeriod] = useState(REPORT_PERIODS.includes(searchParams.get('period')) ? searchParams.get('period') : 'All')
+  const [showShare, setShowShare] = useState(false)
+  const [qrLoading, setQrLoading] = useState(false)
 
   useEffect(() => {
     Promise.all([api.leads.list(), api.orders.list()]).then(([l, o]) => {
@@ -28,18 +38,31 @@ export default function Reports() {
     })
   }, [])
 
-  const totalLeads = leads.length
-  const converted = leads.filter((l) => l.status === 'Converted Customer').length
+  useEffect(() => {
+    setSearchParams(period === 'All' ? {} : { period }, { replace: true })
+  }, [period]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const range = useMemo(() => periodRange(period), [period])
+
+  // Orders are filtered by orderDate (a real business date on every
+  // record). Leads only get a reliable createdAt from the real
+  // Supabase backend — mock/demo leads without one are kept rather
+  // than dropped, per isWithinRange's fallback.
+  const filteredOrders = useMemo(() => orders.filter((o) => isWithinRange(o.orderDate, range)), [orders, range])
+  const filteredLeads = useMemo(() => leads.filter((l) => isWithinRange(l.createdAt, range)), [leads, range])
+
+  const totalLeads = filteredLeads.length
+  const converted = filteredLeads.filter((l) => l.status === 'Converted Customer').length
   const conversionRate = totalLeads ? Math.round((converted / totalLeads) * 100) : 0
-  const totalRevenue = orders.reduce((s, o) => s + (o.total || 0), 0)
+  const totalRevenue = filteredOrders.reduce((s, o) => s + (o.total || 0), 0)
 
   const funnelData = useMemo(() => {
-    const max = Math.max(1, leads.length)
+    const max = Math.max(1, filteredLeads.length)
     return PIPELINE_STAGES.map((stage, i) => {
-      const count = leads.filter((l) => PIPELINE_STAGES.indexOf(l.status) >= i).length
+      const count = filteredLeads.filter((l) => PIPELINE_STAGES.indexOf(l.status) >= i).length
       return { stage, count, pct: Math.round((count / max) * 100) }
     })
-  }, [leads])
+  }, [filteredLeads])
 
   const revenueByMonth = useMemo(() => {
     const months = ['Dec 25', 'Jan 26', 'Feb 26', 'Mar 26', 'Apr 26', 'May 26', 'Jun 26']
@@ -55,21 +78,100 @@ export default function Reports() {
 
   const industryData = useMemo(() => {
     const counts = {}
-    leads.forEach((l) => { counts[l.industry] = (counts[l.industry] || 0) + 1 })
+    filteredLeads.forEach((l) => { counts[l.industry] = (counts[l.industry] || 0) + 1 })
     return Object.entries(counts).map(([name, value]) => ({ name, value }))
-  }, [leads])
+  }, [filteredLeads])
 
   const warehouseData = useMemo(() => {
     const counts = {}
-    orders.forEach((o) => { counts[o.warehouse] = (counts[o.warehouse] || 0) + 1 })
+    filteredOrders.forEach((o) => { counts[o.warehouse] = (counts[o.warehouse] || 0) + 1 })
     return Object.entries(counts).map(([name, count]) => ({ name, count }))
-  }, [orders])
+  }, [filteredOrders])
+
+  // Flat metric list reused by Download PDF / Download Excel (via
+  // ExportBar) so the exported file matches what's on screen for the
+  // selected period, not just the raw table data.
+  const summaryRows = useMemo(() => [
+    ['Total Leads', totalLeads],
+    ['Conversion Rate', `${conversionRate}%`],
+    ['Total Orders', filteredOrders.length],
+    ['Total Revenue', formatINR(totalRevenue)],
+    ...funnelData.map((f) => [`Pipeline — ${f.stage}`, f.count]),
+    ...industryData.map((i) => [`Industry — ${i.name}`, i.value]),
+    ...warehouseData.map((w) => [`Warehouse — ${w.name}`, w.count]),
+  ], [totalLeads, conversionRate, filteredOrders.length, totalRevenue, funnelData, industryData, warehouseData])
+
+  const shareSubject = `JSV Ingredient — Sales Report (${periodLabel(period)})`
+  const shareMessage = useMemo(() => [
+    shareSubject,
+    `Total Leads: ${totalLeads}`,
+    `Conversion Rate: ${conversionRate}%`,
+    `Total Orders: ${filteredOrders.length}`,
+    `Total Revenue: ${formatINR(totalRevenue)}`,
+    `Generated on ${new Date().toLocaleString('en-IN')}`,
+  ].join('\n'), [shareSubject, totalLeads, conversionRate, filteredOrders.length, totalRevenue])
+
+  // Encodes this exact filtered view (current URL, period included) as
+  // a scannable QR so the report can be pulled up on a phone in one
+  // scan instead of retyping the URL.
+  async function handleDownloadQR() {
+    setQrLoading(true)
+    try {
+      const url = new URL(window.location.href)
+      url.searchParams.set('period', period)
+      const dataUrl = await QRCode.toDataURL(url.toString(), {
+        width: 320, margin: 1, color: { dark: '#0f1e3d', light: '#ffffff' },
+      })
+      const a = document.createElement('a')
+      a.href = dataUrl
+      a.download = `jsv-report-${period.toLowerCase()}-qr.png`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+    } catch (err) {
+      showToast('Could not generate QR code: ' + (err.message || 'Unknown error'), 'error')
+    } finally {
+      setQrLoading(false)
+    }
+  }
 
   if (loading) return <div className="loading-screen">Loading reports…</div>
 
   return (
     <div>
-      <PageHeader title="Reports" subtitle="Lead conversion, sales performance, revenue, industries and orders." />
+      <PageHeader
+        title="Reports"
+        subtitle="Lead conversion, sales performance, revenue, industries and orders."
+        actions={
+          <div style={{ display: 'flex', gap: 10 }}>
+            <ExportBar
+              title={`Sales Report — ${periodLabel(period)}`}
+              headers={['Metric', 'Value']}
+              rows={summaryRows}
+              count={summaryRows.length}
+            />
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowShare(true)}>
+              📧 Email / WhatsApp
+            </button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={handleDownloadQR} disabled={qrLoading}>
+              {qrLoading ? 'Generating…' : '▦ Download QR'}
+            </button>
+          </div>
+        }
+      />
+
+      <div className="filters-bar">
+        {REPORT_PERIODS.map((p) => (
+          <button
+            key={p}
+            type="button"
+            className={`btn btn-sm ${period === p ? 'btn-primary' : 'btn-ghost-light'}`}
+            onClick={() => setPeriod(p)}
+          >
+            {p}
+          </button>
+        ))}
+      </div>
 
       <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
         <StatCard icon={IconUsers} tone="blue" label="Total Leads" value={totalLeads} />
@@ -139,6 +241,13 @@ export default function Reports() {
           )}
         </div>
       </div>
+
+      <ReportShareModal
+        open={showShare}
+        onClose={() => setShowShare(false)}
+        subject={shareSubject}
+        message={shareMessage}
+      />
     </div>
   )
 }
