@@ -5,7 +5,7 @@ import {
   IconGrid, IconUsers, IconClock, IconUserCheck, IconFlask,
   IconFile, IconCart, IconBox, IconChart, IconLogout, IconPanel, IconShield,
   IconCheckSquare, IconCalendar, IconFolder, IconReceipt, IconCreditCard, IconSearch,
-  IconLayers,
+  IconLayers, IconTrend,
 } from './Icons.jsx'
 import { api } from '../lib/api.js'
 import jsvMark from '../assets/jsv-mark.png'
@@ -27,6 +27,7 @@ const NAV = [
   { to: '/documents', label: 'Documents', icon: IconFolder, key: 'documents' },
   { to: '/invoices', label: 'Invoices', icon: IconReceipt, key: 'invoices' },
   { to: '/payments', label: 'Payments', icon: IconCreditCard, key: 'payments' },
+  { to: '/reconciliation', label: 'Reconciliation', icon: IconTrend, key: 'payments' },
 ]
 
 const ADMIN_NAV = [
