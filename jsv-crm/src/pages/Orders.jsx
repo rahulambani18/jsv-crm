@@ -405,7 +405,7 @@ export default function Orders() {
                 <td className="cell-mono cell-strong">
                   {formatINR(o.total)}
                   <br /><span className="cell-mono cell-muted" style={{ fontSize: 11, fontWeight: 400 }}>
-                    {formatINR(o.subtotal)} + GST {formatINR(o.gstAmount)} ({o.gstRate || 18}%){Number(o.deliveryCharge) > 0 ? ` + delivery ${formatINR(o.deliveryCharge)}` : ''}
+                    {formatINR(o.subtotal)}{Number(o.deliveryCharge) > 0 ? ` + delivery ${formatINR(o.deliveryCharge)}` : ''} + GST {formatINR(o.gstAmount)} ({o.gstRate || 18}%)
                   </span>
                 </td>
                 <td>
@@ -602,10 +602,6 @@ export default function Orders() {
                 <span style={{ color: 'var(--ink-500)' }}>Subtotal</span>
                 <span className="cell-mono">{formatINR(totals.subtotal)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ color: 'var(--ink-500)' }}>GST (18%)</span>
-                <span className="cell-mono">{formatINR(totals.gstAmount)}</span>
-              </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                 <span style={{ color: 'var(--ink-500)' }}>Delivery charges</span>
                 <input
@@ -613,6 +609,10 @@ export default function Orders() {
                   onChange={(e) => setForm({ ...form, deliveryCharge: e.target.value })}
                   style={{ width: 110, textAlign: 'right', fontSize: 12.5, padding: '4px 8px' }}
                 />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ color: 'var(--ink-500)' }}>GST (18%) on subtotal + delivery</span>
+                <span className="cell-mono">{formatINR(totals.gstAmount)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 14.5, paddingTop: 6, borderTop: '1px solid var(--paper-200)' }}>
                 <span>Total (incl. GST + delivery)</span>
