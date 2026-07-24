@@ -40,7 +40,7 @@ function emptyForm() {
     customerId: '', company: '', warehouse: WAREHOUSES[0], orderDate: '', delivery: '',
     paymentTerms: 'Net 30', paymentDueDate: '',
     poNumber: '', poDate: '', dispatchDate: '',
-    lineItems: [emptyLineItem()], status: 'Processing', payment: 'Pending',
+    lineItems: [emptyLineItem()], deliveryCharge: 0, status: 'Processing', payment: 'Pending',
   }
 }
 
@@ -110,7 +110,7 @@ export default function Orders() {
   useEffect(() => { setPage(1) }, [warehouseFilter, statusFilter, paymentFilter, search])
   const paged = useMemo(() => filtered.slice((page - 1) * pageSize, page * pageSize), [filtered, page, pageSize])
 
-  const totals = useMemo(() => calcOrderTotals(form.lineItems), [form.lineItems])
+  const totals = useMemo(() => calcOrderTotals(form.lineItems, GST_RATE, form.deliveryCharge), [form.lineItems, form.deliveryCharge])
 
 
   const stockByKey = useMemo(() => {
@@ -265,11 +265,11 @@ export default function Orders() {
     const lineItems = form.lineItems
       .filter((li) => li.product && Number(li.qty) > 0)
       .map((li) => ({ ...li, lineTotal: Math.round((Number(li.qty) || 0) * (Number(li.unitPrice) || 0) * 100) / 100 }))
-    const { subtotal, gstAmount, total } = calcOrderTotals(lineItems)
+    const { subtotal, gstAmount, deliveryCharge, total } = calcOrderTotals(lineItems, GST_RATE, form.deliveryCharge)
     const record = {
       customerId: form.customerId, company: form.company, warehouse: form.warehouse,
       orderDate: form.orderDate, delivery: form.delivery, lineItems,
-      subtotal, gstRate: GST_RATE, gstAmount, total,
+      subtotal, gstRate: GST_RATE, gstAmount, deliveryCharge, total,
       status: form.status, payment: form.payment,
       paymentTerms: form.paymentTerms, paymentDueDate: form.paymentDueDate,
       poNumber: form.poNumber, poDate: form.poDate, dispatchDate: form.dispatchDate,
@@ -404,7 +404,9 @@ export default function Orders() {
                 <td className="cell-mono">{o.dispatchDate || <span className="cell-muted">—</span>}</td>
                 <td className="cell-mono cell-strong">
                   {formatINR(o.total)}
-                  <br /><span className="cell-mono cell-muted" style={{ fontSize: 11, fontWeight: 400 }}>{formatINR(o.subtotal)} + GST {formatINR(o.gstAmount)} ({o.gstRate || 18}%)</span>
+                  <br /><span className="cell-mono cell-muted" style={{ fontSize: 11, fontWeight: 400 }}>
+                    {formatINR(o.subtotal)} + GST {formatINR(o.gstAmount)} ({o.gstRate || 18}%){Number(o.deliveryCharge) > 0 ? ` + delivery ${formatINR(o.deliveryCharge)}` : ''}
+                  </span>
                 </td>
                 <td>
                   <select
@@ -604,8 +606,16 @@ export default function Orders() {
                 <span style={{ color: 'var(--ink-500)' }}>GST (18%)</span>
                 <span className="cell-mono">{formatINR(totals.gstAmount)}</span>
               </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ color: 'var(--ink-500)' }}>Delivery charges</span>
+                <input
+                  type="number" min="0" value={form.deliveryCharge}
+                  onChange={(e) => setForm({ ...form, deliveryCharge: e.target.value })}
+                  style={{ width: 110, textAlign: 'right', fontSize: 12.5, padding: '4px 8px' }}
+                />
+              </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 14.5, paddingTop: 6, borderTop: '1px solid var(--paper-200)' }}>
-                <span>Total (incl. GST)</span>
+                <span>Total (incl. GST + delivery)</span>
                 <span className="cell-mono">{formatINR(totals.total)}</span>
               </div>
             </div>

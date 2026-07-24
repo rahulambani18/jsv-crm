@@ -186,7 +186,8 @@ create table if not exists orders (
   subtotal numeric default 0,
   gst_rate numeric default 18,
   gst_amount numeric default 0,
-  total numeric default 0,         -- subtotal + gst_amount
+  delivery_charge numeric default 0,  -- freight/courier charge, added at actual cost, not taxed
+  total numeric default 0,         -- subtotal + gst_amount + delivery_charge
   status text default 'Processing',  -- Processing | Dispatched | Delivered | Cancelled
   payment text default 'Pending',    -- Pending | Paid | Partial
   created_at timestamptz default now()

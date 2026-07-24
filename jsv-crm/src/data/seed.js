@@ -111,11 +111,13 @@ export const COURIERS = [
 
 export const GST_RATE = 18
 
-export function calcOrderTotals(lineItems, gstRate = GST_RATE) {
+export function calcOrderTotals(lineItems, gstRate = GST_RATE, deliveryCharge = 0) {
   const subtotal = lineItems.reduce((sum, li) => sum + (Number(li.qty) || 0) * (Number(li.unitPrice) || 0), 0)
   const gstAmount = Math.round(subtotal * (gstRate / 100) * 100) / 100
-  const total = Math.round((subtotal + gstAmount) * 100) / 100
-  return { subtotal: Math.round(subtotal * 100) / 100, gstAmount, total }
+  const delivery = Math.round((Number(deliveryCharge) || 0) * 100) / 100
+  // Delivery/freight is added at actual cost on top of subtotal + GST, not taxed itself.
+  const total = Math.round((subtotal + gstAmount + delivery) * 100) / 100
+  return { subtotal: Math.round(subtotal * 100) / 100, gstAmount, deliveryCharge: delivery, total }
 }
 
 
