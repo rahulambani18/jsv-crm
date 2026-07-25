@@ -170,11 +170,11 @@ export default function Orders() {
   }
 
   async function handleDelete(order) {
-    if (!confirm(`Delete order "${order.orderNo}"? This cannot be undone.`)) return
+    if (!confirm(`Delete order "${order.poNumber || order.orderNo}"? This cannot be undone.`)) return
     try {
       await api.orders.remove(order.id)
       refresh()
-      showToast(`Order ${order.orderNo} deleted`)
+      showToast(`Order ${order.poNumber || order.orderNo} deleted`)
     } catch (err) {
       showToast('Could not delete: ' + (err.message || 'Unknown error'), 'error')
     }
@@ -211,8 +211,8 @@ export default function Orders() {
     const rows = filtered.filter((o) => selected.has(o.id))
     exportCSV(
       'Orders',
-      ['Order #', 'PO Number', 'Company', 'Warehouse', 'Order Date', 'Expected Delivery', 'Dispatch Date', 'Total', 'Status', 'Payment'],
-      rows.map((o) => [o.orderNo, o.poNumber, o.company, o.warehouse, o.orderDate, o.delivery, o.dispatchDate, `₹${Number(o.total).toLocaleString('en-IN')}`, o.status, o.payment])
+      ['PO Number', 'Order #', 'Company', 'Warehouse', 'Order Date', 'Expected Delivery', 'Dispatch Date', 'Total', 'Status', 'Payment'],
+      rows.map((o) => [o.poNumber, o.orderNo, o.company, o.warehouse, o.orderDate, o.delivery, o.dispatchDate, `₹${Number(o.total).toLocaleString('en-IN')}`, o.status, o.payment])
     )
   }
 
@@ -303,8 +303,8 @@ export default function Orders() {
           <div style={{ display: 'flex', gap: 10 }}>
             <ExportBar
               title="Orders"
-              headers={['Order #', 'PO Number', 'Company', 'Warehouse', 'Order Date', 'Expected Delivery', 'Dispatch Date', 'Total', 'Status', 'Payment']}
-              rows={filtered.map((o) => [o.orderNo, o.poNumber, o.company, o.warehouse, o.orderDate, o.delivery, o.dispatchDate, `₹${Number(o.total).toLocaleString('en-IN')}`, o.status, o.payment])}
+              headers={['PO Number', 'Order #', 'Company', 'Warehouse', 'Order Date', 'Expected Delivery', 'Dispatch Date', 'Total', 'Status', 'Payment']}
+              rows={filtered.map((o) => [o.poNumber, o.orderNo, o.company, o.warehouse, o.orderDate, o.delivery, o.dispatchDate, `₹${Number(o.total).toLocaleString('en-IN')}`, o.status, o.payment])}
               count={filtered.length}
             />
             {canEdit && (
@@ -366,7 +366,7 @@ export default function Orders() {
                   />
                 </th>
               )}
-              <th>Order #</th><th>Company</th><th>Warehouse</th><th>Order Date</th><th>Expected Delivery</th><th>Dispatch Date</th><th>Total (incl. GST)</th><th>Status</th><th>Payment</th>{(canEdit || canDelete) && <th>Actions</th>}
+              <th>PO Number</th><th>Company</th><th>Warehouse</th><th>Order Date</th><th>Expected Delivery</th><th>Dispatch Date</th><th>Total (incl. GST)</th><th>Status</th><th>Payment</th>{(canEdit || canDelete) && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
@@ -394,8 +394,8 @@ export default function Orders() {
                   </td>
                 )}
                 <td className="cell-mono">
-                  {o.orderNo}
-                  {o.poNumber && <><br /><span className="cell-mono cell-muted" style={{ fontSize: 11 }}>PO: {o.poNumber}</span></>}
+                  {o.poNumber || <span className="cell-muted">—</span>}
+                  <br /><span className="cell-mono cell-muted" style={{ fontSize: 11 }}>{o.orderNo}</span>
                 </td>
                 <td className="cell-strong">{o.company}</td>
                 <td>{o.warehouse}</td>

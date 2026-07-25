@@ -40,7 +40,12 @@ function snakeToCamel(str) {
 }
 function toDbShape(obj) {
   if (!obj || typeof obj !== 'object') return obj
-  return Object.fromEntries(Object.entries(obj).map(([k, v]) => [camelToSnake(k), v]))
+  // Empty strings from optional <input type="date"> / <input type="number">
+  // fields (left blank by the user) are invalid input for Postgres date,
+  // numeric, and uuid columns — Postgres wants null for "no value", not "".
+  // Coercing '' -> null here, once, protects every table's insert/update
+  // instead of requiring each page to remember to do it.
+  return Object.fromEntries(Object.entries(obj).map(([k, v]) => [camelToSnake(k), v === '' ? null : v]))
 }
 function fromDbShape(obj) {
   if (!obj || typeof obj !== 'object') return obj
