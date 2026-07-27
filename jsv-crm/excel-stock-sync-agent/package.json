@@ -1,0 +1,19 @@
+{
+  "name": "jsv-crm-excel-stock-sync-agent",
+  "version": "1.0.0",
+  "description": "Watches a local/shared stock Excel (.xlsx/.csv) file and pushes every change straight into the JSV CRM's Supabase `stock` table automatically.",
+  "type": "module",
+  "main": "sync.js",
+  "scripts": {
+    "start": "node sync.js",
+    "once": "node sync.js --once"
+  },
+  "dependencies": {
+    "chokidar": "^3.6.0",
+    "xlsx": "^0.18.5",
+    "dotenv": "^16.4.5"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
