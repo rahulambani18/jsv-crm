@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { api } from '../lib/api.js'
 import { useAuth } from '../lib/AuthContext.jsx'
 import { PIPELINE_STAGES } from '../data/seed.js'
@@ -80,6 +80,17 @@ export default function Dashboard() {
     leads.forEach((l) => { counts[l.industry] = (counts[l.industry] || 0) + 1 })
     return Object.entries(counts).map(([name, value]) => ({ name, value }))
   }, [leads])
+
+  // Sales by customer — total order value per company, so you can see
+  // at a glance who's driving the most revenue without leaving the Dashboard.
+  const salesByCustomer = useMemo(() => {
+    const totals = {}
+    orders.forEach((o) => { totals[o.company] = (totals[o.company] || 0) + Number(o.total || 0) })
+    return Object.entries(totals)
+      .map(([company, total]) => ({ company, total }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 8)
+  }, [orders])
 
   // "Attention needed" — the handful of things across other modules that
   // are actionable right now, surfaced here so the day can start from one
@@ -264,6 +275,25 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
+        </div>
+      </div>
+
+      <div className="panel-row">
+        <div className="panel" style={{ flex: '1 1 100%' }}>
+          <p className="panel-title">Sales by Customer</p>
+          {salesByCustomer.length === 0 ? (
+            <p style={{ color: 'var(--ink-300)', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>No orders yet.</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={Math.max(220, salesByCustomer.length * 42)}>
+              <BarChart data={salesByCustomer} layout="vertical" margin={{ left: 10, right: 24 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <XAxis type="number" tickFormatter={(v) => formatINR(v)} fontSize={11} />
+                <YAxis type="category" dataKey="company" width={160} fontSize={11.5} />
+                <Tooltip formatter={(v) => formatINR(v)} />
+                <Bar dataKey="total" fill={COLORS[0]} radius={[0, 4, 4, 0]} onClick={(d) => navigate(`/orders?q=${encodeURIComponent(d.company)}`)} cursor="pointer" />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
     </div>
