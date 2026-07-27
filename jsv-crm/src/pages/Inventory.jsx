@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../lib/api.js'
 import { WAREHOUSES } from '../data/seed.js'
 import { readSpreadsheetFile, normalizeRow } from '../lib/fileImport.js'
@@ -36,6 +37,15 @@ function formatINR(n) {
   return '₹' + Number(n || 0).toLocaleString('en-IN')
 }
 
+function formatUpdatedAt(iso) {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+}
+
+const SOURCE_TONE = { 'Excel Sync': 'teal', 'Excel Import': 'navy', Manual: 'gray' }
+
 function emptyEntryForm() {
   return {
     product: '', warehouse: WAREHOUSES[0] || '', type: 'Received',
@@ -61,6 +71,7 @@ export default function Inventory() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [warehouseFilter, setWarehouseFilter] = useState('All')
+  const [statusFilter, setStatusFilter] = useState('All')
 
   const [showEntryModal, setShowEntryModal] = useState(false)
   const [entryForm, setEntryForm] = useState(emptyEntryForm())
@@ -134,13 +145,13 @@ export default function Inventory() {
         if (priorQty === row.qtyOnHand && existing) continue // nothing changed for this row
 
         if (existing) {
-          const patch = { qtyOnHand: row.qtyOnHand }
+          const patch = { qtyOnHand: row.qtyOnHand, updatedAt: new Date().toISOString(), source: 'Excel Import' }
           if (row.reorderLevel !== undefined) patch.reorderLevel = row.reorderLevel
           await api.stock.update(existing.id, patch)
         } else {
           await api.stock.insert({
             product: row.product, warehouse: row.warehouse, unit: row.unit,
-            qtyOnHand: row.qtyOnHand, reorderLevel: row.reorderLevel || 0,
+            qtyOnHand: row.qtyOnHand, reorderLevel: row.reorderLevel || 0, source: 'Excel Import',
           })
         }
         changed++
@@ -148,7 +159,7 @@ export default function Inventory() {
         if (priorQty !== null && priorQty !== row.qtyOnHand) {
           await api.stockMovements.insert({
             product: row.product, warehouse: row.warehouse, type: 'Adjustment',
-            qty: Math.abs(row.qtyOnHand - priorQty), reference: file.name,
+            qty: Math.abs(row.qtyOnHand - priorQty), reference: file.name, createdBy: 'Excel Import',
             notes: `Imported from spreadsheet — ${row.qtyOnHand > priorQty ? 'increased' : 'decreased'} by ${Math.abs(row.qtyOnHand - priorQty)} ${row.unit}`,
           })
         }
@@ -168,13 +179,14 @@ export default function Inventory() {
     return stock.filter((s) => {
       const matchesSearch = !search || [s.product, s.warehouse].some((v) => (v || '').toLowerCase().includes(search.toLowerCase()))
       const matchesWarehouse = warehouseFilter === 'All' || s.warehouse === warehouseFilter
-      return matchesSearch && matchesWarehouse
+      const matchesStatus = statusFilter === 'All' || statusFor(s) === statusFilter
+      return matchesSearch && matchesWarehouse && matchesStatus
     })
-  }, [stock, search, warehouseFilter])
+  }, [stock, search, warehouseFilter, statusFilter])
 
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
-  useEffect(() => { setPage(1) }, [search, warehouseFilter])
+  useEffect(() => { setPage(1) }, [search, warehouseFilter, statusFilter])
   const paged = useMemo(() => filtered.slice((page - 1) * pageSize, page * pageSize), [filtered, page, pageSize])
 
   const stats = useMemo(() => {
@@ -206,7 +218,7 @@ export default function Inventory() {
       }
 
       if (existing) {
-        const patch = { qtyOnHand: nextQty }
+        const patch = { qtyOnHand: nextQty, updatedAt: new Date().toISOString(), source: 'Manual' }
         // A fresh Received entry replaces the tracked expiry with the new
         // batch's date; other movement types leave the existing date alone.
         if (entryForm.type === 'Received' && entryForm.expiryDate) patch.expiryDate = entryForm.expiryDate
@@ -215,7 +227,7 @@ export default function Inventory() {
         await api.stock.insert({
           product: entryForm.product, warehouse: entryForm.warehouse,
           unit: 'kg', qtyOnHand: Math.max(0, signedDelta), reorderLevel: 0,
-          expiryDate: entryForm.expiryDate || null,
+          expiryDate: entryForm.expiryDate || null, source: 'Manual',
         })
       }
 
@@ -236,11 +248,16 @@ export default function Inventory() {
     }
   }
 
+  function openRestock(row) {
+    setEntryForm({ ...emptyEntryForm(), product: row.product, warehouse: row.warehouse, type: 'Received' })
+    setShowEntryModal(true)
+  }
+
   async function handleReorderLevelBlur(row, value) {
     const level = Number(value) || 0
     if (level === Number(row.reorderLevel || 0)) return
     try {
-      await api.stock.update(row.id, { reorderLevel: level })
+      await api.stock.update(row.id, { reorderLevel: level, updatedAt: new Date().toISOString() })
       refresh()
     } catch (err) {
       showToast('Could not update reorder level: ' + (err.message || 'Unknown error'), 'error')
@@ -251,7 +268,7 @@ export default function Inventory() {
     const next = value || null
     if (next === (row.expiryDate || null)) return
     try {
-      await api.stock.update(row.id, { expiryDate: next })
+      await api.stock.update(row.id, { expiryDate: next, updatedAt: new Date().toISOString() })
       refresh()
     } catch (err) {
       showToast('Could not update expiry date: ' + (err.message || 'Unknown error'), 'error')
@@ -300,8 +317,8 @@ export default function Inventory() {
     const rows = filtered.filter((s) => selected.has(s.id))
     exportCSV(
       'Inventory',
-      ['Product', 'Warehouse', 'Qty On Hand', 'Unit', 'Reorder Level', 'Status', 'Expiry Date', 'Expiry Status'],
-      rows.map((s) => [s.product, s.warehouse, s.qtyOnHand, s.unit, s.reorderLevel, statusFor(s), s.expiryDate || '', expiryStatus(s) || ''])
+      ['Product', 'Warehouse', 'Qty On Hand', 'Unit', 'Reorder Level', 'Status', 'Expiry Date', 'Expiry Status', 'Last Updated', 'Source'],
+      rows.map((s) => [s.product, s.warehouse, s.qtyOnHand, s.unit, s.reorderLevel, statusFor(s), s.expiryDate || '', expiryStatus(s) || '', s.updatedAt || '', s.source || ''])
     )
   }
 
@@ -334,8 +351,8 @@ export default function Inventory() {
             )}
             <ExportBar
               title="Inventory"
-              headers={['Product', 'Warehouse', 'Qty On Hand', 'Unit', 'Reorder Level', 'Status', 'Expiry Date', 'Expiry Status']}
-              rows={filtered.map((s) => [s.product, s.warehouse, s.qtyOnHand, s.unit, s.reorderLevel, statusFor(s), s.expiryDate || '', expiryStatus(s) || ''])}
+              headers={['Product', 'Warehouse', 'Qty On Hand', 'Unit', 'Reorder Level', 'Status', 'Expiry Date', 'Expiry Status', 'Last Updated', 'Source']}
+              rows={filtered.map((s) => [s.product, s.warehouse, s.qtyOnHand, s.unit, s.reorderLevel, statusFor(s), s.expiryDate || '', expiryStatus(s) || '', s.updatedAt || '', s.source || ''])}
               count={filtered.length}
             />
             {canEdit && (
@@ -371,6 +388,11 @@ export default function Inventory() {
           value={warehouseFilter}
           onChange={setWarehouseFilter}
         />
+        <Dropdown
+          options={['All', 'In Stock', 'Low Stock', 'Out of Stock']}
+          value={statusFilter}
+          onChange={setStatusFilter}
+        />
       </div>
 
       {canEdit && (
@@ -396,14 +418,14 @@ export default function Inventory() {
                 </th>
               )}
               <th>Product</th><th>Warehouse</th><th>Qty On Hand</th><th>Unit</th>
-              <th>Reorder Level</th><th>Status</th><th>Expiry Date</th><th>Actions</th>
+              <th>Reorder Level</th><th>Status</th><th>Expiry Date</th><th>Last Updated</th><th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={8 + (canEdit ? 1 : 0)}>Loading inventory…</td></tr>
+              <tr className="empty-row"><td colSpan={9 + (canEdit ? 1 : 0)}>Loading inventory…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={8 + (canEdit ? 1 : 0)}>
+              <tr className="empty-row"><td colSpan={9 + (canEdit ? 1 : 0)}>
                 {stock.length === 0 ? (
                   <EmptyState
                     icon="📦"
@@ -418,6 +440,7 @@ export default function Inventory() {
               </td></tr>
             ) : paged.map((s) => {
               const status = statusFor(s)
+              const productExists = products.some((p) => p.name === s.product)
               return (
                 <tr key={s.id}>
                   {canEdit && (
@@ -425,7 +448,13 @@ export default function Inventory() {
                       <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggleSelected(s.id)} />
                     </td>
                   )}
-                  <td className="cell-strong">{s.product}</td>
+                  <td className="cell-strong">
+                    {productExists ? (
+                      <Link to={`/products?q=${encodeURIComponent(s.product)}`}>{s.product}</Link>
+                    ) : (
+                      s.product
+                    )}
+                  </td>
                   <td>{s.warehouse}</td>
                   <td className="cell-mono">{Number(s.qtyOnHand).toLocaleString('en-IN')}</td>
                   <td>{s.unit}</td>
@@ -456,8 +485,19 @@ export default function Inventory() {
                       {expiryStatus(s) === 'Expiring Soon' && <Pill tone="amber">Expiring Soon</Pill>}
                     </div>
                   </td>
+                  <td className="cell-mono">
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                      <span>{formatUpdatedAt(s.updatedAt)}</span>
+                      {s.source && <Pill tone={SOURCE_TONE[s.source] || 'gray'}>{s.source}</Pill>}
+                    </div>
+                  </td>
                   <td>
                     <div style={{ display: 'flex', gap: 4 }}>
+                      {canEdit && status !== 'In Stock' && (
+                        <button className="btn btn-ghost btn-sm" onClick={() => openRestock(s)} title="Log a Received entry for this product/warehouse">
+                          <IconPlus width={14} height={14} /> Restock
+                        </button>
+                      )}
                       <button className="btn btn-ghost btn-sm" onClick={() => setHistoryRow(s)} title="View movement history">
                         <IconClock width={14} height={14} />
                       </button>

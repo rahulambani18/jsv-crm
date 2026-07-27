@@ -28,6 +28,11 @@ your Supabase SQL Editor — it creates the `stock` and
 `stock_movements` tables this agent writes into. Safe to run even if
 you're not sure whether it's already been done.
 
+Also run `supabase/add_stock_source_column.sql` — it adds the
+`source` column the Inventory page uses to show whether a row was
+last updated by this agent, the in-app Import Excel/CSV button, or a
+person (Stock Entry / manual edit).
+
 ## Step 2 — Get your Supabase service role key
 
 This is different from the key the website uses — it's more

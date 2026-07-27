@@ -111,11 +111,20 @@ async function fetchExistingStock() {
 
 async function upsertStockRow(record) {
   // Relies on the `unique (workspace_id, product, warehouse)` constraint
-  // from supabase/add_inventory_tables.sql to do a true upsert.
+  // from supabase/add_inventory_tables.sql to do a true upsert. `source`
+  // and `updated_at` (supabase/add_stock_source_column.sql) let the
+  // Inventory page show this row was last touched by this agent, and
+  // when — separate from a person's manual Stock Entry or the in-app
+  // Import Excel/CSV button.
   await supabaseFetch('stock?on_conflict=workspace_id,product,warehouse', {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-    body: JSON.stringify({ workspace_id: DEFAULT_WORKSPACE, ...record }),
+    body: JSON.stringify({
+      workspace_id: DEFAULT_WORKSPACE,
+      ...record,
+      source: 'Excel Sync',
+      updated_at: new Date().toISOString(),
+    }),
   })
 }
 
