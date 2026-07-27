@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../lib/api.js'
 import { WAREHOUSES } from '../data/seed.js'
+import { readSpreadsheetFile, normalizeRow } from '../lib/fileImport.js'
 import PageHeader from '../components/PageHeader.jsx'
 import ExportBar from '../components/ExportBar.jsx'
 import Modal from '../components/Modal.jsx'
@@ -10,7 +11,7 @@ import Dropdown from '../components/Dropdown.jsx'
 import ComboField from '../components/ComboField.jsx'
 import BulkActionsBar from '../components/BulkActionsBar.jsx'
 import Pagination from '../components/Pagination.jsx'
-import { IconPlus, IconSearch, IconLayers, IconTrash, IconClock } from '../components/Icons.jsx'
+import { IconPlus, IconSearch, IconLayers, IconTrash, IconClock, IconUpload } from '../components/Icons.jsx'
 import { useAuth } from '../lib/AuthContext.jsx'
 import { showToast } from '../lib/toast.js'
 import { exportCSV } from '../lib/exportUtils.js'
@@ -19,6 +20,17 @@ import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 
 const MOVEMENT_TYPES = ['Received', 'Dispatched', 'Adjustment', 'Return']
+
+// Same column-name aliases the excel-stock-sync-agent uses, so a file
+// that works with one works with the other — whichever one someone
+// reaches for on a given day, the same spreadsheet format applies.
+const STOCK_FIELD_MAP = {
+  product: ['product', 'productname', 'item', 'itemname', 'sku', 'productcode'],
+  warehouse: ['warehouse', 'location', 'godown', 'store', 'branch'],
+  unit: ['unit', 'uom', 'units'],
+  qty: ['qty', 'quantity', 'qtyonhand', 'closingstock', 'currentstock', 'availableqty', 'stock', 'stockqty', 'onhand'],
+  reorderLevel: ['reorderlevel', 'reorderqty', 'minstock', 'minimumstock', 'reorderpoint'],
+}
 
 function formatINR(n) {
   return '₹' + Number(n || 0).toLocaleString('en-IN')
@@ -57,6 +69,10 @@ export default function Inventory() {
   const [historyRow, setHistoryRow] = useState(null)
   const [selected, setSelected] = useState(new Set())
 
+  const [importError, setImportError] = useState('')
+  const [importBusy, setImportBusy] = useState(false)
+  const fileInputRef = useRef(null)
+
   useEffect(() => { refresh() }, [])
 
   // Location/godown suggestions: the starter list plus any locations
@@ -87,6 +103,66 @@ export default function Inventory() {
     products.forEach((p) => { map[p.name] = p.unitPrice })
     return map
   }, [products])
+
+  async function handleFileSelected(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImportError('')
+    setImportBusy(true)
+    try {
+      const rows = await readSpreadsheetFile(file)
+      const parsed = rows
+        .map((row) => normalizeRow(row, STOCK_FIELD_MAP))
+        .filter((r) => r.product && r.warehouse && r.qty !== '' && r.qty !== undefined)
+        .map((r) => ({
+          product: String(r.product).trim(),
+          warehouse: String(r.warehouse).trim(),
+          unit: r.unit ? String(r.unit).trim() : 'kg',
+          qtyOnHand: Number(r.qty) || 0,
+          reorderLevel: r.reorderLevel !== undefined && r.reorderLevel !== '' ? Number(r.reorderLevel) || 0 : undefined,
+        }))
+
+      if (parsed.length === 0) {
+        setImportError('No valid rows found. Make sure the file has Product, Warehouse and Qty columns (see the excel-stock-sync-agent README for accepted column names).')
+        return
+      }
+
+      let changed = 0
+      for (const row of parsed) {
+        const existing = stock.find((s) => s.product === row.product && s.warehouse === row.warehouse)
+        const priorQty = existing ? Number(existing.qtyOnHand) : null
+        if (priorQty === row.qtyOnHand && existing) continue // nothing changed for this row
+
+        if (existing) {
+          const patch = { qtyOnHand: row.qtyOnHand }
+          if (row.reorderLevel !== undefined) patch.reorderLevel = row.reorderLevel
+          await api.stock.update(existing.id, patch)
+        } else {
+          await api.stock.insert({
+            product: row.product, warehouse: row.warehouse, unit: row.unit,
+            qtyOnHand: row.qtyOnHand, reorderLevel: row.reorderLevel || 0,
+          })
+        }
+        changed++
+
+        if (priorQty !== null && priorQty !== row.qtyOnHand) {
+          await api.stockMovements.insert({
+            product: row.product, warehouse: row.warehouse, type: 'Adjustment',
+            qty: Math.abs(row.qtyOnHand - priorQty), reference: file.name,
+            notes: `Imported from spreadsheet — ${row.qtyOnHand > priorQty ? 'increased' : 'decreased'} by ${Math.abs(row.qtyOnHand - priorQty)} ${row.unit}`,
+          })
+        }
+      }
+
+      refresh()
+      showToast(changed > 0 ? `Imported ${changed} row(s) from ${file.name}` : `Checked ${parsed.length} row(s), nothing changed`)
+    } catch (err) {
+      setImportError(err.message || 'Could not import this file.')
+    } finally {
+      setImportBusy(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
 
   const filtered = useMemo(() => {
     return stock.filter((s) => {
@@ -242,6 +318,20 @@ export default function Inventory() {
         subtitle={`${stock.length} SKUs tracked`}
         actions={
           <>
+            {canEdit && (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  style={{ display: 'none' }}
+                  onChange={handleFileSelected}
+                />
+                <button className="btn btn-secondary" onClick={() => fileInputRef.current?.click()} disabled={importBusy}>
+                  <IconUpload width={15} height={15} /> {importBusy ? 'Importing…' : 'Import Excel/CSV'}
+                </button>
+              </>
+            )}
             <ExportBar
               title="Inventory"
               headers={['Product', 'Warehouse', 'Qty On Hand', 'Unit', 'Reorder Level', 'Status', 'Expiry Date', 'Expiry Status']}
@@ -256,6 +346,12 @@ export default function Inventory() {
           </>
         }
       />
+
+      {importError && (
+        <div style={{ background: 'var(--red-100)', color: 'var(--red-600)', padding: '10px 14px', borderRadius: 8, fontSize: 13, marginBottom: 14 }}>
+          {importError}
+        </div>
+      )}
 
       <div className="stat-grid">
         <StatCard icon={IconLayers} tone="blue" label="SKUs Tracked" value={stats.totalSkus} />
