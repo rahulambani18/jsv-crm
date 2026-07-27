@@ -281,6 +281,8 @@ export default function Orders() {
         showToast('Order updated successfully')
       } else {
         record.orderNo = `ORD-2026-${String(300 + orders.length + 1).padStart(4, '0')}`
+        if (!record.poNumber) record.poNumber = `PO-2026-${String(300 + orders.length + 1).padStart(4, '0')}`
+        if (!record.poDate) record.poDate = record.orderDate
         await api.orders.insert(record)
         showToast('Order created successfully')
       }
@@ -522,7 +524,7 @@ export default function Orders() {
             <div className="field-row">
               <div className="field">
                 <label>Purchase order number</label>
-                <input value={form.poNumber} onChange={(e) => setForm({ ...form, poNumber: e.target.value })} placeholder="Customer's PO #" />
+                <input value={form.poNumber} onChange={(e) => setForm({ ...form, poNumber: e.target.value })} placeholder="Leave blank to auto-generate" />
               </div>
               <div className="field">
                 <label>PO date</label>
