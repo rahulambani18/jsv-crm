@@ -82,9 +82,12 @@ function numberToWords(n) {
   return words + ' Only'
 }
 
-function buildInvoiceHTML(inv, order) {
+function buildInvoiceHTML(inv, order, customer) {
   const lineItems = order?.lineItems || []
   const isInterstate = Number(inv.igst || 0) > 0
+  const billAddress = customer?.billingAddress || ''
+  const shipAddress = customer?.shippingAddress || customer?.billingAddress || ''
+  const cityState = [customer?.city, customer?.state].filter(Boolean).join(', ')
   const html = `<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><title>Tax Invoice - ${inv.invoiceNo}</title>
 <style>
@@ -173,9 +176,9 @@ function buildInvoiceHTML(inv, order) {
     <div class="party-label">Bill To (Buyer)</div>
     <div class="party-name">${inv.company}</div>
     <div class="party-detail">
-      Address: ___________________________________<br>
-      City / State: ________________________________<br>
-      GSTIN / UIN: ________________________________<br>
+      Address: ${billAddress || '___________________________________'}<br>
+      City / State: ${cityState || '________________________________'}<br>
+      GSTIN / UIN: ${customer?.gst || '________________________________'}<br>
       PAN No.: ____________________________________
     </div>
   </div>
@@ -183,9 +186,10 @@ function buildInvoiceHTML(inv, order) {
     <div class="party-label">Ship To (Delivery Address)</div>
     <div class="party-name">${inv.company}</div>
     <div class="party-detail">
+      Address: ${shipAddress || '___________________________________'}<br>
       Warehouse: ${order?.warehouse || '—'}<br>
       Delivery Date: ${order?.delivery || '—'}<br>
-      City / State: ________________________________<br>
+      City / State: ${cityState || '________________________________'}<br>
       Transport / LR No.: __________________________
     </div>
   </div>
@@ -311,8 +315,8 @@ function buildInvoiceHTML(inv, order) {
   return html
 }
 
-function printInvoice(inv, order) {
-  const html = buildInvoiceHTML(inv, order)
+function printInvoice(inv, order, customer) {
+  const html = buildInvoiceHTML(inv, order, customer)
   const w = window.open('', '_blank')
   w.document.write(html)
   w.document.close()
@@ -660,8 +664,8 @@ export default function Invoices() {
                   <RowActionsMenu
                     items={[
                       canEdit && { label: 'Edit', icon: <IconEdit width={13} height={13} />, onClick: () => openEdit(inv) },
-                      { label: 'Preview PDF', icon: '👁', onClick: () => setPreviewInvoiceData({ inv, order: orders.find((o) => o.id === inv.orderId) }) },
-                      { label: 'Print / Save as PDF', icon: '🖨', onClick: () => printInvoice(inv, orders.find((o) => o.id === inv.orderId)) },
+                      { label: 'Preview PDF', icon: '👁', onClick: () => setPreviewInvoiceData({ inv, order: orders.find((o) => o.id === inv.orderId), customer }) },
+                      { label: 'Print / Save as PDF', icon: '🖨', onClick: () => printInvoice(inv, orders.find((o) => o.id === inv.orderId), customer) },
                       { label: 'Payment history', icon: '📜', onClick: () => setHistoryInvoice(inv) },
                       canDelete && 'divider',
                       canDelete && { label: 'Delete', icon: <IconTrash width={13} height={13} />, danger: true, onClick: () => handleDelete(inv) },
@@ -777,7 +781,7 @@ export default function Invoices() {
               <button className="btn btn-secondary" onClick={() => setPreviewInvoiceData(null)}>Close</button>
               <button
                 className="btn btn-primary"
-                onClick={() => printInvoice(previewInvoiceData.inv, previewInvoiceData.order)}
+                onClick={() => printInvoice(previewInvoiceData.inv, previewInvoiceData.order, previewInvoiceData.customer)}
               >
                 🖨 Print / Save as PDF
               </button>
@@ -786,7 +790,7 @@ export default function Invoices() {
         >
           <iframe
             title="Invoice PDF preview"
-            srcDoc={buildInvoiceHTML(previewInvoiceData.inv, previewInvoiceData.order)}
+            srcDoc={buildInvoiceHTML(previewInvoiceData.inv, previewInvoiceData.order, previewInvoiceData.customer)}
             style={{ width: '100%', height: '72vh', border: '1px solid var(--paper-200)', borderRadius: 8, background: '#fff' }}
           />
         </Modal>
