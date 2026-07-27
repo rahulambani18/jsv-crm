@@ -27,9 +27,10 @@ const GST_RATE = 18
 
 const STATUS_OPTIONS = ['Draft', 'Sent', 'Paid', 'Unpaid', 'Overdue', 'Cancelled']
 const PAYMENT_MODES = ['NEFT', 'RTGS', 'Cheque', 'Cash', 'UPI', 'Bank Transfer']
-const PAYMENT_TERMS = ['Net 15', 'Net 30', 'Net 45', 'Net 60', 'Custom']
+const PAYMENT_TERMS = ['Due on Receipt', 'Net 15', 'Net 30', 'Net 45', 'Net 60', 'Custom']
 
 function termsToDays(terms) {
+  if (terms === 'Due on Receipt') return 0
   const match = /Net (\d+)/.exec(terms || '')
   return match ? Number(match[1]) : null
 }
