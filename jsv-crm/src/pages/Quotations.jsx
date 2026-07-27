@@ -7,7 +7,9 @@ import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
 import SendButtons from '../components/SendButtons.jsx'
 import Pagination from '../components/Pagination.jsx'
-import { IconPlus, IconTrash, IconSearch } from '../components/Icons.jsx'
+import RowActionsMenu from '../components/RowActionsMenu.jsx'
+import { IconPlus, IconTrash, IconSearch, IconEdit } from '../components/Icons.jsx'
+import { showToast } from '../lib/toast.js'
 import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 
@@ -29,6 +31,7 @@ export default function Quotations() {
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(emptyForm())
   const [saving, setSaving] = useState(false)
+  const [editingId, setEditingId] = useState(null)
 
   useEffect(() => { refresh() }, [])
 
@@ -77,17 +80,52 @@ export default function Quotations() {
       validUntil: form.validUntil,
       status: form.status,
       lineItems,
-      quoteNo: `QT-2026-${String(120 + quotations.length).padStart(4, '0')}`,
     }
     try {
-      await api.quotations.insert(record)
+      if (editingId) {
+        await api.quotations.update(editingId, record)
+        showToast('Quotation updated successfully')
+      } else {
+        record.quoteNo = `QT-2026-${String(120 + quotations.length).padStart(4, '0')}`
+        await api.quotations.insert(record)
+        showToast('Quotation created successfully')
+      }
       setShowModal(false)
       setForm(emptyForm())
+      setEditingId(null)
       refresh()
     } catch (err) {
-      alert('Could not save quotation: ' + (err.message || 'Unknown error'))
+      showToast('Could not save quotation: ' + (err.message || 'Unknown error'), 'error')
     } finally {
       setSaving(false)
+    }
+  }
+
+  function openEdit(q) {
+    setEditingId(q.id)
+    setForm({
+      company: q.company || '',
+      validUntil: q.validUntil || '',
+      status: q.status || 'Draft',
+      lineItems: q.lineItems && q.lineItems.length ? q.lineItems : [emptyLineItem()],
+    })
+    setShowModal(true)
+  }
+
+  function openCreate() {
+    setEditingId(null)
+    setForm(emptyForm())
+    setShowModal(true)
+  }
+
+  async function handleDelete(q) {
+    if (!confirm(`Delete quotation "${q.quoteNo}" for "${q.company}"? This cannot be undone.`)) return
+    try {
+      await api.quotations.remove(q.id)
+      showToast(`Quotation "${q.quoteNo}" deleted`)
+      refresh()
+    } catch (err) {
+      showToast('Could not delete: ' + (err.message || 'Unknown error'), 'error')
     }
   }
 
@@ -106,7 +144,7 @@ export default function Quotations() {
               rows={filtered.map((q) => [q.quoteNo, q.company, q.items, `₹${Number(q.total).toLocaleString('en-IN')}`, q.validUntil, q.status])}
               count={filtered.length}
             />
-            <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+            <button className="btn btn-primary" onClick={openCreate}>
               <IconPlus width={15} height={15} /> New Quotation
             </button>
           </div>
@@ -159,7 +197,13 @@ export default function Quotations() {
                     category="quotation"
                     vars={{ company: q.company, contact: customer?.contact, quoteNo: q.quoteNo, total: fmt(q.total), validUntil: q.validUntil }}
                   />
-                  <button className="btn btn-ghost btn-sm">View</button>
+                  <RowActionsMenu
+                    items={[
+                      { label: 'Edit', icon: <IconEdit width={13} height={13} />, onClick: () => openEdit(q) },
+                      'divider',
+                      { label: 'Delete', icon: <IconTrash width={13} height={13} />, danger: true, onClick: () => handleDelete(q) },
+                    ]}
+                  />
                 </td>
               </tr>
             )})}
@@ -171,13 +215,13 @@ export default function Quotations() {
 
       {showModal && (
         <Modal
-          title="New Quotation"
-          onClose={() => setShowModal(false)}
+          title={editingId ? 'Edit Quotation' : 'New Quotation'}
+          onClose={() => { setShowModal(false); setEditingId(null) }}
           footer={
             <>
-              <button className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
+              <button className="btn btn-secondary" onClick={() => { setShowModal(false); setEditingId(null) }}>Cancel</button>
               <button className="btn btn-primary" form="quote-form" type="submit" disabled={saving}>
-                {saving ? 'Saving…' : 'Save quotation'}
+                {saving ? 'Saving…' : editingId ? 'Save changes' : 'Save quotation'}
               </button>
             </>
           }

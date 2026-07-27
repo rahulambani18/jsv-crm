@@ -160,6 +160,7 @@ create table if not exists quotations (
   company text not null,
   items integer default 0,
   total numeric default 0,
+  line_items jsonb default '[]',  -- [{ product, qty, packingSize, price }]
   valid_until date,
   status text default 'Draft',  -- Draft | Sent | Under Negotiation | Accepted | Rejected
   created_at timestamptz default now()
