@@ -6,6 +6,7 @@ import { useAuth } from '../lib/AuthContext.jsx'
 import { PIPELINE_STAGES } from '../data/seed.js'
 import { APP_TODAY, getOverdueInvoices, daysOverdue } from '../lib/overdue.js'
 import { getExpiringStock, expiryStatus, daysToExpiry } from '../lib/expiry.js'
+import { availableQty, stockStatus } from '../lib/stockStatus.js'
 import StatCard from '../components/StatCard.jsx'
 import Pill from '../components/Pill.jsx'
 import {
@@ -107,11 +108,11 @@ export default function Dashboard() {
       }))
 
     const lowStock = stock
-      .filter((s) => Number(s.reorderLevel) > 0 && Number(s.qtyOnHand) <= Number(s.reorderLevel))
+      .filter((s) => Number(s.reorderLevel) > 0 && availableQty(s) <= Number(s.reorderLevel))
       .map((s) => ({
-        key: `s-${s.id}`, tone: s.qtyOnHand === 0 ? 'red' : 'amber', icon: IconBox,
+        key: `s-${s.id}`, tone: availableQty(s) === 0 ? 'red' : 'amber', icon: IconBox,
         title: s.product,
-        detail: `${s.qtyOnHand} ${s.unit} left at ${s.warehouse} (reorder at ${s.reorderLevel})`,
+        detail: `${availableQty(s)} ${s.unit} available at ${s.warehouse} (reorder at ${s.reorderLevel})`,
         route: '/inventory',
       }))
 
@@ -129,8 +130,8 @@ export default function Dashboard() {
   // the day can start from the Dashboard without a trip to Inventory.
   const lowStockItems = useMemo(() => {
     return stock
-      .filter((s) => Number(s.reorderLevel) > 0 && Number(s.qtyOnHand) <= Number(s.reorderLevel))
-      .sort((a, b) => Number(a.qtyOnHand) - Number(b.qtyOnHand))
+      .filter((s) => Number(s.reorderLevel) > 0 && availableQty(s) <= Number(s.reorderLevel))
+      .sort((a, b) => availableQty(a) - availableQty(b))
   }, [stock])
 
   const expiringItems = useMemo(() => getExpiringStock(stock, today), [stock, today])
@@ -194,12 +195,12 @@ export default function Dashboard() {
                   className="attention-row"
                   onClick={() => navigate('/inventory')}
                 >
-                  <span className={`attention-icon ${s.qtyOnHand === 0 ? 'red' : 'amber'}`}><IconBox /></span>
+                  <span className={`attention-icon ${availableQty(s) === 0 ? 'red' : 'amber'}`}><IconBox /></span>
                   <span className="attention-text">
                     <span className="attention-title">{s.product}</span>
-                    <span className="attention-detail">{Number(s.qtyOnHand).toLocaleString('en-IN')} {s.unit} · {s.warehouse}</span>
+                    <span className="attention-detail">{availableQty(s).toLocaleString('en-IN')} {s.unit} available · {s.warehouse}</span>
                   </span>
-                  <span style={{ flex: '0 0 auto', fontSize: 15 }}>{s.qtyOnHand === 0 ? '🚫' : '⚠️'}</span>
+                  <span style={{ flex: '0 0 auto', fontSize: 15 }}>{availableQty(s) === 0 ? '🚫' : '⚠️'}</span>
                 </button>
               ))}
             </div>

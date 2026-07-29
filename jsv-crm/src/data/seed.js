@@ -173,19 +173,19 @@ export const seedOrders = [
 ]
 
 export const seedStock = [
-  { id: 'st1', product: 'Citric Acid', warehouse: 'Mumbai (Bhiwandi)', unit: 'kg', qtyOnHand: 1200, reorderLevel: 500, expiryDate: '2027-03-15' },
-  { id: 'st2', product: 'Sodium Benzoate', warehouse: 'Mumbai (Bhiwandi)', unit: 'kg', qtyOnHand: 180, reorderLevel: 200, expiryDate: '2026-07-10' },
-  { id: 'st3', product: 'Carrageenan', warehouse: 'Delhi (Siraspur)', unit: 'kg', qtyOnHand: 320, reorderLevel: 100, expiryDate: '2026-12-01' },
-  { id: 'st4', product: 'Calcium Lactate', warehouse: 'Delhi (Siraspur)', unit: 'kg', qtyOnHand: 40, reorderLevel: 50, expiryDate: '2026-06-18' },
-  { id: 'st5', product: 'Xanthan Gum', warehouse: 'Mumbai (Bhiwandi)', unit: 'kg', qtyOnHand: 5, reorderLevel: 75, expiryDate: '2026-08-05' },
-  { id: 'st6', product: 'Guar Gum', warehouse: 'Chennai (Ambattur Road)', unit: 'kg', qtyOnHand: 0, reorderLevel: 50, expiryDate: '2026-09-01' },
-  { id: 'st7', product: 'Ascorbic Acid', warehouse: 'Delhi (Siraspur)', unit: 'kg', qtyOnHand: 610, reorderLevel: 150, expiryDate: '2026-07-01' },
+  { id: 'st1', product: 'Citric Acid', warehouse: 'Mumbai (Bhiwandi)', unit: 'kg', qtyOnHand: 1200, reorderLevel: 500, expiryDate: '2027-03-15', batchNumber: 'B-2026-0605', lotNumber: 'RZBC-L118', manufacturingDate: '2026-01-15', barcode: '8901234500017', reservedQty: 150, damagedQty: 0 },
+  { id: 'st2', product: 'Sodium Benzoate', warehouse: 'Mumbai (Bhiwandi)', unit: 'kg', qtyOnHand: 180, reorderLevel: 200, expiryDate: '2026-07-10', batchNumber: 'B-2026-0608', lotNumber: 'EK-L502', manufacturingDate: '2026-01-08', barcode: '8901234500024', reservedQty: 0, damagedQty: 0 },
+  { id: 'st3', product: 'Carrageenan', warehouse: 'Delhi (Siraspur)', unit: 'kg', qtyOnHand: 320, reorderLevel: 100, expiryDate: '2026-12-01', batchNumber: 'B-2026-0412', lotNumber: 'CG-L090', manufacturingDate: '2025-12-01', barcode: '8901234500031', reservedQty: 40, damagedQty: 0 },
+  { id: 'st4', product: 'Calcium Lactate', warehouse: 'Delhi (Siraspur)', unit: 'kg', qtyOnHand: 40, reorderLevel: 50, expiryDate: '2026-06-18', batchNumber: 'B-2026-0301', lotNumber: 'CL-L044', manufacturingDate: '2025-12-18', barcode: '8901234500048', reservedQty: 0, damagedQty: 5 },
+  { id: 'st5', product: 'Xanthan Gum', warehouse: 'Mumbai (Bhiwandi)', unit: 'kg', qtyOnHand: 5, reorderLevel: 75, expiryDate: '2026-08-05', batchNumber: 'B-2026-0201', lotNumber: 'XG-L012', manufacturingDate: '2026-02-05', barcode: '8901234500055', reservedQty: 0, damagedQty: 0 },
+  { id: 'st6', product: 'Guar Gum', warehouse: 'Chennai (Ambattur Road)', unit: 'kg', qtyOnHand: 0, reorderLevel: 50, expiryDate: '2026-09-01', batchNumber: '', lotNumber: '', manufacturingDate: '', barcode: '8901234500062', reservedQty: 0, damagedQty: 0 },
+  { id: 'st7', product: 'Ascorbic Acid', warehouse: 'Delhi (Siraspur)', unit: 'kg', qtyOnHand: 610, reorderLevel: 150, expiryDate: '2026-07-01', batchNumber: 'B-2026-0510', lotNumber: 'AA-L221', manufacturingDate: '2026-01-01', barcode: '8901234500079', reservedQty: 60, damagedQty: 10 },
 ]
 
 export const seedStockMovements = [
-  { id: 'sm1', product: 'Citric Acid', warehouse: 'Mumbai (Bhiwandi)', type: 'Received', qty: 1500, reference: 'PO-4471', notes: 'From RZBC', date: '2026-06-05' },
+  { id: 'sm1', product: 'Citric Acid', warehouse: 'Mumbai (Bhiwandi)', type: 'Received', qty: 1500, reference: 'PO-4471', notes: 'From RZBC', date: '2026-06-05', batchNumber: 'B-2026-0605', lotNumber: 'RZBC-L118', manufacturingDate: '2026-01-15' },
   { id: 'sm2', product: 'Citric Acid', warehouse: 'Mumbai (Bhiwandi)', type: 'Dispatched', qty: 500, reference: 'ORD-2026-0301', notes: '', date: '2026-06-18' },
-  { id: 'sm3', product: 'Sodium Benzoate', warehouse: 'Mumbai (Bhiwandi)', type: 'Received', qty: 280, reference: 'PO-4488', notes: 'From Emerald Kalama', date: '2026-06-08' },
+  { id: 'sm3', product: 'Sodium Benzoate', warehouse: 'Mumbai (Bhiwandi)', type: 'Received', qty: 280, reference: 'PO-4488', notes: 'From Emerald Kalama', date: '2026-06-08', batchNumber: 'B-2026-0608', lotNumber: 'EK-L502', manufacturingDate: '2026-01-08' },
   { id: 'sm4', product: 'Sodium Benzoate', warehouse: 'Mumbai (Bhiwandi)', type: 'Dispatched', qty: 100, reference: 'ORD-2026-0301', notes: '', date: '2026-06-18' },
   { id: 'sm5', product: 'Calcium Lactate', warehouse: 'Delhi (Siraspur)', type: 'Adjustment', qty: -5, reference: '', notes: 'Damaged bag, written off', date: '2026-06-27' },
 ]

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import QRCode from 'qrcode'
 import { api } from '../lib/api.js'
 import { WAREHOUSES } from '../data/seed.js'
 import { readSpreadsheetFile, normalizeRow } from '../lib/fileImport.js'
@@ -12,11 +13,15 @@ import Dropdown from '../components/Dropdown.jsx'
 import ComboField from '../components/ComboField.jsx'
 import BulkActionsBar from '../components/BulkActionsBar.jsx'
 import Pagination from '../components/Pagination.jsx'
-import { IconPlus, IconSearch, IconLayers, IconTrash, IconClock, IconUpload } from '../components/Icons.jsx'
+import {
+  IconPlus, IconSearch, IconLayers, IconTrash, IconClock, IconUpload,
+  IconBarcode, IconQrCode, IconTransfer, IconAlertTriangle,
+} from '../components/Icons.jsx'
 import { useAuth } from '../lib/AuthContext.jsx'
 import { showToast } from '../lib/toast.js'
 import { exportCSV } from '../lib/exportUtils.js'
-import { expiryStatus } from '../lib/expiry.js'
+import { expiryStatus, EXPIRY_WARNING_DAYS } from '../lib/expiry.js'
+import { availableQty, stockStatus } from '../lib/stockStatus.js'
 import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 
@@ -45,19 +50,47 @@ function formatUpdatedAt(iso) {
 }
 
 const SOURCE_TONE = { 'Excel Sync': 'teal', 'Excel Import': 'navy', Manual: 'gray' }
+const MOVEMENT_TONE = {
+  Dispatched: 'amber', Adjustment: 'gray', Received: 'teal', Return: 'teal',
+  'Transfer Out': 'navy', 'Transfer In': 'navy', Damaged: 'red', Reserved: 'amber', 'Write-off': 'red',
+}
+
+const EXPORT_HEADERS = [
+  'Product', 'Warehouse', 'Qty On Hand', 'Available', 'Reserved', 'Damaged', 'Unit',
+  'Reorder Level', 'Status', 'Batch Number', 'Lot Number', 'Manufacturing Date',
+  'Expiry Date', 'Expiry Status', 'Barcode', 'Last Updated', 'Source',
+]
+
+function exportRow(s) {
+  return [
+    s.product, s.warehouse, s.qtyOnHand, availableQty(s), s.reservedQty || 0, s.damagedQty || 0, s.unit,
+    s.reorderLevel, stockStatus(s), s.batchNumber || '', s.lotNumber || '', s.manufacturingDate || '',
+    s.expiryDate || '', expiryStatus(s) || '', s.barcode || '', s.updatedAt || '', s.source || '',
+  ]
+}
 
 function emptyEntryForm() {
   return {
     product: '', warehouse: WAREHOUSES[0] || '', type: 'Received',
     qty: '', reference: '', notes: '', date: new Date().toISOString().slice(0, 10),
-    expiryDate: '',
+    expiryDate: '', batchNumber: '', lotNumber: '', manufacturingDate: '',
   }
 }
 
-function statusFor(row) {
-  if (Number(row.qtyOnHand) <= 0) return 'Out of Stock'
-  if (Number(row.reorderLevel) > 0 && Number(row.qtyOnHand) <= Number(row.reorderLevel)) return 'Low Stock'
-  return 'In Stock'
+function emptyTransferForm(row) {
+  return {
+    product: row?.product || '', fromWarehouse: row?.warehouse || '', toWarehouse: '',
+    qty: '', reference: '', notes: '', date: new Date().toISOString().slice(0, 10),
+  }
+}
+
+// Generates a simple, deterministic-looking EAN-13-shaped code so a
+// stock line always has *something* scannable even before a real
+// barcode is assigned — "8" + India GS1 prefix stand-in + 9 digits
+// derived from the current time, so codes don't collide in a demo.
+function generateBarcode() {
+  const digits = String(Date.now()).slice(-9)
+  return `890${digits}`
 }
 
 export default function Inventory() {
@@ -84,6 +117,20 @@ export default function Inventory() {
   const [importError, setImportError] = useState('')
   const [importBusy, setImportBusy] = useState(false)
   const fileInputRef = useRef(null)
+
+  const [showTransferModal, setShowTransferModal] = useState(false)
+  const [transferForm, setTransferForm] = useState(emptyTransferForm())
+  const [transferring, setTransferring] = useState(false)
+
+  const [batchRow, setBatchRow] = useState(null)
+  const [batchForm, setBatchForm] = useState(null)
+  const [savingBatch, setSavingBatch] = useState(false)
+
+  const [qrRow, setQrRow] = useState(null)
+  const [qrDataUrl, setQrDataUrl] = useState('')
+  const [qrLoading, setQrLoading] = useState(false)
+
+  const [showExpiryBanner, setShowExpiryBanner] = useState(true)
 
   useEffect(() => { refresh() }, [])
 
@@ -180,7 +227,7 @@ export default function Inventory() {
     return stock.filter((s) => {
       const matchesSearch = !search || [s.product, s.warehouse].some((v) => (v || '').toLowerCase().includes(search.toLowerCase()))
       const matchesWarehouse = warehouseFilter === 'All' || s.warehouse === warehouseFilter
-      const matchesStatus = statusFilter === 'All' || statusFor(s) === statusFilter
+      const matchesStatus = statusFilter === 'All' || stockStatus(s) === statusFilter
       const matchesArchived = showArchived ? !!s.archived : !s.archived
       return matchesSearch && matchesWarehouse && matchesStatus && matchesArchived
     })
@@ -192,11 +239,12 @@ export default function Inventory() {
   const paged = useMemo(() => filtered.slice((page - 1) * pageSize, page * pageSize), [filtered, page, pageSize])
 
   const stats = useMemo(() => {
-    const lowStock = stock.filter((s) => statusFor(s) === 'Low Stock').length
-    const outOfStock = stock.filter((s) => statusFor(s) === 'Out of Stock').length
+    const lowStock = stock.filter((s) => stockStatus(s) === 'Low Stock').length
+    const outOfStock = stock.filter((s) => stockStatus(s) === 'Out of Stock').length
     const totalValue = stock.reduce((sum, s) => sum + Number(s.qtyOnHand || 0) * (priceByProduct[s.product] || 0), 0)
     const expiring = stock.filter((s) => Number(s.qtyOnHand) > 0 && ['Expired', 'Expiring Soon'].includes(expiryStatus(s))).length
-    return { totalSkus: stock.length, lowStock, outOfStock, totalValue, expiring }
+    const damagedSkus = stock.filter((s) => Number(s.damagedQty) > 0).length
+    return { totalSkus: stock.length, lowStock, outOfStock, totalValue, expiring, damagedSkus }
   }, [stock, priceByProduct])
 
   async function handleLogMovement(e) {
@@ -221,15 +269,23 @@ export default function Inventory() {
 
       if (existing) {
         const patch = { qtyOnHand: nextQty, updatedAt: new Date().toISOString(), source: 'Manual' }
-        // A fresh Received entry replaces the tracked expiry with the new
-        // batch's date; other movement types leave the existing date alone.
-        if (entryForm.type === 'Received' && entryForm.expiryDate) patch.expiryDate = entryForm.expiryDate
+        // A fresh Received entry replaces the tracked expiry/batch info
+        // with the new batch's details; other movement types leave
+        // whatever's currently on the stock line alone.
+        if (entryForm.type === 'Received') {
+          if (entryForm.expiryDate) patch.expiryDate = entryForm.expiryDate
+          if (entryForm.batchNumber) patch.batchNumber = entryForm.batchNumber
+          if (entryForm.lotNumber) patch.lotNumber = entryForm.lotNumber
+          if (entryForm.manufacturingDate) patch.manufacturingDate = entryForm.manufacturingDate
+        }
         await api.stock.update(existing.id, patch)
       } else {
         await api.stock.insert({
           product: entryForm.product, warehouse: entryForm.warehouse,
           unit: 'kg', qtyOnHand: Math.max(0, signedDelta), reorderLevel: 0,
           expiryDate: entryForm.expiryDate || null, source: 'Manual',
+          batchNumber: entryForm.batchNumber || null, lotNumber: entryForm.lotNumber || null,
+          manufacturingDate: entryForm.manufacturingDate || null,
         })
       }
 
@@ -237,6 +293,11 @@ export default function Inventory() {
         product: entryForm.product, warehouse: entryForm.warehouse,
         type: entryForm.type, qty: Math.abs(enteredQty),
         reference: entryForm.reference, notes: entryForm.notes, date: entryForm.date,
+        ...(entryForm.type === 'Received' ? {
+          batchNumber: entryForm.batchNumber || null,
+          lotNumber: entryForm.lotNumber || null,
+          manufacturingDate: entryForm.manufacturingDate || null,
+        } : {}),
       })
 
       setShowEntryModal(false)
@@ -275,6 +336,189 @@ export default function Inventory() {
     } catch (err) {
       showToast('Could not update expiry date: ' + (err.message || 'Unknown error'), 'error')
     }
+  }
+
+  // Reserved and damaged qty are edited inline like reorder level, but
+  // unlike reorder level they represent real stock movement (into or
+  // out of an allocation bucket), so each change is logged just like a
+  // Stock Entry would be — keeping the movement history complete.
+  async function handleReservedBlur(row, value) {
+    const next = Math.max(0, Number(value) || 0)
+    const prev = Number(row.reservedQty || 0)
+    if (next === prev) return
+    try {
+      await api.stock.update(row.id, { reservedQty: next, updatedAt: new Date().toISOString() })
+      await api.stockMovements.insert({
+        product: row.product, warehouse: row.warehouse, type: 'Reserved',
+        qty: Math.abs(next - prev), date: new Date().toISOString().slice(0, 10),
+        notes: next > prev ? `Reserved qty increased by ${next - prev}` : `Reservation released for ${prev - next}`,
+      })
+      refresh()
+    } catch (err) {
+      showToast('Could not update reserved qty: ' + (err.message || 'Unknown error'), 'error')
+    }
+  }
+
+  async function handleDamagedBlur(row, value) {
+    const next = Math.max(0, Number(value) || 0)
+    const prev = Number(row.damagedQty || 0)
+    if (next === prev) return
+    try {
+      await api.stock.update(row.id, { damagedQty: next, updatedAt: new Date().toISOString() })
+      await api.stockMovements.insert({
+        product: row.product, warehouse: row.warehouse, type: 'Damaged',
+        qty: Math.abs(next - prev), date: new Date().toISOString().slice(0, 10),
+        notes: next > prev ? `Marked ${next - prev} more as damaged` : `${prev - next} un-marked as damaged`,
+      })
+      refresh()
+    } catch (err) {
+      showToast('Could not update damaged qty: ' + (err.message || 'Unknown error'), 'error')
+    }
+  }
+
+  // Disposes of the currently-damaged qty entirely — removes it from
+  // qtyOnHand (it's leaving the warehouse for good) and clears the
+  // damaged bucket back to 0.
+  async function handleWriteOffDamaged(row) {
+    const damaged = Number(row.damagedQty || 0)
+    if (damaged <= 0) return
+    if (!confirm(`Write off ${damaged} ${row.unit} of damaged ${row.product} at ${row.warehouse}? This removes it from qty on hand permanently.`)) return
+    try {
+      const nextQty = Math.max(0, Number(row.qtyOnHand || 0) - damaged)
+      await api.stock.update(row.id, { qtyOnHand: nextQty, damagedQty: 0, updatedAt: new Date().toISOString() })
+      await api.stockMovements.insert({
+        product: row.product, warehouse: row.warehouse, type: 'Write-off',
+        qty: damaged, date: new Date().toISOString().slice(0, 10),
+        notes: 'Damaged stock written off and removed from qty on hand',
+      })
+      refresh()
+      showToast(`Wrote off ${damaged} ${row.unit} of ${row.product}`)
+    } catch (err) {
+      showToast('Could not write off damaged stock: ' + (err.message || 'Unknown error'), 'error')
+    }
+  }
+
+  function openTransfer(row) {
+    setTransferForm(emptyTransferForm(row))
+    setShowTransferModal(true)
+  }
+
+  async function handleTransfer(e) {
+    e.preventDefault()
+    const { product, fromWarehouse, toWarehouse, qty } = transferForm
+    const moveQty = Math.abs(Number(qty) || 0)
+    if (!toWarehouse || !moveQty) {
+      showToast('Destination warehouse and quantity are required', 'error')
+      return
+    }
+    if (toWarehouse === fromWarehouse) {
+      showToast('Choose a different destination warehouse', 'error')
+      return
+    }
+    const source = stock.find((s) => s.product === product && s.warehouse === fromWarehouse)
+    const sourceAvailable = source ? availableQty(source) : 0
+    if (moveQty > sourceAvailable) {
+      showToast(`Only ${sourceAvailable} ${source?.unit || ''} available to transfer at ${fromWarehouse}`, 'error')
+      return
+    }
+    setTransferring(true)
+    try {
+      await api.stock.update(source.id, { qtyOnHand: Math.max(0, Number(source.qtyOnHand) - moveQty), updatedAt: new Date().toISOString() })
+
+      const dest = stock.find((s) => s.product === product && s.warehouse === toWarehouse)
+      if (dest) {
+        await api.stock.update(dest.id, { qtyOnHand: Number(dest.qtyOnHand) + moveQty, updatedAt: new Date().toISOString() })
+      } else {
+        // New destination line — carries over the source's batch/expiry
+        // metadata for the transferred qty, since this is its first
+        // stock at that warehouse.
+        await api.stock.insert({
+          product, warehouse: toWarehouse, unit: source.unit, qtyOnHand: moveQty, reorderLevel: 0,
+          expiryDate: source.expiryDate || null, batchNumber: source.batchNumber || null,
+          lotNumber: source.lotNumber || null, manufacturingDate: source.manufacturingDate || null,
+          barcode: source.barcode || null, source: 'Manual',
+        })
+      }
+
+      await api.stockMovements.insert({
+        product, warehouse: fromWarehouse, type: 'Transfer Out', qty: moveQty,
+        reference: transferForm.reference, date: transferForm.date,
+        notes: `To ${toWarehouse}${transferForm.notes ? ' — ' + transferForm.notes : ''}`,
+      })
+      await api.stockMovements.insert({
+        product, warehouse: toWarehouse, type: 'Transfer In', qty: moveQty,
+        reference: transferForm.reference, date: transferForm.date,
+        notes: `From ${fromWarehouse}${transferForm.notes ? ' — ' + transferForm.notes : ''}`,
+      })
+
+      setShowTransferModal(false)
+      refresh()
+      showToast(`Transferred ${moveQty} ${source.unit} of ${product} to ${toWarehouse}`)
+    } catch (err) {
+      showToast('Could not complete transfer: ' + (err.message || 'Unknown error'), 'error')
+    } finally {
+      setTransferring(false)
+    }
+  }
+
+  function openBatchDetails(row) {
+    setBatchRow(row)
+    setBatchForm({
+      batchNumber: row.batchNumber || '', lotNumber: row.lotNumber || '',
+      manufacturingDate: row.manufacturingDate || '', expiryDate: row.expiryDate || '',
+      barcode: row.barcode || '',
+    })
+  }
+
+  async function handleSaveBatchDetails(e) {
+    e.preventDefault()
+    setSavingBatch(true)
+    try {
+      await api.stock.update(batchRow.id, { ...batchForm, updatedAt: new Date().toISOString() })
+      setBatchRow(null)
+      setBatchForm(null)
+      refresh()
+      showToast('Batch details updated')
+    } catch (err) {
+      showToast('Could not save batch details: ' + (err.message || 'Unknown error'), 'error')
+    } finally {
+      setSavingBatch(false)
+    }
+  }
+
+  // Encodes the stock line's key identifiers into a scannable QR — a
+  // warehouse team can scan it to pull up exactly which batch/lot this
+  // label belongs to without retyping anything.
+  async function handleShowQR(row) {
+    setQrRow(row)
+    setQrDataUrl('')
+    setQrLoading(true)
+    try {
+      const barcode = row.barcode || generateBarcode()
+      if (!row.barcode) await api.stock.update(row.id, { barcode })
+      const payload = [
+        `Product: ${row.product}`, `Warehouse: ${row.warehouse}`, `Barcode: ${barcode}`,
+        row.batchNumber && `Batch: ${row.batchNumber}`, row.lotNumber && `Lot: ${row.lotNumber}`,
+        row.manufacturingDate && `Mfg: ${row.manufacturingDate}`, row.expiryDate && `Exp: ${row.expiryDate}`,
+      ].filter(Boolean).join('\n')
+      const dataUrl = await QRCode.toDataURL(payload, { width: 280, margin: 1, color: { dark: '#0f1e3d', light: '#ffffff' } })
+      setQrDataUrl(dataUrl)
+      if (!row.barcode) refresh()
+    } catch (err) {
+      showToast('Could not generate QR code: ' + (err.message || 'Unknown error'), 'error')
+    } finally {
+      setQrLoading(false)
+    }
+  }
+
+  function handleDownloadQR() {
+    if (!qrDataUrl || !qrRow) return
+    const a = document.createElement('a')
+    a.href = qrDataUrl
+    a.download = `${qrRow.product}-${qrRow.warehouse}-qr.png`.replace(/\s+/g, '-')
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
   }
 
   async function handleDeleteRow(row) {
@@ -319,8 +563,8 @@ export default function Inventory() {
     const rows = filtered.filter((s) => selected.has(s.id))
     exportCSV(
       'Inventory',
-      ['Product', 'Warehouse', 'Qty On Hand', 'Unit', 'Reorder Level', 'Status', 'Expiry Date', 'Expiry Status', 'Last Updated', 'Source'],
-      rows.map((s) => [s.product, s.warehouse, s.qtyOnHand, s.unit, s.reorderLevel, statusFor(s), s.expiryDate || '', expiryStatus(s) || '', s.updatedAt || '', s.source || ''])
+      EXPORT_HEADERS,
+      rows.map(exportRow)
     )
   }
 
@@ -368,8 +612,8 @@ export default function Inventory() {
             )}
             <ExportBar
               title="Inventory"
-              headers={['Product', 'Warehouse', 'Qty On Hand', 'Unit', 'Reorder Level', 'Status', 'Expiry Date', 'Expiry Status', 'Last Updated', 'Source']}
-              rows={filtered.map((s) => [s.product, s.warehouse, s.qtyOnHand, s.unit, s.reorderLevel, statusFor(s), s.expiryDate || '', expiryStatus(s) || '', s.updatedAt || '', s.source || ''])}
+              headers={EXPORT_HEADERS}
+              rows={filtered.map(exportRow)}
               count={filtered.length}
             />
             {canEdit && (
@@ -387,11 +631,22 @@ export default function Inventory() {
         </div>
       )}
 
+      {showExpiryBanner && stats.expiring > 0 && (
+        <div style={{ background: 'var(--amber-100, #fef3c7)', color: 'var(--amber-700, #92400e)', padding: '10px 14px', borderRadius: 8, fontSize: 13, marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <IconAlertTriangle width={16} height={16} />
+            {stats.expiring} batch{stats.expiring === 1 ? '' : 'es'} expired or expiring within {EXPIRY_WARNING_DAYS} days — check the Expiry Date column below.
+          </span>
+          <button className="btn btn-ghost btn-sm" onClick={() => setShowExpiryBanner(false)}>Dismiss</button>
+        </div>
+      )}
+
       <div className="stat-grid">
         <StatCard icon={IconLayers} tone="blue" label="SKUs Tracked" value={stats.totalSkus} />
         <StatCard icon={IconClock} tone="amber" label="Low Stock" value={stats.lowStock} />
         <StatCard icon={IconTrash} tone="red" label="Out of Stock" value={stats.outOfStock} />
         <StatCard icon={IconClock} tone="red" label="Expiring / Expired" value={stats.expiring} />
+        <StatCard icon={IconAlertTriangle} tone="red" label="Damaged Stock" value={stats.damagedSkus} />
         <StatCard icon={IconLayers} tone="teal" label="Stock Value (est.)" value={formatINR(stats.totalValue)} mono />
       </div>
 
@@ -444,15 +699,15 @@ export default function Inventory() {
                   />
                 </th>
               )}
-              <th>Product</th><th>Warehouse</th><th>Qty On Hand</th><th>Unit</th>
+              <th>Product</th><th>Warehouse</th><th>Qty On Hand</th><th>Available</th><th>Reserved</th><th>Damaged</th><th>Unit</th>
               <th>Reorder Level</th><th>Status</th><th>Expiry Date</th><th>Last Updated</th><th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={9 + (canEdit ? 1 : 0)}>Loading inventory…</td></tr>
+              <tr className="empty-row"><td colSpan={12 + (canEdit ? 1 : 0)}>Loading inventory…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={9 + (canEdit ? 1 : 0)}>
+              <tr className="empty-row"><td colSpan={12 + (canEdit ? 1 : 0)}>
                 {stock.length === 0 ? (
                   <EmptyState
                     icon="📦"
@@ -466,7 +721,7 @@ export default function Inventory() {
                 )}
               </td></tr>
             ) : paged.map((s) => {
-              const status = statusFor(s)
+              const status = stockStatus(s)
               const productExists = products.some((p) => p.name === s.product)
               return (
                 <tr key={s.id} style={{ opacity: s.archived ? 0.55 : 1 }}>
@@ -485,6 +740,36 @@ export default function Inventory() {
                   </td>
                   <td>{s.warehouse}</td>
                   <td className="cell-mono">{Number(s.qtyOnHand).toLocaleString('en-IN')}</td>
+                  <td className="cell-mono cell-strong">{availableQty(s).toLocaleString('en-IN')}</td>
+                  <td className="cell-mono">
+                    {canEdit ? (
+                      <input
+                        type="number" min="0" defaultValue={s.reservedQty || 0}
+                        style={{ width: 70 }}
+                        onBlur={(e) => handleReservedBlur(s, e.target.value)}
+                      />
+                    ) : (
+                      s.reservedQty || 0
+                    )}
+                  </td>
+                  <td className="cell-mono">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      {canEdit ? (
+                        <input
+                          type="number" min="0" defaultValue={s.damagedQty || 0}
+                          style={{ width: 70 }}
+                          onBlur={(e) => handleDamagedBlur(s, e.target.value)}
+                        />
+                      ) : (
+                        s.damagedQty || 0
+                      )}
+                      {canEdit && Number(s.damagedQty) > 0 && (
+                        <button className="btn btn-ghost btn-sm" onClick={() => handleWriteOffDamaged(s)} title="Write off damaged stock (removes from qty on hand)">
+                          <IconTrash width={12} height={12} />
+                        </button>
+                      )}
+                    </div>
+                  </td>
                   <td>{s.unit}</td>
                   <td className="cell-mono">
                     {canEdit ? (
@@ -526,6 +811,17 @@ export default function Inventory() {
                           <IconPlus width={14} height={14} /> Restock
                         </button>
                       )}
+                      {canEdit && Number(s.qtyOnHand) > 0 && (
+                        <button className="btn btn-ghost btn-sm" onClick={() => openTransfer(s)} title="Transfer to another warehouse">
+                          <IconTransfer width={14} height={14} />
+                        </button>
+                      )}
+                      <button className="btn btn-ghost btn-sm" onClick={() => openBatchDetails(s)} title="Batch, lot & barcode details">
+                        <IconBarcode width={14} height={14} />
+                      </button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => handleShowQR(s)} title="Generate QR code label">
+                        <IconQrCode width={14} height={14} />
+                      </button>
                       <button className="btn btn-ghost btn-sm" onClick={() => setHistoryRow(s)} title="View movement history">
                         <IconClock width={14} height={14} />
                       </button>
@@ -613,15 +909,42 @@ export default function Inventory() {
               </div>
             </div>
             {entryForm.type === 'Received' && (
-              <div className="field-row">
-                <div className="field">
-                  <label>Expiry Date <span className="cell-muted">(optional)</span></label>
-                  <input
-                    type="date" value={entryForm.expiryDate}
-                    onChange={(e) => setEntryForm({ ...entryForm, expiryDate: e.target.value })}
-                  />
+              <>
+                <div className="field-row">
+                  <div className="field">
+                    <label>Batch Number <span className="cell-muted">(optional)</span></label>
+                    <input
+                      value={entryForm.batchNumber}
+                      onChange={(e) => setEntryForm({ ...entryForm, batchNumber: e.target.value })}
+                      placeholder="e.g. B-2026-0605"
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Lot Number <span className="cell-muted">(optional)</span></label>
+                    <input
+                      value={entryForm.lotNumber}
+                      onChange={(e) => setEntryForm({ ...entryForm, lotNumber: e.target.value })}
+                      placeholder="e.g. RZBC-L118"
+                    />
+                  </div>
                 </div>
-              </div>
+                <div className="field-row">
+                  <div className="field">
+                    <label>Manufacturing Date <span className="cell-muted">(optional)</span></label>
+                    <input
+                      type="date" value={entryForm.manufacturingDate}
+                      onChange={(e) => setEntryForm({ ...entryForm, manufacturingDate: e.target.value })}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Expiry Date <span className="cell-muted">(optional)</span></label>
+                    <input
+                      type="date" value={entryForm.expiryDate}
+                      onChange={(e) => setEntryForm({ ...entryForm, expiryDate: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </>
             )}
             <div className="field">
               <label>Notes</label>
@@ -648,7 +971,7 @@ export default function Inventory() {
                 {historyRows.map((m) => (
                   <tr key={m.id}>
                     <td className="cell-mono">{m.date}</td>
-                    <td><Pill tone={m.type === 'Dispatched' ? 'amber' : m.type === 'Adjustment' ? 'gray' : 'teal'}>{m.type}</Pill></td>
+                    <td><Pill tone={MOVEMENT_TONE[m.type] || 'teal'}>{m.type}</Pill></td>
                     <td className="cell-mono">{m.qty}</td>
                     <td className="cell-mono">{m.reference || <span className="cell-muted">—</span>}</td>
                     <td>{m.notes || <span className="cell-muted">—</span>}</td>
@@ -657,6 +980,160 @@ export default function Inventory() {
               </tbody>
             </table>
           )}
+        </Modal>
+      )}
+
+      {showTransferModal && (
+        <Modal
+          title={`Transfer stock — ${transferForm.product}`}
+          onClose={() => setShowTransferModal(false)}
+          footer={
+            <>
+              <button className="btn btn-secondary" onClick={() => setShowTransferModal(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleTransfer} disabled={transferring}>{transferring ? 'Transferring…' : 'Transfer'}</button>
+            </>
+          }
+        >
+          <form onSubmit={handleTransfer}>
+            <div className="field-row">
+              <div className="field">
+                <label>From</label>
+                <input value={transferForm.fromWarehouse} disabled style={{ opacity: 0.7 }} />
+              </div>
+              <div className="field">
+                <label>To</label>
+                <ComboField
+                  options={warehouseNames.filter((w) => w !== transferForm.fromWarehouse)}
+                  value={transferForm.toWarehouse}
+                  onChange={(v) => setTransferForm({ ...transferForm, toWarehouse: v })}
+                  placeholder="Select destination…"
+                />
+              </div>
+            </div>
+            <div className="field-row">
+              <div className="field">
+                <label>Quantity</label>
+                <input
+                  type="number" min="0" value={transferForm.qty}
+                  onChange={(e) => setTransferForm({ ...transferForm, qty: e.target.value })}
+                  placeholder="e.g. 100"
+                />
+              </div>
+              <div className="field">
+                <label>Date</label>
+                <input
+                  type="date" value={transferForm.date}
+                  onChange={(e) => setTransferForm({ ...transferForm, date: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="field-row">
+              <div className="field">
+                <label>Reference</label>
+                <input
+                  value={transferForm.reference}
+                  onChange={(e) => setTransferForm({ ...transferForm, reference: e.target.value })}
+                  placeholder="e.g. TRF-0012"
+                />
+              </div>
+              <div className="field">
+                <label>Notes</label>
+                <input
+                  value={transferForm.notes}
+                  onChange={(e) => setTransferForm({ ...transferForm, notes: e.target.value })}
+                  placeholder="Optional"
+                />
+              </div>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {batchRow && batchForm && (
+        <Modal
+          title={`Batch details — ${batchRow.product} (${batchRow.warehouse})`}
+          onClose={() => { setBatchRow(null); setBatchForm(null) }}
+          footer={
+            <>
+              <button className="btn btn-secondary" onClick={() => { setBatchRow(null); setBatchForm(null) }}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleSaveBatchDetails} disabled={savingBatch}>{savingBatch ? 'Saving…' : 'Save'}</button>
+            </>
+          }
+        >
+          <form onSubmit={handleSaveBatchDetails}>
+            <div className="field-row">
+              <div className="field">
+                <label>Batch Number</label>
+                <input
+                  value={batchForm.batchNumber}
+                  onChange={(e) => setBatchForm({ ...batchForm, batchNumber: e.target.value })}
+                  placeholder="e.g. B-2026-0605"
+                />
+              </div>
+              <div className="field">
+                <label>Lot Number</label>
+                <input
+                  value={batchForm.lotNumber}
+                  onChange={(e) => setBatchForm({ ...batchForm, lotNumber: e.target.value })}
+                  placeholder="e.g. RZBC-L118"
+                />
+              </div>
+            </div>
+            <div className="field-row">
+              <div className="field">
+                <label>Manufacturing Date</label>
+                <input
+                  type="date" value={batchForm.manufacturingDate}
+                  onChange={(e) => setBatchForm({ ...batchForm, manufacturingDate: e.target.value })}
+                />
+              </div>
+              <div className="field">
+                <label>Expiry Date</label>
+                <input
+                  type="date" value={batchForm.expiryDate}
+                  onChange={(e) => setBatchForm({ ...batchForm, expiryDate: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="field">
+              <label>Barcode</label>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <input
+                  value={batchForm.barcode}
+                  onChange={(e) => setBatchForm({ ...batchForm, barcode: e.target.value })}
+                  placeholder="e.g. 8901234500017"
+                />
+                <button
+                  type="button" className="btn btn-secondary btn-sm"
+                  onClick={() => setBatchForm({ ...batchForm, barcode: generateBarcode() })}
+                >
+                  Generate
+                </button>
+              </div>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {qrRow && (
+        <Modal title={`QR label — ${qrRow.product} (${qrRow.warehouse})`} onClose={() => { setQrRow(null); setQrDataUrl('') }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+            {qrLoading ? (
+              <p className="cell-muted">Generating…</p>
+            ) : qrDataUrl ? (
+              <>
+                <img src={qrDataUrl} alt={`QR code for ${qrRow.product}`} width={220} height={220} style={{ borderRadius: 8, border: '1px solid var(--border, #e2e5eb)' }} />
+                <div style={{ fontSize: 12.5, color: 'var(--ink-500)', textAlign: 'center' }}>
+                  <div>{qrRow.product} — {qrRow.warehouse}</div>
+                  {qrRow.batchNumber && <div>Batch: {qrRow.batchNumber}</div>}
+                  {qrRow.barcode && <div>Barcode: {qrRow.barcode}</div>}
+                </div>
+                <button className="btn btn-primary btn-sm" onClick={handleDownloadQR}>Download PNG</button>
+              </>
+            ) : (
+              <p className="cell-muted">Could not generate a QR code.</p>
+            )}
+          </div>
         </Modal>
       )}
     </div>

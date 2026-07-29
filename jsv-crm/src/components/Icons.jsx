@@ -102,6 +102,18 @@ export const IconChevronLeft = (p) => (
 export const IconUpload = (p) => (
   <svg {...base} {...p}><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 002 2h12a2 2 0 002-2v-3"/></svg>
 )
+export const IconBarcode = (p) => (
+  <svg {...base} {...p}><path d="M4 4v16M8 4v16M11 4v16M15 4v16M17 4v10M20 4v16" strokeWidth="1.6"/></svg>
+)
+export const IconQrCode = (p) => (
+  <svg {...base} {...p}><rect x="3.5" y="3.5" width="6" height="6" rx="1"/><rect x="14.5" y="3.5" width="6" height="6" rx="1"/><rect x="3.5" y="14.5" width="6" height="6" rx="1"/><path d="M14.5 14.5h3v3h-3zM20 14.5v2.5M17.5 20H20"/></svg>
+)
+export const IconTransfer = (p) => (
+  <svg {...base} {...p}><path d="M3 8h14M13 4l4 4-4 4"/><path d="M21 16H7M11 12l-4 4 4 4"/></svg>
+)
+export const IconAlertTriangle = (p) => (
+  <svg {...base} {...p}><path d="M12 3.5L21.5 20h-19L12 3.5z"/><path d="M12 9.5v4.5M12 17.2v.3"/></svg>
+)
 export const IconKey = (p) => (
   <svg {...base} {...p}><circle cx="8" cy="14" r="4"/><path d="M11 11l9-9"/><path d="M16 6l2.5 2.5"/><path d="M13 9l2 2"/></svg>
 )
