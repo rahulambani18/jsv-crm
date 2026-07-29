@@ -72,6 +72,7 @@ export default function Inventory() {
   const [search, setSearch] = useState('')
   const [warehouseFilter, setWarehouseFilter] = useState('All')
   const [statusFilter, setStatusFilter] = useState('All')
+  const [showArchived, setShowArchived] = useState(false)
 
   const [showEntryModal, setShowEntryModal] = useState(false)
   const [entryForm, setEntryForm] = useState(emptyEntryForm())
@@ -180,13 +181,14 @@ export default function Inventory() {
       const matchesSearch = !search || [s.product, s.warehouse].some((v) => (v || '').toLowerCase().includes(search.toLowerCase()))
       const matchesWarehouse = warehouseFilter === 'All' || s.warehouse === warehouseFilter
       const matchesStatus = statusFilter === 'All' || statusFor(s) === statusFilter
-      return matchesSearch && matchesWarehouse && matchesStatus
+      const matchesArchived = showArchived ? !!s.archived : !s.archived
+      return matchesSearch && matchesWarehouse && matchesStatus && matchesArchived
     })
-  }, [stock, search, warehouseFilter, statusFilter])
+  }, [stock, search, warehouseFilter, statusFilter, showArchived])
 
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
-  useEffect(() => { setPage(1) }, [search, warehouseFilter, statusFilter])
+  useEffect(() => { setPage(1) }, [search, warehouseFilter, statusFilter, showArchived])
   const paged = useMemo(() => filtered.slice((page - 1) * pageSize, page * pageSize), [filtered, page, pageSize])
 
   const stats = useMemo(() => {
@@ -322,6 +324,21 @@ export default function Inventory() {
     )
   }
 
+  // Soft alternative to Delete: hides discontinued/obsolete stock
+  // lines from the active view without dropping their movement
+  // history, the way removing them entirely would.
+  async function handleBulkArchive(archived) {
+    const count = selected.size
+    try {
+      await Promise.all([...selected].map((id) => api.stock.update(id, { archived })))
+      setSelected(new Set())
+      refresh()
+      showToast(`${count} stock line${count === 1 ? '' : 's'} ${archived ? 'archived' : 'unarchived'}`)
+    } catch (err) {
+      showToast(`Could not ${archived ? 'archive' : 'unarchive'} selected: ` + (err.message || 'Unknown error'), 'error')
+    }
+  }
+
   const historyRows = historyRow
     ? movements
         .filter((m) => m.product === historyRow.product && m.warehouse === historyRow.warehouse)
@@ -393,6 +410,10 @@ export default function Inventory() {
           value={statusFilter}
           onChange={setStatusFilter}
         />
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--ink-500)', whiteSpace: 'nowrap' }}>
+          <input type="checkbox" checked={showArchived} onChange={(e) => { setShowArchived(e.target.checked); setSelected(new Set()) }} />
+          Show archived
+        </label>
       </div>
 
       {canEdit && (
@@ -401,7 +422,13 @@ export default function Inventory() {
           onClear={() => setSelected(new Set())}
           onExport={handleBulkExport}
           onDelete={canDelete ? handleBulkDelete : undefined}
-        />
+        >
+          {showArchived ? (
+            <button type="button" className="btn btn-ghost-light" onClick={() => handleBulkArchive(false)}>↩️ Unarchive</button>
+          ) : (
+            <button type="button" className="btn btn-ghost-light" onClick={() => handleBulkArchive(true)}>🗄️ Archive</button>
+          )}
+        </BulkActionsBar>
       )}
 
       <div className="table-wrap">
@@ -442,7 +469,7 @@ export default function Inventory() {
               const status = statusFor(s)
               const productExists = products.some((p) => p.name === s.product)
               return (
-                <tr key={s.id}>
+                <tr key={s.id} style={{ opacity: s.archived ? 0.55 : 1 }}>
                   {canEdit && (
                     <td className="row-checkbox-cell">
                       <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggleSelected(s.id)} />
@@ -454,6 +481,7 @@ export default function Inventory() {
                     ) : (
                       s.product
                     )}
+                    {s.archived && <span className="pill pill-gray" style={{ marginLeft: 6, fontSize: 10.5 }}>Archived</span>}
                   </td>
                   <td>{s.warehouse}</td>
                   <td className="cell-mono">{Number(s.qtyOnHand).toLocaleString('en-IN')}</td>

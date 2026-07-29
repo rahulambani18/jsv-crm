@@ -243,6 +243,49 @@ export default function Orders() {
     }
   }
 
+  // Bulk version of the "Generate from order" flow already on the
+  // Invoices page — skips orders that already have an invoice
+  // (matched by orderId) instead of creating duplicates.
+  async function handleBulkGenerateInvoice() {
+    const targets = orders.filter((o) => selected.has(o.id) && !invoices.some((i) => i.orderId === o.id))
+    const skipped = selected.size - targets.length
+    if (targets.length === 0) {
+      showToast('Every selected order already has an invoice', 'error')
+      return
+    }
+    if (!confirm(`Generate ${targets.length} invoice${targets.length === 1 ? '' : 's'} from the selected order${targets.length === 1 ? '' : 's'}?${skipped ? ` (${skipped} already invoiced, will be skipped)` : ''}`)) return
+    try {
+      let n = 0
+      for (const order of targets) {
+        const subtotal = Number(order.subtotal ?? order.total / 1.18 ?? 0)
+        const gst = Number(order.gstAmount ?? subtotal * 0.18)
+        await api.invoices.insert({
+          invoiceNo: `INV-2026-${String(40 + invoices.length + n + 1).padStart(4, '0')}`,
+          company: order.company,
+          orderId: order.id,
+          issueDate: new Date().toISOString().slice(0, 10),
+          dueDate: order.paymentDueDate || addDays(new Date().toISOString().slice(0, 10), 30),
+          paymentTerms: order.paymentTerms || 'Net 30',
+          subtotal: Math.round(subtotal),
+          cgst: Math.round(gst / 2),
+          sgst: Math.round(gst / 2),
+          igst: 0,
+          total: Math.round(subtotal + gst),
+          status: 'Draft',
+          paymentMode: '',
+          notes: `Generated from order ${order.orderNo}`,
+        })
+        n++
+      }
+      setSelected(new Set())
+      const invs = await api.invoices.list()
+      setInvoices(invs)
+      showToast(`${n} invoice${n === 1 ? '' : 's'} generated${skipped ? ` (${skipped} skipped — already invoiced)` : ''}`)
+    } catch (err) {
+      showToast('Could not generate invoices: ' + (err.message || 'Unknown error'), 'error')
+    }
+  }
+
   // Inline Status/Payment dropdowns in the table — deliberately available
   // to everyone who can see this page, not just users with full "edit"
   // rights. Editing the rest of an order (products, amounts, dates) still
@@ -353,6 +396,9 @@ export default function Orders() {
             <option value="Delivered">Delivered</option>
             <option value="Cancelled">Cancelled</option>
           </select>
+          <button type="button" className="btn btn-ghost-light" onClick={handleBulkGenerateInvoice}>
+            🧾 Generate Invoice
+          </button>
         </BulkActionsBar>
       )}
 

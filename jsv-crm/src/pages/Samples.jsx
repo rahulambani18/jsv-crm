@@ -9,8 +9,12 @@ import Modal from '../components/Modal.jsx'
 import MultiComboField from '../components/MultiComboField.jsx'
 import SendButtons from '../components/SendButtons.jsx'
 import Pagination from '../components/Pagination.jsx'
+import BulkActionsBar from '../components/BulkActionsBar.jsx'
+import BulkSendModal from '../components/BulkSendModal.jsx'
 import { IconPlus, IconSearch, IconTrash } from '../components/Icons.jsx'
 import { useAuth } from '../lib/AuthContext.jsx'
+import { showToast } from '../lib/toast.js'
+import { exportCSV } from '../lib/exportUtils.js'
 import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 
@@ -34,8 +38,12 @@ export default function Samples() {
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(emptyForm())
   const [saving, setSaving] = useState(false)
+  const [selected, setSelected] = useState(new Set())
+  const [users, setUsers] = useState([])
+  const [sendModal, setSendModal] = useState(null) // 'whatsapp' | 'email' | null
 
   useEffect(() => { refresh() }, [])
+  useEffect(() => { api.users.list().then(setUsers).catch(() => {}) }, [])
 
   function refresh() {
     setLoading(true)
@@ -93,6 +101,64 @@ export default function Samples() {
     }
   }
 
+  function toggleSelected(id) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    setSelected((prev) =>
+      prev.size === filtered.length ? new Set() : new Set(filtered.map((s) => s.id))
+    )
+  }
+
+  async function handleBulkDelete() {
+    const count = selected.size
+    if (!confirm(`Delete ${count} sample${count === 1 ? '' : 's'}? This cannot be undone.`)) return
+    try {
+      await Promise.all([...selected].map((id) => api.samples.remove(id)))
+      setSelected(new Set())
+      refresh()
+      showToast(`${count} sample${count === 1 ? '' : 's'} deleted`)
+    } catch (err) {
+      showToast('Could not delete selected samples: ' + (err.message || 'Unknown error'), 'error')
+    }
+  }
+
+  function handleBulkExport() {
+    const rows = filtered.filter((s) => selected.has(s.id))
+    exportCSV(
+      'Samples',
+      ['Code', 'Company', 'Contact', 'Products', 'Qty', 'Sent', 'Courier', 'Tracking', 'Status'],
+      rows.map((s) => [s.code, s.company, s.contact, (s.products || []).join(', '), s.qty, s.sent, s.courier, s.tracking, s.status])
+    )
+  }
+
+  async function handleBulkAssign(repName) {
+    if (!repName) return
+    const count = selected.size
+    try {
+      await Promise.all([...selected].map((id) => api.samples.update(id, { assignedTo: repName })))
+      setSelected(new Set())
+      refresh()
+      showToast(`${count} sample${count === 1 ? '' : 's'} assigned to ${repName}`)
+    } catch (err) {
+      showToast('Could not assign: ' + (err.message || 'Unknown error'), 'error')
+    }
+  }
+
+  const sendRows = useMemo(() => filtered.filter((s) => selected.has(s.id)).map((s) => ({
+    key: s.id,
+    title: s.company,
+    subtitle: `${s.code} · ${(s.products || []).join(', ')}`,
+    phone: s.phone,
+    email: s.email,
+    vars: { company: s.company, contact: s.contact, products: (s.products || []).join(', '), courier: s.courier, tracking: s.tracking },
+  })), [filtered, selected])
+
   return (
     <div>
       <PageHeader
@@ -125,16 +191,51 @@ export default function Samples() {
         </select>
       </div>
 
+      {canEdit && (
+        <BulkActionsBar
+          count={selected.size}
+          onClear={() => setSelected(new Set())}
+          onExport={handleBulkExport}
+          onDelete={canDelete ? handleBulkDelete : undefined}
+        >
+          <select className="btn btn-ghost-light" defaultValue="" onChange={(e) => { handleBulkAssign(e.target.value); e.target.value = '' }}>
+            <option value="" disabled>Assign to…</option>
+            {users.map((u) => <option key={u.id} value={u.name}>{u.name}</option>)}
+          </select>
+          <button type="button" className="btn btn-ghost-light" onClick={() => setSendModal('email')}>✉️ Send Email</button>
+          <button type="button" className="btn btn-ghost-light" onClick={() => setSendModal('whatsapp')}>💬 Send WhatsApp</button>
+        </BulkActionsBar>
+      )}
+
+      <BulkSendModal
+        open={!!sendModal}
+        onClose={() => setSendModal(null)}
+        category="sample"
+        channel={sendModal || 'both'}
+        rows={sendRows}
+      />
+
       <div className="table-wrap">
         <table className="data-table">
           <thead>
-            <tr><th>Code</th><th>Company</th><th>Contact</th><th>Products</th><th>Qty</th><th>Sent</th><th>Courier</th><th>Tracking</th><th>Status</th>{(canEdit || canDelete) && <th>Actions</th>}</tr>
+            <tr>
+              {canEdit && (
+                <th className="header-checkbox-cell">
+                  <input
+                    type="checkbox"
+                    checked={filtered.length > 0 && selected.size === filtered.length}
+                    onChange={toggleSelectAll}
+                  />
+                </th>
+              )}
+              <th>Code</th><th>Company</th><th>Contact</th><th>Products</th><th>Qty</th><th>Sent</th><th>Courier</th><th>Tracking</th><th>Status</th>{(canEdit || canDelete) && <th>Actions</th>}
+            </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={(canEdit || canDelete) ? 10 : 9}>Loading samples…</td></tr>
+              <tr className="empty-row"><td colSpan={9 + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>Loading samples…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={(canEdit || canDelete) ? 10 : 9}>
+              <tr className="empty-row"><td colSpan={9 + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>
                 {samples.length === 0 ? (
                   <EmptyState
                     icon="🧫"
@@ -150,6 +251,11 @@ export default function Samples() {
             ) : paged.map((s) => {
               return (
               <tr key={s.id}>
+                {canEdit && (
+                  <td className="header-checkbox-cell">
+                    <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggleSelected(s.id)} />
+                  </td>
+                )}
                 <td className="cell-mono">{s.code}</td>
                 <td className="cell-strong">{s.company}</td>
                 <td>{s.contact}<br /><span className="cell-mono cell-muted" style={{ fontSize: 11.5 }}>{s.phone}</span></td>

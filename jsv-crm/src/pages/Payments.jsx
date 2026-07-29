@@ -6,11 +6,14 @@ import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
 import ExportBar from '../components/ExportBar.jsx'
 import TallyImportButton from '../components/TallyImportButton.jsx'
+import BulkActionsBar from '../components/BulkActionsBar.jsx'
 import { IconPlus, IconSearch, IconTrash, IconDollarSign, IconCalendar, IconReceipt, IconFlame, IconChevronRight } from '../components/Icons.jsx'
 import StatCard from '../components/StatCard.jsx'
 import Pagination from '../components/Pagination.jsx'
 import EmptyState from '../components/EmptyState.jsx'
 import { getOverdueInvoices, daysOverdue } from '../lib/overdue.js'
+import { showToast } from '../lib/toast.js'
+import { exportCSV } from '../lib/exportUtils.js'
 import '../styles/components.css'
 
 const PAYMENT_MODES = ['NEFT', 'RTGS', 'Cheque', 'Cash', 'UPI', 'Bank Transfer']
@@ -34,6 +37,7 @@ export default function Payments() {
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(emptyForm())
   const [saving, setSaving] = useState(false)
+  const [selected, setSelected] = useState(new Set())
 
   useEffect(() => { refresh() }, [])
 
@@ -111,6 +115,42 @@ export default function Payments() {
     }
   }
 
+  function toggleSelected(id) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    setSelected((prev) =>
+      prev.size === filtered.length ? new Set() : new Set(filtered.map((p) => p.id))
+    )
+  }
+
+  async function handleBulkDelete() {
+    const count = selected.size
+    if (!confirm(`Delete ${count} payment${count === 1 ? '' : 's'}? This cannot be undone.`)) return
+    try {
+      await Promise.all([...selected].map((id) => api.payments.remove(id)))
+      setSelected(new Set())
+      refresh()
+      showToast(`${count} payment${count === 1 ? '' : 's'} deleted`)
+    } catch (err) {
+      showToast('Could not delete selected payments: ' + (err.message || 'Unknown error'), 'error')
+    }
+  }
+
+  function handleBulkExport() {
+    const rows = filtered.filter((p) => selected.has(p.id))
+    exportCSV(
+      'Payments',
+      ['Payment #', 'Company', 'Amount', 'Date', 'Mode', 'Reference', 'Status'],
+      rows.map((p) => [p.paymentNo, p.company, p.amount, p.date, p.mode, p.reference, p.status])
+    )
+  }
+
   const totalReceived = payments.filter((p) => p.status === 'Completed').reduce((s, p) => s + Number(p.amount || 0), 0)
 
   return (
@@ -185,16 +225,36 @@ export default function Payments() {
         </select>
       </div>
 
+      {(canEdit || canDelete) && (
+        <BulkActionsBar
+          count={selected.size}
+          onClear={() => setSelected(new Set())}
+          onExport={handleBulkExport}
+          onDelete={canDelete ? handleBulkDelete : undefined}
+        />
+      )}
+
       <div className="table-wrap">
         <table className="data-table">
           <thead>
-            <tr><th>Payment #</th><th>Company</th><th>Amount</th><th>Date</th><th>Mode</th><th>Reference</th><th>Linked Invoice</th><th>Status</th>{canDelete && <th>Actions</th>}</tr>
+            <tr>
+              {(canEdit || canDelete) && (
+                <th className="header-checkbox-cell">
+                  <input
+                    type="checkbox"
+                    checked={filtered.length > 0 && selected.size === filtered.length}
+                    onChange={toggleSelectAll}
+                  />
+                </th>
+              )}
+              <th>Payment #</th><th>Company</th><th>Amount</th><th>Date</th><th>Mode</th><th>Reference</th><th>Linked Invoice</th><th>Status</th>{canDelete && <th>Actions</th>}
+            </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={canDelete ? 9 : 8}>Loading payments…</td></tr>
+              <tr className="empty-row"><td colSpan={8 + ((canEdit || canDelete) ? 1 : 0) + (canDelete ? 1 : 0)}>Loading payments…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={canDelete ? 9 : 8}>
+              <tr className="empty-row"><td colSpan={8 + ((canEdit || canDelete) ? 1 : 0) + (canDelete ? 1 : 0)}>
                 {payments.length === 0 ? (
                   <EmptyState
                     icon="💳"
@@ -211,6 +271,11 @@ export default function Payments() {
               const inv = invoices.find((i) => i.id === p.invoiceId)
               return (
                 <tr key={p.id}>
+                  {(canEdit || canDelete) && (
+                    <td className="header-checkbox-cell">
+                      <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelected(p.id)} />
+                    </td>
+                  )}
                   <td className="cell-mono cell-strong">{p.paymentNo}</td>
                   <td className="cell-strong">{p.company}</td>
                   <td className="cell-mono" style={{ color: 'var(--teal-700)', fontWeight: 600 }}>{formatINR(p.amount)}</td>

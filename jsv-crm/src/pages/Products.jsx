@@ -8,7 +8,10 @@ import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
 import { IconPlus, IconSearch, IconUpload, IconEdit, IconTrash } from '../components/Icons.jsx'
 import ExportBar from '../components/ExportBar.jsx'
+import BulkActionsBar from '../components/BulkActionsBar.jsx'
 import Pagination from '../components/Pagination.jsx'
+import { showToast } from '../lib/toast.js'
+import { exportCSV } from '../lib/exportUtils.js'
 import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 
@@ -42,6 +45,7 @@ export default function Products() {
   const [importError, setImportError] = useState('')
   const [importBusy, setImportBusy] = useState(false)
   const fileInputRef = useRef(null)
+  const [selected, setSelected] = useState(new Set())
 
   useEffect(() => { refresh() }, [])
 
@@ -113,6 +117,55 @@ export default function Products() {
     if (!window.confirm(`Remove "${product.name}" from the catalogue? This can't be undone.`)) return
     await api.products.remove(product.id)
     refresh()
+  }
+
+  function toggleSelected(id) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    setSelected((prev) =>
+      prev.size === filtered.length ? new Set() : new Set(filtered.map((p) => p.id))
+    )
+  }
+
+  async function handleBulkDelete() {
+    const count = selected.size
+    if (!confirm(`Remove ${count} product${count === 1 ? '' : 's'} from the catalogue? This can't be undone.`)) return
+    try {
+      await Promise.all([...selected].map((id) => api.products.remove(id)))
+      setSelected(new Set())
+      refresh()
+      showToast(`${count} product${count === 1 ? '' : 's'} removed`)
+    } catch (err) {
+      showToast('Could not remove selected products: ' + (err.message || 'Unknown error'), 'error')
+    }
+  }
+
+  function handleBulkExport() {
+    const rows = filtered.filter((p) => selected.has(p.id))
+    exportCSV(
+      'Products',
+      ['Product', 'Category', 'Supplier', 'Origin', 'MOQ', 'Unit Price', 'Status'],
+      rows.map((p) => [p.name, p.category, p.supplier, p.origin, p.moq, p.unitPrice ? `₹${Number(p.unitPrice).toLocaleString('en-IN')}` : '', p.status])
+    )
+  }
+
+  async function handleBulkStatus(status) {
+    if (!status) return
+    const count = selected.size
+    try {
+      await Promise.all([...selected].map((id) => api.products.update(id, { status })))
+      setSelected(new Set())
+      refresh()
+      showToast(`${count} product${count === 1 ? '' : 's'} marked ${status}`)
+    } catch (err) {
+      showToast('Could not update status: ' + (err.message || 'Unknown error'), 'error')
+    }
   }
 
   async function handleFileSelected(e) {
@@ -189,16 +242,42 @@ export default function Products() {
         </select>
       </div>
 
+      {canEdit && (
+        <BulkActionsBar
+          count={selected.size}
+          onClear={() => setSelected(new Set())}
+          onExport={handleBulkExport}
+          onDelete={canDelete ? handleBulkDelete : undefined}
+        >
+          <select className="btn btn-ghost-light" defaultValue="" onChange={(e) => { handleBulkStatus(e.target.value); e.target.value = '' }}>
+            <option value="" disabled>Set status…</option>
+            <option value="Active">Activate</option>
+            <option value="Inactive">Deactivate</option>
+          </select>
+        </BulkActionsBar>
+      )}
+
       <div className="table-wrap">
         <table className="data-table">
           <thead>
-            <tr><th>Product</th><th>Category</th><th>Supplier</th><th>Origin</th><th>MOQ</th><th>Unit Price</th><th>Docs</th><th>Status</th>{(canEdit || canDelete) && <th>Actions</th>}</tr>
+            <tr>
+              {canEdit && (
+                <th className="header-checkbox-cell">
+                  <input
+                    type="checkbox"
+                    checked={filtered.length > 0 && selected.size === filtered.length}
+                    onChange={toggleSelectAll}
+                  />
+                </th>
+              )}
+              <th>Product</th><th>Category</th><th>Supplier</th><th>Origin</th><th>MOQ</th><th>Unit Price</th><th>Docs</th><th>Status</th>{(canEdit || canDelete) && <th>Actions</th>}
+            </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={(canEdit || canDelete) ? 9 : 8}>Loading products…</td></tr>
+              <tr className="empty-row"><td colSpan={8 + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>Loading products…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={(canEdit || canDelete) ? 9 : 8}>
+              <tr className="empty-row"><td colSpan={8 + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>
                 {products.length === 0 ? (
                   <EmptyState
                     icon="🧪"
@@ -213,6 +292,11 @@ export default function Products() {
               </td></tr>
             ) : paged.map((p) => (
               <tr key={p.id} style={{ opacity: p.status === 'Inactive' ? 0.55 : 1 }}>
+                {canEdit && (
+                  <td className="header-checkbox-cell">
+                    <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelected(p.id)} />
+                  </td>
+                )}
                 <td className="cell-strong">{p.name}</td>
                 <td>{p.category}</td>
                 <td className="cell-muted">{p.supplier || '—'}</td>

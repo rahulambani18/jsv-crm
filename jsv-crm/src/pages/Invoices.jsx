@@ -345,8 +345,10 @@ export default function Invoices() {
   const [showReminderModal, setShowReminderModal] = useState(false)
   const [previewInvoiceData, setPreviewInvoiceData] = useState(null) // { inv, order }
   const [historyInvoice, setHistoryInvoice] = useState(null)
+  const [users, setUsers] = useState([])
 
   useEffect(() => { refresh() }, [])
+  useEffect(() => { api.users.list().then(setUsers).catch(() => {}) }, [])
 
   function refresh() {
     setLoading(true)
@@ -455,6 +457,19 @@ export default function Invoices() {
       ['Invoice #', 'Company', 'Issue Date', 'Due Date', 'Subtotal', 'CGST', 'SGST', 'Total', 'Status'],
       rows.map((i) => [i.invoiceNo, i.company, i.issueDate, i.dueDate, i.subtotal, i.cgst, i.sgst, i.total, i.status])
     )
+  }
+
+  async function handleBulkAssign(repName) {
+    if (!repName) return
+    const count = selected.size
+    try {
+      await Promise.all([...selected].map((id) => api.invoices.update(id, { assignedTo: repName })))
+      setSelected(new Set())
+      refresh()
+      showToast(`${count} invoice${count === 1 ? '' : 's'} assigned to ${repName}`)
+    } catch (err) {
+      showToast('Could not assign: ' + (err.message || 'Unknown error'), 'error')
+    }
   }
 
   // Builds one row per company (not per invoice) so a customer with
@@ -598,6 +613,10 @@ export default function Invoices() {
         onExport={handleBulkExport}
         onDelete={canDelete ? handleBulkDelete : undefined}
       >
+        <select className="btn btn-ghost-light" defaultValue="" onChange={(e) => { handleBulkAssign(e.target.value); e.target.value = '' }}>
+          <option value="" disabled>Assign to…</option>
+          {users.map((u) => <option key={u.id} value={u.name}>{u.name}</option>)}
+        </select>
         <button type="button" className="btn btn-ghost-light" onClick={() => setShowReminderModal(true)}>
           📨 Send Payment Reminders
         </button>

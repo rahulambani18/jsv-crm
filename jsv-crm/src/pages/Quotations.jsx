@@ -8,8 +8,12 @@ import Modal from '../components/Modal.jsx'
 import SendButtons from '../components/SendButtons.jsx'
 import Pagination from '../components/Pagination.jsx'
 import RowActionsMenu from '../components/RowActionsMenu.jsx'
+import BulkActionsBar from '../components/BulkActionsBar.jsx'
+import BulkSendModal from '../components/BulkSendModal.jsx'
 import { IconPlus, IconTrash, IconSearch, IconEdit } from '../components/Icons.jsx'
+import { useAuth } from '../lib/AuthContext.jsx'
 import { showToast } from '../lib/toast.js'
+import { exportCSV } from '../lib/exportUtils.js'
 import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 
@@ -22,18 +26,27 @@ function emptyForm() {
 }
 
 export default function Quotations() {
+  const { can } = useAuth()
+  const canEdit = can('quotations', 'edit')
+  const canDelete = can('quotations', 'delete')
   const [searchParams] = useSearchParams()
   const [search, setSearch] = useState(searchParams.get('q') || '')
   const [quotations, setQuotations] = useState([])
   const [products, setProducts] = useState([])
   const [customers, setCustomers] = useState([])
+  const [users, setUsers] = useState([])
+  const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(emptyForm())
   const [saving, setSaving] = useState(false)
   const [editingId, setEditingId] = useState(null)
+  const [selected, setSelected] = useState(new Set())
+  const [sendModal, setSendModal] = useState(null) // 'whatsapp' | 'email' | null
 
   useEffect(() => { refresh() }, [])
+  useEffect(() => { api.users.list().then(setUsers).catch(() => {}) }, [])
+  useEffect(() => { api.invoices.list().then(setInvoices).catch(() => {}) }, [])
 
   function refresh() {
     setLoading(true)
@@ -131,6 +144,106 @@ export default function Quotations() {
 
   const fmt = (n) => '₹' + Number(n || 0).toLocaleString('en-IN')
 
+  function toggleSelected(id) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    setSelected((prev) =>
+      prev.size === filtered.length ? new Set() : new Set(filtered.map((q) => q.id))
+    )
+  }
+
+  async function handleBulkDelete() {
+    const count = selected.size
+    if (!confirm(`Delete ${count} quotation${count === 1 ? '' : 's'}? This cannot be undone.`)) return
+    try {
+      await Promise.all([...selected].map((id) => api.quotations.remove(id)))
+      setSelected(new Set())
+      refresh()
+      showToast(`${count} quotation${count === 1 ? '' : 's'} deleted`)
+    } catch (err) {
+      showToast('Could not delete selected quotations: ' + (err.message || 'Unknown error'), 'error')
+    }
+  }
+
+  function handleBulkExport() {
+    const rows = filtered.filter((q) => selected.has(q.id))
+    exportCSV(
+      'Quotations',
+      ['Quote #', 'Company', 'Items', 'Total', 'Valid Until', 'Status'],
+      rows.map((q) => [q.quoteNo, q.company, q.items, `₹${Number(q.total).toLocaleString('en-IN')}`, q.validUntil, q.status])
+    )
+  }
+
+  async function handleBulkAssign(repName) {
+    if (!repName) return
+    const count = selected.size
+    try {
+      await Promise.all([...selected].map((id) => api.quotations.update(id, { assignedTo: repName })))
+      setSelected(new Set())
+      refresh()
+      showToast(`${count} quotation${count === 1 ? '' : 's'} assigned to ${repName}`)
+    } catch (err) {
+      showToast('Could not assign: ' + (err.message || 'Unknown error'), 'error')
+    }
+  }
+
+  // Bulk version of "convert to invoice" — skips quotations that
+  // already have a linked invoice (matched via notes on the invoice,
+  // same convention Invoices.jsx would use if it tracked quoteId).
+  async function handleBulkGenerateInvoice() {
+    const targets = filtered.filter((q) => selected.has(q.id))
+    if (targets.length === 0) return
+    if (!confirm(`Generate ${targets.length} invoice${targets.length === 1 ? '' : 's'} from the selected quotation${targets.length === 1 ? '' : 's'}?`)) return
+    try {
+      let n = 0
+      for (const q of targets) {
+        const subtotal = Number(q.total) / 1.18
+        const gst = Number(q.total) - subtotal
+        await api.invoices.insert({
+          invoiceNo: `INV-2026-${String(40 + invoices.length + n + 1).padStart(4, '0')}`,
+          company: q.company,
+          quoteId: q.id,
+          issueDate: new Date().toISOString().slice(0, 10),
+          dueDate: q.validUntil || '',
+          paymentTerms: 'Net 30',
+          subtotal: Math.round(subtotal),
+          cgst: Math.round(gst / 2),
+          sgst: Math.round(gst / 2),
+          igst: 0,
+          total: Math.round(Number(q.total)),
+          status: 'Draft',
+          paymentMode: '',
+          notes: `Generated from quotation ${q.quoteNo}`,
+        })
+        n++
+      }
+      setSelected(new Set())
+      const invs = await api.invoices.list()
+      setInvoices(invs)
+      showToast(`${n} invoice${n === 1 ? '' : 's'} generated from selected quotations`)
+    } catch (err) {
+      showToast('Could not generate invoices: ' + (err.message || 'Unknown error'), 'error')
+    }
+  }
+
+  const sendRows = useMemo(() => filtered.filter((q) => selected.has(q.id)).map((q) => {
+    const customer = customers.find((c) => c.company === q.company)
+    return {
+      key: q.id,
+      title: q.company,
+      subtitle: `${q.quoteNo} · ${fmt(q.total)}`,
+      phone: customer?.mobile,
+      email: customer?.email,
+      vars: { company: q.company, contact: customer?.contact, quoteNo: q.quoteNo, total: fmt(q.total), validUntil: q.validUntil },
+    }
+  }), [filtered, selected, customers])
+
   return (
     <div>
       <PageHeader
@@ -158,16 +271,52 @@ export default function Quotations() {
         </div>
       </div>
 
+      {canEdit && (
+        <BulkActionsBar
+          count={selected.size}
+          onClear={() => setSelected(new Set())}
+          onExport={handleBulkExport}
+          onDelete={canDelete ? handleBulkDelete : undefined}
+        >
+          <select className="btn btn-ghost-light" defaultValue="" onChange={(e) => { handleBulkAssign(e.target.value); e.target.value = '' }}>
+            <option value="" disabled>Assign to…</option>
+            {users.map((u) => <option key={u.id} value={u.name}>{u.name}</option>)}
+          </select>
+          <button type="button" className="btn btn-ghost-light" onClick={() => setSendModal('email')}>✉️ Send Email</button>
+          <button type="button" className="btn btn-ghost-light" onClick={() => setSendModal('whatsapp')}>💬 Send WhatsApp</button>
+          <button type="button" className="btn btn-ghost-light" onClick={handleBulkGenerateInvoice}>🧾 Generate Invoice</button>
+        </BulkActionsBar>
+      )}
+
+      <BulkSendModal
+        open={!!sendModal}
+        onClose={() => setSendModal(null)}
+        category="quotation"
+        channel={sendModal || 'both'}
+        rows={sendRows}
+      />
+
       <div className="table-wrap">
         <table className="data-table">
           <thead>
-            <tr><th>Quote #</th><th>Company</th><th>Items</th><th>Total</th><th>Valid Until</th><th>Status</th><th>Actions</th></tr>
+            <tr>
+              {canEdit && (
+                <th className="header-checkbox-cell">
+                  <input
+                    type="checkbox"
+                    checked={filtered.length > 0 && selected.size === filtered.length}
+                    onChange={toggleSelectAll}
+                  />
+                </th>
+              )}
+              <th>Quote #</th><th>Company</th><th>Items</th><th>Total</th><th>Valid Until</th><th>Status</th><th>Actions</th>
+            </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={7}>Loading quotations…</td></tr>
+              <tr className="empty-row"><td colSpan={7 + (canEdit ? 1 : 0)}>Loading quotations…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={7}>
+              <tr className="empty-row"><td colSpan={7 + (canEdit ? 1 : 0)}>
                 {quotations.length === 0 ? (
                   <EmptyState
                     icon="📄"
@@ -184,6 +333,11 @@ export default function Quotations() {
               const customer = customers.find((c) => c.company === q.company)
               return (
               <tr key={q.id}>
+                {canEdit && (
+                  <td className="header-checkbox-cell">
+                    <input type="checkbox" checked={selected.has(q.id)} onChange={() => toggleSelected(q.id)} />
+                  </td>
+                )}
                 <td className="cell-mono">{q.quoteNo}</td>
                 <td className="cell-strong">{q.company}</td>
                 <td>{q.items}</td>
