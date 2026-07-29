@@ -13,6 +13,7 @@ import BulkActionsBar from '../components/BulkActionsBar.jsx'
 import Pagination from '../components/Pagination.jsx'
 import { useAuth } from '../lib/AuthContext.jsx'
 import { showToast } from '../lib/toast.js'
+import { availableQty } from '../lib/stockStatus.js'
 import { exportCSV } from '../lib/exportUtils.js'
 import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
@@ -116,7 +117,14 @@ export default function Orders() {
 
   const stockByKey = useMemo(() => {
     const map = {}
-    stock.forEach((s) => { map[`${s.product}|${s.warehouse}`] = Number(s.qtyOnHand) })
+    // A product/warehouse can now have several batches (batch/lot
+    // tracking) — sum their available qty (on hand minus reserved and
+    // damaged) rather than letting the last batch overwrite the rest.
+    stock.forEach((s) => {
+      if (s.archived) return
+      const key = `${s.product}|${s.warehouse}`
+      map[key] = (map[key] || 0) + availableQty(s)
+    })
     return map
   }, [stock])
 

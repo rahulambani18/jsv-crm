@@ -8,6 +8,7 @@ import {
   IconLayers, IconTrend,
 } from './Icons.jsx'
 import { api } from '../lib/api.js'
+import { availableQty } from '../lib/stockStatus.js'
 import jsvMark from '../assets/jsv-mark.png'
 import '../styles/shell.css'
 
@@ -192,15 +193,18 @@ export default function Shell({ children }) {
 
       // 6) Inventory alerts — out of stock first (most urgent), then
       // low stock (at or below the reorder level). Same thresholds as
-      // the Inventory page's own statusFor(), kept in sync here so the
-      // bell always matches what that page shows.
+      // the Inventory page's own stockStatus(), kept in sync here so
+      // the bell always matches what that page shows. A product can
+      // now have several batches per warehouse, so each low/out batch
+      // gets its own alert, tagged with its batch number.
       stock.forEach((s) => {
-        const qty = Number(s.qtyOnHand)
+        const available = availableQty(s)
         const reorder = Number(s.reorderLevel)
-        if (qty <= 0) {
-          notifs.push({ id: `stk-out-${s.id}`, group: 'Out of Stock', text: `${s.product} — ${s.warehouse}`, sub: `0 ${s.unit || ''} on hand`, color: 'var(--red-600)', route: '/inventory' })
-        } else if (reorder > 0 && qty <= reorder) {
-          notifs.push({ id: `stk-low-${s.id}`, group: 'Low Stock', text: `${s.product} — ${s.warehouse}`, sub: `${qty} ${s.unit || ''} left · reorder at ${reorder}`, color: 'var(--amber-600)', route: '/inventory' })
+        const batchTag = s.batchNumber ? ` (${s.batchNumber})` : ''
+        if (available <= 0) {
+          notifs.push({ id: `stk-out-${s.id}`, group: 'Out of Stock', text: `${s.product}${batchTag} — ${s.warehouse}`, sub: `0 ${s.unit || ''} available`, color: 'var(--red-600)', route: '/inventory' })
+        } else if (reorder > 0 && available <= reorder) {
+          notifs.push({ id: `stk-low-${s.id}`, group: 'Low Stock', text: `${s.product}${batchTag} — ${s.warehouse}`, sub: `${available} ${s.unit || ''} available · reorder at ${reorder}`, color: 'var(--amber-600)', route: '/inventory' })
         }
       })
 

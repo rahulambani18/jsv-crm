@@ -36,6 +36,10 @@ const STOCK_FIELD_MAP = {
   unit: ['unit', 'uom', 'units'],
   qty: ['qty', 'quantity', 'qtyonhand', 'closingstock', 'currentstock', 'availableqty', 'stock', 'stockqty', 'onhand'],
   reorderLevel: ['reorderlevel', 'reorderqty', 'minstock', 'minimumstock', 'reorderpoint'],
+  batchNumber: ['batchnumber', 'batchno', 'batch'],
+  lotNumber: ['lotnumber', 'lotno', 'lot'],
+  manufacturingDate: ['manufacturingdate', 'mfgdate', 'manufactured', 'mfddate'],
+  expiryDate: ['expirydate', 'expiry', 'expdate', 'bestbefore'],
 }
 
 function formatINR(n) {
@@ -74,6 +78,7 @@ function emptyEntryForm() {
     product: '', warehouse: WAREHOUSES[0] || '', type: 'Received',
     qty: '', reference: '', notes: '', date: new Date().toISOString().slice(0, 10),
     expiryDate: '', batchNumber: '', lotNumber: '', manufacturingDate: '',
+    batchId: '',
   }
 }
 
@@ -81,6 +86,7 @@ function emptyTransferForm(row) {
   return {
     product: row?.product || '', fromWarehouse: row?.warehouse || '', toWarehouse: '',
     qty: '', reference: '', notes: '', date: new Date().toISOString().slice(0, 10),
+    batchId: row?.id || '',
   }
 }
 
@@ -143,6 +149,19 @@ export default function Inventory() {
     return [...names]
   }, [stock])
 
+  // Batches available for whichever product+warehouse is currently
+  // picked — used by the "Batch" picker shown on every Stock Entry
+  // movement type except Received (which can also open a new batch).
+  const batchOptionsForForm = useMemo(() => {
+    if (!entryForm.product || !entryForm.warehouse) return []
+    return stock.filter((s) => s.product === entryForm.product && s.warehouse === entryForm.warehouse && !s.archived)
+  }, [stock, entryForm.product, entryForm.warehouse])
+
+  const batchOptionsForTransfer = useMemo(() => {
+    if (!transferForm.product || !transferForm.fromWarehouse) return []
+    return stock.filter((s) => s.product === transferForm.product && s.warehouse === transferForm.fromWarehouse && !s.archived)
+  }, [stock, transferForm.product, transferForm.fromWarehouse])
+
   async function refresh() {
     setLoading(true)
     try {
@@ -179,6 +198,10 @@ export default function Inventory() {
           unit: r.unit ? String(r.unit).trim() : 'kg',
           qtyOnHand: Number(r.qty) || 0,
           reorderLevel: r.reorderLevel !== undefined && r.reorderLevel !== '' ? Number(r.reorderLevel) || 0 : undefined,
+          batchNumber: r.batchNumber ? String(r.batchNumber).trim() : undefined,
+          lotNumber: r.lotNumber ? String(r.lotNumber).trim() : undefined,
+          manufacturingDate: r.manufacturingDate ? String(r.manufacturingDate).trim() : undefined,
+          expiryDate: r.expiryDate ? String(r.expiryDate).trim() : undefined,
         }))
 
       if (parsed.length === 0) {
@@ -188,25 +211,36 @@ export default function Inventory() {
 
       let changed = 0
       for (const row of parsed) {
-        const existing = stock.find((s) => s.product === row.product && s.warehouse === row.warehouse)
+        // When the file includes a batch number, match that exact batch
+        // so multiple batches of the same product/warehouse import
+        // correctly instead of colliding into one row.
+        const existing = row.batchNumber
+          ? stock.find((s) => s.product === row.product && s.warehouse === row.warehouse && (s.batchNumber || '').trim().toLowerCase() === row.batchNumber.toLowerCase())
+          : stock.find((s) => s.product === row.product && s.warehouse === row.warehouse && !s.batchNumber)
         const priorQty = existing ? Number(existing.qtyOnHand) : null
         if (priorQty === row.qtyOnHand && existing) continue // nothing changed for this row
 
         if (existing) {
           const patch = { qtyOnHand: row.qtyOnHand, updatedAt: new Date().toISOString(), source: 'Excel Import' }
           if (row.reorderLevel !== undefined) patch.reorderLevel = row.reorderLevel
+          if (row.manufacturingDate !== undefined) patch.manufacturingDate = row.manufacturingDate
+          if (row.expiryDate !== undefined) patch.expiryDate = row.expiryDate
+          if (row.lotNumber !== undefined) patch.lotNumber = row.lotNumber
           await api.stock.update(existing.id, patch)
         } else {
           await api.stock.insert({
             product: row.product, warehouse: row.warehouse, unit: row.unit,
             qtyOnHand: row.qtyOnHand, reorderLevel: row.reorderLevel || 0, source: 'Excel Import',
+            batchNumber: row.batchNumber || null, lotNumber: row.lotNumber || null,
+            manufacturingDate: row.manufacturingDate || null, expiryDate: row.expiryDate || null,
+            damagedQty: 0, reservedQty: 0,
           })
         }
         changed++
 
         if (priorQty !== null && priorQty !== row.qtyOnHand) {
           await api.stockMovements.insert({
-            product: row.product, warehouse: row.warehouse, type: 'Adjustment',
+            product: row.product, warehouse: row.warehouse, type: 'Adjustment', batchNumber: row.batchNumber || null,
             qty: Math.abs(row.qtyOnHand - priorQty), reference: file.name, createdBy: 'Excel Import',
             notes: `Imported from spreadsheet — ${row.qtyOnHand > priorQty ? 'increased' : 'decreased'} by ${Math.abs(row.qtyOnHand - priorQty)} ${row.unit}`,
           })
@@ -225,7 +259,7 @@ export default function Inventory() {
 
   const filtered = useMemo(() => {
     return stock.filter((s) => {
-      const matchesSearch = !search || [s.product, s.warehouse].some((v) => (v || '').toLowerCase().includes(search.toLowerCase()))
+      const matchesSearch = !search || [s.product, s.warehouse, s.batchNumber, s.lotNumber].some((v) => (v || '').toLowerCase().includes(search.toLowerCase()))
       const matchesWarehouse = warehouseFilter === 'All' || s.warehouse === warehouseFilter
       const matchesStatus = statusFilter === 'All' || stockStatus(s) === statusFilter
       const matchesArchived = showArchived ? !!s.archived : !s.archived
@@ -253,6 +287,10 @@ export default function Inventory() {
       showToast('Product, warehouse and quantity are required', 'error')
       return
     }
+    if (entryForm.type !== 'Received' && !entryForm.batchId) {
+      showToast('Select which batch this entry applies to', 'error')
+      return
+    }
     setSaving(true)
     const enteredQty = Number(entryForm.qty)
     const signedDelta =
@@ -261,44 +299,59 @@ export default function Inventory() {
       Math.abs(enteredQty) // Received | Return
 
     try {
-      const existing = stock.find((s) => s.product === entryForm.product && s.warehouse === entryForm.warehouse)
-      const nextQty = Math.max(0, Number(existing?.qtyOnHand || 0) + signedDelta)
-      if (existing && Number(existing.qtyOnHand || 0) + signedDelta < 0) {
-        showToast(`Only ${existing.qtyOnHand} on hand — quantity floored at 0`, 'error')
-      }
+      if (entryForm.type === 'Received') {
+        const bn = entryForm.batchNumber.trim()
+        // A Received entry with a batch number that already exists for
+        // this product+warehouse restocks that exact batch; otherwise
+        // it opens a new one — this is what lets two lots of the same
+        // product sit side by side with their own expiry dates.
+        const existing = bn
+          ? stock.find((s) => s.product === entryForm.product && s.warehouse === entryForm.warehouse && (s.batchNumber || '').trim().toLowerCase() === bn.toLowerCase())
+          : null
 
-      if (existing) {
-        const patch = { qtyOnHand: nextQty, updatedAt: new Date().toISOString(), source: 'Manual' }
-        // A fresh Received entry replaces the tracked expiry/batch info
-        // with the new batch's details; other movement types leave
-        // whatever's currently on the stock line alone.
-        if (entryForm.type === 'Received') {
+        if (existing) {
+          const patch = { qtyOnHand: Number(existing.qtyOnHand || 0) + Math.abs(enteredQty), updatedAt: new Date().toISOString(), source: 'Manual' }
           if (entryForm.expiryDate) patch.expiryDate = entryForm.expiryDate
-          if (entryForm.batchNumber) patch.batchNumber = entryForm.batchNumber
           if (entryForm.lotNumber) patch.lotNumber = entryForm.lotNumber
           if (entryForm.manufacturingDate) patch.manufacturingDate = entryForm.manufacturingDate
+          await api.stock.update(existing.id, patch)
+        } else {
+          await api.stock.insert({
+            product: entryForm.product, warehouse: entryForm.warehouse,
+            unit: 'kg', qtyOnHand: Math.abs(enteredQty), reorderLevel: 0,
+            expiryDate: entryForm.expiryDate || null, source: 'Manual',
+            batchNumber: entryForm.batchNumber || null, lotNumber: entryForm.lotNumber || null,
+            manufacturingDate: entryForm.manufacturingDate || null,
+            damagedQty: 0, reservedQty: 0,
+          })
         }
-        await api.stock.update(existing.id, patch)
-      } else {
-        await api.stock.insert({
+
+        await api.stockMovements.insert({
           product: entryForm.product, warehouse: entryForm.warehouse,
-          unit: 'kg', qtyOnHand: Math.max(0, signedDelta), reorderLevel: 0,
-          expiryDate: entryForm.expiryDate || null, source: 'Manual',
+          type: 'Received', qty: Math.abs(enteredQty),
+          reference: entryForm.reference, notes: entryForm.notes, date: entryForm.date,
           batchNumber: entryForm.batchNumber || null, lotNumber: entryForm.lotNumber || null,
           manufacturingDate: entryForm.manufacturingDate || null,
         })
-      }
+      } else {
+        const batch = stock.find((s) => s.id === entryForm.batchId)
+        if (!batch) {
+          showToast('Selected batch no longer exists — refresh and try again', 'error')
+          setSaving(false)
+          return
+        }
+        const nextQty = Math.max(0, Number(batch.qtyOnHand || 0) + signedDelta)
+        if (Number(batch.qtyOnHand || 0) + signedDelta < 0) {
+          showToast(`Only ${batch.qtyOnHand} on hand for this batch — quantity floored at 0`, 'error')
+        }
+        await api.stock.update(batch.id, { qtyOnHand: nextQty, updatedAt: new Date().toISOString(), source: 'Manual' })
 
-      await api.stockMovements.insert({
-        product: entryForm.product, warehouse: entryForm.warehouse,
-        type: entryForm.type, qty: Math.abs(enteredQty),
-        reference: entryForm.reference, notes: entryForm.notes, date: entryForm.date,
-        ...(entryForm.type === 'Received' ? {
-          batchNumber: entryForm.batchNumber || null,
-          lotNumber: entryForm.lotNumber || null,
-          manufacturingDate: entryForm.manufacturingDate || null,
-        } : {}),
-      })
+        await api.stockMovements.insert({
+          product: batch.product, warehouse: batch.warehouse, batchNumber: batch.batchNumber || null,
+          type: entryForm.type, qty: Math.abs(enteredQty),
+          reference: entryForm.reference, notes: entryForm.notes, date: entryForm.date,
+        })
+      }
 
       setShowEntryModal(false)
       setEntryForm(emptyEntryForm())
@@ -312,7 +365,11 @@ export default function Inventory() {
   }
 
   function openRestock(row) {
-    setEntryForm({ ...emptyEntryForm(), product: row.product, warehouse: row.warehouse, type: 'Received' })
+    setEntryForm({
+      ...emptyEntryForm(), product: row.product, warehouse: row.warehouse, type: 'Received',
+      batchNumber: row.batchNumber || '', lotNumber: row.lotNumber || '',
+      manufacturingDate: row.manufacturingDate || '', expiryDate: row.expiryDate || '',
+    })
     setShowEntryModal(true)
   }
 
@@ -405,27 +462,38 @@ export default function Inventory() {
 
   async function handleTransfer(e) {
     e.preventDefault()
-    const { product, fromWarehouse, toWarehouse, qty } = transferForm
+    const { toWarehouse, qty, batchId } = transferForm
     const moveQty = Math.abs(Number(qty) || 0)
+    if (!batchId) {
+      showToast('Select which batch to transfer', 'error')
+      return
+    }
     if (!toWarehouse || !moveQty) {
       showToast('Destination warehouse and quantity are required', 'error')
       return
     }
-    if (toWarehouse === fromWarehouse) {
+    const source = stock.find((s) => s.id === batchId)
+    if (!source) {
+      showToast('Selected batch no longer exists — refresh and try again', 'error')
+      return
+    }
+    if (toWarehouse === source.warehouse) {
       showToast('Choose a different destination warehouse', 'error')
       return
     }
-    const source = stock.find((s) => s.product === product && s.warehouse === fromWarehouse)
-    const sourceAvailable = source ? availableQty(source) : 0
+    const sourceAvailable = availableQty(source)
     if (moveQty > sourceAvailable) {
-      showToast(`Only ${sourceAvailable} ${source?.unit || ''} available to transfer at ${fromWarehouse}`, 'error')
+      showToast(`Only ${sourceAvailable} ${source.unit || ''} available to transfer from this batch`, 'error')
       return
     }
     setTransferring(true)
     try {
       await api.stock.update(source.id, { qtyOnHand: Math.max(0, Number(source.qtyOnHand) - moveQty), updatedAt: new Date().toISOString() })
 
-      const dest = stock.find((s) => s.product === product && s.warehouse === toWarehouse)
+      // Match the destination by batch number too — a different batch
+      // of the same product already at that warehouse shouldn't get
+      // this transfer's qty merged into it.
+      const dest = stock.find((s) => s.product === source.product && s.warehouse === toWarehouse && (s.batchNumber || '') === (source.batchNumber || ''))
       if (dest) {
         await api.stock.update(dest.id, { qtyOnHand: Number(dest.qtyOnHand) + moveQty, updatedAt: new Date().toISOString() })
       } else {
@@ -433,27 +501,27 @@ export default function Inventory() {
         // metadata for the transferred qty, since this is its first
         // stock at that warehouse.
         await api.stock.insert({
-          product, warehouse: toWarehouse, unit: source.unit, qtyOnHand: moveQty, reorderLevel: 0,
+          product: source.product, warehouse: toWarehouse, unit: source.unit, qtyOnHand: moveQty, reorderLevel: source.reorderLevel || 0,
           expiryDate: source.expiryDate || null, batchNumber: source.batchNumber || null,
           lotNumber: source.lotNumber || null, manufacturingDate: source.manufacturingDate || null,
-          barcode: source.barcode || null, source: 'Manual',
+          barcode: null, source: 'Manual', damagedQty: 0, reservedQty: 0,
         })
       }
 
       await api.stockMovements.insert({
-        product, warehouse: fromWarehouse, type: 'Transfer Out', qty: moveQty,
+        product: source.product, warehouse: source.warehouse, type: 'Transfer Out', qty: moveQty, batchNumber: source.batchNumber || null,
         reference: transferForm.reference, date: transferForm.date,
         notes: `To ${toWarehouse}${transferForm.notes ? ' — ' + transferForm.notes : ''}`,
       })
       await api.stockMovements.insert({
-        product, warehouse: toWarehouse, type: 'Transfer In', qty: moveQty,
+        product: source.product, warehouse: toWarehouse, type: 'Transfer In', qty: moveQty, batchNumber: source.batchNumber || null,
         reference: transferForm.reference, date: transferForm.date,
-        notes: `From ${fromWarehouse}${transferForm.notes ? ' — ' + transferForm.notes : ''}`,
+        notes: `From ${source.warehouse}${transferForm.notes ? ' — ' + transferForm.notes : ''}`,
       })
 
       setShowTransferModal(false)
       refresh()
-      showToast(`Transferred ${moveQty} ${source.unit} of ${product} to ${toWarehouse}`)
+      showToast(`Transferred ${moveQty} ${source.unit} of ${source.product} to ${toWarehouse}`)
     } catch (err) {
       showToast('Could not complete transfer: ' + (err.message || 'Unknown error'), 'error')
     } finally {
@@ -472,6 +540,14 @@ export default function Inventory() {
 
   async function handleSaveBatchDetails(e) {
     e.preventDefault()
+    const nextBn = batchForm.batchNumber.trim()
+    if (nextBn) {
+      const clash = stock.find((s) => s.id !== batchRow.id && s.product === batchRow.product && s.warehouse === batchRow.warehouse && (s.batchNumber || '').trim().toLowerCase() === nextBn.toLowerCase())
+      if (clash) {
+        showToast(`Batch "${nextBn}" already exists for ${batchRow.product} at ${batchRow.warehouse}`, 'error')
+        return
+      }
+    }
     setSavingBatch(true)
     try {
       await api.stock.update(batchRow.id, { ...batchForm, updatedAt: new Date().toISOString() })
@@ -522,7 +598,7 @@ export default function Inventory() {
   }
 
   async function handleDeleteRow(row) {
-    if (!confirm(`Stop tracking "${row.product}" at ${row.warehouse}? Movement history is kept, only the stock line is removed.`)) return
+    if (!confirm(`Stop tracking "${row.product}"${row.batchNumber ? ` (${row.batchNumber})` : ''} at ${row.warehouse}? Movement history is kept, only the stock line is removed.`)) return
     try {
       await api.stock.remove(row.id)
       refresh()
@@ -585,7 +661,7 @@ export default function Inventory() {
 
   const historyRows = historyRow
     ? movements
-        .filter((m) => m.product === historyRow.product && m.warehouse === historyRow.warehouse)
+        .filter((m) => m.product === historyRow.product && m.warehouse === historyRow.warehouse && (!historyRow.batchNumber || m.batchNumber === historyRow.batchNumber))
         .sort((a, b) => (a.date < b.date ? 1 : -1))
     : []
 
@@ -593,7 +669,7 @@ export default function Inventory() {
     <div>
       <PageHeader
         title="Inventory"
-        subtitle={`${stock.length} SKUs tracked`}
+        subtitle={`${stock.length} batch${stock.length === 1 ? '' : 'es'} tracked`}
         actions={
           <>
             {canEdit && (
@@ -642,7 +718,7 @@ export default function Inventory() {
       )}
 
       <div className="stat-grid">
-        <StatCard icon={IconLayers} tone="blue" label="SKUs Tracked" value={stats.totalSkus} />
+        <StatCard icon={IconLayers} tone="blue" label="Batches Tracked" value={stats.totalSkus} />
         <StatCard icon={IconClock} tone="amber" label="Low Stock" value={stats.lowStock} />
         <StatCard icon={IconTrash} tone="red" label="Out of Stock" value={stats.outOfStock} />
         <StatCard icon={IconClock} tone="red" label="Expiring / Expired" value={stats.expiring} />
@@ -653,7 +729,7 @@ export default function Inventory() {
       <div className="filters-bar">
         <div className="search-input">
           <IconSearch width={16} height={16} />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search product, warehouse…" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search product, warehouse, batch, lot…" />
         </div>
         <Dropdown
           options={['All', ...warehouseNames]}
@@ -699,15 +775,15 @@ export default function Inventory() {
                   />
                 </th>
               )}
-              <th>Product</th><th>Warehouse</th><th>Qty On Hand</th><th>Available</th><th>Reserved</th><th>Damaged</th><th>Unit</th>
+              <th>Product</th><th>Batch / Lot</th><th>Warehouse</th><th>Qty On Hand</th><th>Available</th><th>Reserved</th><th>Damaged</th><th>Unit</th>
               <th>Reorder Level</th><th>Status</th><th>Expiry Date</th><th>Last Updated</th><th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={12 + (canEdit ? 1 : 0)}>Loading inventory…</td></tr>
+              <tr className="empty-row"><td colSpan={13 + (canEdit ? 1 : 0)}>Loading inventory…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={12 + (canEdit ? 1 : 0)}>
+              <tr className="empty-row"><td colSpan={13 + (canEdit ? 1 : 0)}>
                 {stock.length === 0 ? (
                   <EmptyState
                     icon="📦"
@@ -737,6 +813,10 @@ export default function Inventory() {
                       s.product
                     )}
                     {s.archived && <span className="pill pill-gray" style={{ marginLeft: 6, fontSize: 10.5 }}>Archived</span>}
+                  </td>
+                  <td className="cell-mono" style={{ fontSize: 12 }}>
+                    {s.batchNumber || <span className="cell-muted">No batch #</span>}
+                    {s.lotNumber && <><br /><span className="cell-muted">Lot {s.lotNumber}</span></>}
                   </td>
                   <td>{s.warehouse}</td>
                   <td className="cell-mono">{Number(s.qtyOnHand).toLocaleString('en-IN')}</td>
@@ -859,7 +939,7 @@ export default function Inventory() {
                 <Dropdown
                   options={products.map((p) => p.name)}
                   value={entryForm.product}
-                  onChange={(v) => setEntryForm({ ...entryForm, product: v })}
+                  onChange={(v) => setEntryForm({ ...entryForm, product: v, batchId: '' })}
                   placeholder="Select product…"
                 />
               </div>
@@ -868,7 +948,7 @@ export default function Inventory() {
                 <ComboField
                   options={warehouseNames}
                   value={entryForm.warehouse}
-                  onChange={(v) => setEntryForm({ ...entryForm, warehouse: v })}
+                  onChange={(v) => setEntryForm({ ...entryForm, warehouse: v, batchId: '' })}
                   placeholder="Select location…"
                 />
               </div>
@@ -879,7 +959,7 @@ export default function Inventory() {
                 <Dropdown
                   options={MOVEMENT_TYPES}
                   value={entryForm.type}
-                  onChange={(v) => setEntryForm({ ...entryForm, type: v })}
+                  onChange={(v) => setEntryForm({ ...entryForm, type: v, batchId: '' })}
                 />
               </div>
               <div className="field">
@@ -891,6 +971,27 @@ export default function Inventory() {
                 />
               </div>
             </div>
+
+            {entryForm.type !== 'Received' && (
+              <div className="field">
+                <label>Batch</label>
+                {batchOptionsForForm.length === 0 ? (
+                  <p className="cell-muted" style={{ fontSize: 12.5, margin: '4px 0' }}>
+                    No existing batch for this product/warehouse — switch Movement type to "Received" to create one.
+                  </p>
+                ) : (
+                  <Dropdown
+                    options={batchOptionsForForm.map((b) => ({
+                      value: b.id,
+                      label: `${b.batchNumber || 'No batch #'} — ${b.qtyOnHand} ${b.unit} on hand${b.expiryDate ? `, exp ${b.expiryDate}` : ''}`,
+                    }))}
+                    value={entryForm.batchId}
+                    onChange={(v) => setEntryForm({ ...entryForm, batchId: v })}
+                    placeholder="Select batch…"
+                  />
+                )}
+              </div>
+            )}
             <div className="field-row">
               <div className="field">
                 <label>Reference</label>
@@ -959,7 +1060,7 @@ export default function Inventory() {
       )}
 
       {historyRow && (
-        <Modal title={`Movement history — ${historyRow.product} (${historyRow.warehouse})`} onClose={() => setHistoryRow(null)}>
+        <Modal title={`Movement history — ${historyRow.product} (${historyRow.warehouse}${historyRow.batchNumber ? `, ${historyRow.batchNumber}` : ''})`} onClose={() => setHistoryRow(null)}>
           {historyRows.length === 0 ? (
             <p className="cell-muted">No movements logged yet for this product/warehouse.</p>
           ) : (
@@ -1000,6 +1101,24 @@ export default function Inventory() {
                 <label>From</label>
                 <input value={transferForm.fromWarehouse} disabled style={{ opacity: 0.7 }} />
               </div>
+              <div className="field">
+                <label>Batch</label>
+                {batchOptionsForTransfer.length === 0 ? (
+                  <p className="cell-muted" style={{ fontSize: 12.5, margin: '4px 0' }}>No batches available here.</p>
+                ) : (
+                  <Dropdown
+                    options={batchOptionsForTransfer.map((b) => ({
+                      value: b.id,
+                      label: `${b.batchNumber || 'No batch #'} — ${availableQty(b)} ${b.unit} available`,
+                    }))}
+                    value={transferForm.batchId}
+                    onChange={(v) => setTransferForm({ ...transferForm, batchId: v })}
+                    placeholder="Select batch…"
+                  />
+                )}
+              </div>
+            </div>
+            <div className="field-row">
               <div className="field">
                 <label>To</label>
                 <ComboField
@@ -1051,7 +1170,7 @@ export default function Inventory() {
 
       {batchRow && batchForm && (
         <Modal
-          title={`Batch details — ${batchRow.product} (${batchRow.warehouse})`}
+          title={`Batch details — ${batchRow.product} (${batchRow.warehouse}${batchRow.batchNumber ? `, ${batchRow.batchNumber}` : ''})`}
           onClose={() => { setBatchRow(null); setBatchForm(null) }}
           footer={
             <>
@@ -1116,7 +1235,7 @@ export default function Inventory() {
       )}
 
       {qrRow && (
-        <Modal title={`QR label — ${qrRow.product} (${qrRow.warehouse})`} onClose={() => { setQrRow(null); setQrDataUrl('') }}>
+        <Modal title={`QR label — ${qrRow.product} (${qrRow.warehouse}${qrRow.batchNumber ? `, ${qrRow.batchNumber}` : ''})`} onClose={() => { setQrRow(null); setQrDataUrl('') }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
             {qrLoading ? (
               <p className="cell-muted">Generating…</p>
