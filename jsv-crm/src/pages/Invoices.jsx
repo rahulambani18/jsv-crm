@@ -13,6 +13,11 @@ import BulkActionsBar from '../components/BulkActionsBar.jsx'
 import BulkReminderModal from '../components/BulkReminderModal.jsx'
 import RowActionsMenu from '../components/RowActionsMenu.jsx'
 import Pagination from '../components/Pagination.jsx'
+import TemplatePickerModal from '../components/TemplatePickerModal.jsx'
+import EInvoiceModal from '../components/EInvoiceModal.jsx'
+import EWayBillModal from '../components/EWayBillModal.jsx'
+import PaymentLinkModal from '../components/PaymentLinkModal.jsx'
+import CreditDebitNoteModal from '../components/CreditDebitNoteModal.jsx'
 import { IconPlus, IconSearch, IconEdit, IconTrash, IconReceipt, IconDollarSign, IconFlame, IconClock } from '../components/Icons.jsx'
 import StatCard from '../components/StatCard.jsx'
 import Dropdown from '../components/Dropdown.jsx'
@@ -332,6 +337,8 @@ export default function Invoices() {
   const [orders, setOrders] = useState([])
   const [customers, setCustomers] = useState([])
   const [payments, setPayments] = useState([])
+  const [creditNotes, setCreditNotes] = useState([])
+  const [debitNotes, setDebitNotes] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchParams] = useSearchParams()
   const [search, setSearch] = useState(searchParams.get('q') || '')
@@ -346,14 +353,19 @@ export default function Invoices() {
   const [previewInvoiceData, setPreviewInvoiceData] = useState(null) // { inv, order }
   const [historyInvoice, setHistoryInvoice] = useState(null)
   const [users, setUsers] = useState([])
+  const [reminderInvoice, setReminderInvoice] = useState(null)
+  const [eInvoiceTarget, setEInvoiceTarget] = useState(null)
+  const [ewayBillTarget, setEwayBillTarget] = useState(null)
+  const [paymentLinkTarget, setPaymentLinkTarget] = useState(null)
+  const [noteModal, setNoteModal] = useState(null) // { type: 'Credit'|'Debit', invoice }
 
   useEffect(() => { refresh() }, [])
   useEffect(() => { api.users.list().then(setUsers).catch(() => {}) }, [])
 
   function refresh() {
     setLoading(true)
-    Promise.all([api.invoices.list(), api.orders.list(), api.customers.list(), api.payments.list()]).then(([inv, ord, cust, pay]) => {
-      setInvoices(inv); setOrders(ord); setCustomers(cust); setPayments(pay); setLoading(false)
+    Promise.all([api.invoices.list(), api.orders.list(), api.customers.list(), api.payments.list(), api.creditNotes.list(), api.debitNotes.list()]).then(([inv, ord, cust, pay, cn, dn]) => {
+      setInvoices(inv); setOrders(ord); setCustomers(cust); setPayments(pay); setCreditNotes(cn); setDebitNotes(dn); setLoading(false)
     })
   }
 
@@ -407,6 +419,36 @@ export default function Invoices() {
     setForm({ paymentTerms: 'Custom', ...inv })
     setEditingId(inv.id)
     setShowModal(true)
+  }
+
+  // Pre-fills the New Invoice form from an existing invoice — dates
+  // reset to today/recalculated, status back to Draft — so the rep
+  // reviews it before it's saved as a new record (nothing is written
+  // until they hit Save).
+  function duplicateInvoice(inv) {
+    const issueDate = new Date().toISOString().slice(0, 10)
+    const days = termsToDays(inv.paymentTerms)
+    setForm({
+      company: inv.company,
+      orderId: inv.orderId,
+      issueDate,
+      dueDate: days != null ? addDays(issueDate, days) : issueDate,
+      paymentTerms: inv.paymentTerms || 'Net 30',
+      subtotal: inv.subtotal, cgst: inv.cgst, sgst: inv.sgst, igst: inv.igst, total: inv.total,
+      status: 'Draft',
+      paymentMode: '',
+      notes: `Duplicated from ${inv.invoiceNo}`,
+    })
+    setEditingId(null)
+    setShowModal(true)
+  }
+
+  // Shared by the E-Invoice, E-Way Bill and Payment Link modals — they
+  // each patch a different slice of the invoice record.
+  async function saveInvoiceFields(inv, patch) {
+    const updated = await api.invoices.update(inv.id, patch)
+    setInvoices((prev) => prev.map((i) => (i.id === inv.id ? { ...i, ...patch } : i)))
+    return updated
   }
 
   async function handleDelete(inv) {
@@ -662,6 +704,8 @@ export default function Invoices() {
                 <td className="cell-mono cell-strong">
                   {inv.invoiceNo}
                   {inv.tallySyncedAt && <span title={`Exported to Tally on ${String(inv.tallySyncedAt).slice(0, 10)}`} style={{ marginLeft: 6, fontSize: 11, color: 'var(--teal-700)' }}>⇄ Tally</span>}
+                  {inv.einvoiceIrn && <span title="E-Invoice (demo IRN) generated" style={{ marginLeft: 6, fontSize: 11, color: 'var(--blue-700, #1d4ed8)' }}>🧾 IRN</span>}
+                  {inv.ewayBillNo && <span title={`E-Way Bill (demo) valid upto ${inv.ewayValidUpto}`} style={{ marginLeft: 6, fontSize: 11, color: 'var(--amber-700, #b45309)' }}>🚚 EWB</span>}
                 </td>
                 <td className="cell-strong">{inv.company}</td>
                 <td className="cell-mono">{inv.issueDate}</td>
@@ -683,8 +727,31 @@ export default function Invoices() {
                   <RowActionsMenu
                     items={[
                       canEdit && { label: 'Edit', icon: <IconEdit width={13} height={13} />, onClick: () => openEdit(inv) },
-                      { label: 'Preview PDF', icon: '👁', onClick: () => setPreviewInvoiceData({ inv, order: orders.find((o) => o.id === inv.orderId), customer }) },
-                      { label: 'Print / Save as PDF', icon: '🖨', onClick: () => printInvoice(inv, orders.find((o) => o.id === inv.orderId), customer) },
+                      canEdit && { label: 'Duplicate', icon: '📄', onClick: () => duplicateInvoice(inv) },
+                      'divider',
+                      { label: 'Preview', icon: '👁', onClick: () => setPreviewInvoiceData({ inv, order: orders.find((o) => o.id === inv.orderId), customer }) },
+                      { label: 'Print', icon: '🖨', onClick: () => printInvoice(inv, orders.find((o) => o.id === inv.orderId), customer) },
+                      {
+                        label: 'Download PDF', icon: '⬇', onClick: () => {
+                          printInvoice(inv, orders.find((o) => o.id === inv.orderId), customer)
+                          showToast("In the print dialog, choose 'Save as PDF' as the destination")
+                        },
+                      },
+                      'divider',
+                      {
+                        label: 'Send Reminder', icon: '📨',
+                        disabled: !(customer?.mobile || customer?.email),
+                        disabledReason: 'No phone or email on file for this customer',
+                        onClick: () => setReminderInvoice(inv),
+                      },
+                      { label: 'Payment Link', icon: '🔗', onClick: () => setPaymentLinkTarget(inv) },
+                      'divider',
+                      { label: 'E-Invoice', icon: '🧾', onClick: () => setEInvoiceTarget(inv) },
+                      { label: 'E-Way Bill', icon: '🚚', onClick: () => setEwayBillTarget(inv) },
+                      'divider',
+                      canEdit && { label: 'Credit Note', icon: '➖', onClick: () => setNoteModal({ type: 'Credit', invoice: inv }) },
+                      canEdit && { label: 'Debit Note', icon: '➕', onClick: () => setNoteModal({ type: 'Debit', invoice: inv }) },
+                      'divider',
                       { label: 'Payment history', icon: '📜', onClick: () => setHistoryInvoice(inv) },
                       canDelete && 'divider',
                       canDelete && { label: 'Delete', icon: <IconTrash width={13} height={13} />, danger: true, onClick: () => handleDelete(inv) },
@@ -819,10 +886,12 @@ export default function Invoices() {
         const invoicePayments = payments
           .filter((p) => p.invoiceId === historyInvoice.id)
           .sort((a, b) => (a.date < b.date ? 1 : -1))
+        const invoiceCreditNotes = creditNotes.filter((n) => n.invoiceId === historyInvoice.id)
+        const invoiceDebitNotes = debitNotes.filter((n) => n.invoiceId === historyInvoice.id)
         const totalPaid = invoicePayments.filter((p) => p.status === 'Completed').reduce((s, p) => s + Number(p.amount || 0), 0)
         const balance = Math.max(0, Number(historyInvoice.total || 0) - totalPaid)
         return (
-          <Modal title={`Payment History — ${historyInvoice.invoiceNo}`} onClose={() => setHistoryInvoice(null)}>
+          <Modal title={`History — ${historyInvoice.invoiceNo}`} onClose={() => setHistoryInvoice(null)}>
             <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 16 }}>
               <StatCard icon={IconReceipt} tone="blue" label="Invoice Total" value={formatINR(historyInvoice.total)} mono />
               <StatCard icon={IconDollarSign} tone="teal" label="Paid" value={formatINR(totalPaid)} mono />
@@ -849,9 +918,98 @@ export default function Invoices() {
                 </tbody>
               </table>
             )}
+            {(invoiceCreditNotes.length > 0 || invoiceDebitNotes.length > 0) && (
+              <>
+                <p className="panel-title" style={{ margin: '18px 0 8px' }}>Credit &amp; Debit Notes</p>
+                <table className="data-table">
+                  <thead>
+                    <tr><th>Note #</th><th>Type</th><th>Date</th><th>Amount</th><th>Reason</th></tr>
+                  </thead>
+                  <tbody>
+                    {[...invoiceCreditNotes.map((n) => ({ ...n, type: 'Credit' })), ...invoiceDebitNotes.map((n) => ({ ...n, type: 'Debit' }))]
+                      .sort((a, b) => (a.date < b.date ? 1 : -1))
+                      .map((n) => (
+                        <tr key={n.id}>
+                          <td className="cell-mono cell-strong">{n.noteNo}</td>
+                          <td><Pill tone={n.type === 'Credit' ? 'red' : 'teal'}>{n.type}</Pill></td>
+                          <td className="cell-mono">{n.date}</td>
+                          <td className="cell-mono">{formatINR(n.amount)}</td>
+                          <td>{n.reason || <span className="cell-muted">—</span>}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </>
+            )}
           </Modal>
         )
       })()}
+
+      {reminderInvoice && (() => {
+        const customer = customers.find((c) => c.company === reminderInvoice.company)
+        return (
+          <TemplatePickerModal
+            open={!!reminderInvoice}
+            onClose={() => setReminderInvoice(null)}
+            category="paymentReminder"
+            vars={{ company: reminderInvoice.company, outstanding: formatINR(outstandingForCustomer(reminderInvoice.company, invoices, payments)) }}
+            phone={customer?.mobile}
+            email={customer?.email}
+          />
+        )
+      })()}
+
+      {eInvoiceTarget && (
+        <EInvoiceModal
+          invoice={eInvoiceTarget}
+          onClose={() => setEInvoiceTarget(null)}
+          onSave={async (patch) => {
+            await saveInvoiceFields(eInvoiceTarget, patch)
+            setEInvoiceTarget((prev) => (prev ? { ...prev, ...patch } : prev))
+          }}
+        />
+      )}
+
+      {ewayBillTarget && (
+        <EWayBillModal
+          invoice={ewayBillTarget}
+          onClose={() => setEwayBillTarget(null)}
+          onSave={async (patch) => {
+            await saveInvoiceFields(ewayBillTarget, patch)
+            setEwayBillTarget((prev) => (prev ? { ...prev, ...patch } : prev))
+          }}
+        />
+      )}
+
+      {paymentLinkTarget && (() => {
+        const invoicePayments = payments.filter((p) => p.invoiceId === paymentLinkTarget.id && p.status === 'Completed')
+        const paid = invoicePayments.reduce((s, p) => s + Number(p.amount || 0), 0)
+        const balanceDue = Math.max(0, Number(paymentLinkTarget.total || 0) - paid)
+        const customer = customers.find((c) => c.company === paymentLinkTarget.company)
+        return (
+          <PaymentLinkModal
+            invoice={paymentLinkTarget}
+            balanceDue={balanceDue}
+            customer={customer}
+            onClose={() => setPaymentLinkTarget(null)}
+            onSaveVpa={async (vpa) => {
+              await saveInvoiceFields(paymentLinkTarget, { upiVpa: vpa })
+              setPaymentLinkTarget((prev) => (prev ? { ...prev, upiVpa: vpa } : prev))
+              showToast('UPI ID saved')
+            }}
+          />
+        )
+      })()}
+
+      {noteModal && (
+        <CreditDebitNoteModal
+          type={noteModal.type}
+          invoice={noteModal.invoice}
+          existingCount={(noteModal.type === 'Credit' ? creditNotes : debitNotes).length}
+          onClose={() => setNoteModal(null)}
+          onSaved={() => { setNoteModal(null); refresh() }}
+        />
+      )}
 
       <BulkReminderModal
         open={showReminderModal}

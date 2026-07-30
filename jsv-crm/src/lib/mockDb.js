@@ -26,6 +26,8 @@ const store = {
   payments: [...seedPayments],
   stock: [...seedStock],
   stockMovements: [...seedStockMovements],
+  creditNotes: [],
+  debitNotes: [],
   userPermissions: {}, // { [userId]: { [moduleKey]: { view, edit, delete } } }
 }
 
@@ -100,6 +102,8 @@ export const mockDb = {
   payments: table('payments'),
   stock: table('stock'),
   stockMovements: table('stockMovements'),
+  creditNotes: table('creditNotes'),
+  debitNotes: table('debitNotes'),
   userPermissions: {
     async get(userId) {
       await delay(80)

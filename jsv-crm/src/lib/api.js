@@ -5,7 +5,7 @@
 import { supabase, isMock, db as mock } from './supabaseClient.js'
 import { mockAuth, mockAuditLog } from './mockDb.js'
 
-const TABLES = ['products', 'leads', 'customers', 'samples', 'quotations', 'orders', 'followUps', 'roles', 'users', 'tasks', 'meetings', 'documents', 'invoices', 'payments', 'stock', 'stockMovements']
+const TABLES = ['products', 'leads', 'customers', 'samples', 'quotations', 'orders', 'followUps', 'roles', 'users', 'tasks', 'meetings', 'documents', 'invoices', 'payments', 'stock', 'stockMovements', 'creditNotes', 'debitNotes']
 const SQL_TABLE_NAME = {
   products: 'products',
   leads: 'leads',
@@ -23,6 +23,8 @@ const SQL_TABLE_NAME = {
   payments: 'payments',
   stock: 'stock',
   stockMovements: 'stock_movements',
+  creditNotes: 'credit_notes',
+  debitNotes: 'debit_notes',
 }
 
 // Pages write/read plain camelCase fields (estValue, nextFollowUp,
@@ -59,11 +61,12 @@ const MODULE_LABEL = {
   quotations: 'Quotation', orders: 'Order', followUps: 'Follow-up', tasks: 'Task',
   meetings: 'Meeting', documents: 'Document', invoices: 'Invoice', payments: 'Payment',
   stock: 'Stock', stockMovements: 'Stock Movement',
+  creditNotes: 'Credit Note', debitNotes: 'Debit Note',
 }
 
 function pickLabel(record) {
   if (!record) return ''
-  const candidates = [record.company, record.name, record.title, record.orderNo, record.invoiceNo, record.quoteNo, record.paymentNo, record.code, record.fullName]
+  const candidates = [record.company, record.name, record.title, record.orderNo, record.invoiceNo, record.quoteNo, record.paymentNo, record.noteNo, record.code, record.fullName]
   return String(candidates.find((v) => v) || record.id || '').slice(0, 200)
 }
 
