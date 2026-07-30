@@ -14,6 +14,19 @@ import { showToast } from '../lib/toast.js'
 import { exportCSV } from '../lib/exportUtils.js'
 import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
+import TableSkeleton from '../components/TableSkeleton.jsx'
+import ColumnChooser from '../components/ColumnChooser.jsx'
+
+const PRODUCT_COLUMNS = [
+  { key: 'name', label: 'Product' },
+  { key: 'category', label: 'Category' },
+  { key: 'supplier', label: 'Supplier' },
+  { key: 'origin', label: 'Origin' },
+  { key: 'moq', label: 'MOQ' },
+  { key: 'unitPrice', label: 'Unit Price' },
+  { key: 'docs', label: 'Docs' },
+  { key: 'status', label: 'Status' },
+]
 
 const PRODUCT_FIELD_MAP = {
   name: ['name', 'product', 'productname'],
@@ -35,6 +48,7 @@ export default function Products() {
   const canDelete = can('products', 'delete')
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
+  const [visibleCols, setVisibleCols] = useState(PRODUCT_COLUMNS.map((c) => c.key))
   const [searchParams] = useSearchParams()
   const [search, setSearch] = useState(searchParams.get('q') || '')
   const [categoryFilter, setCategoryFilter] = useState('All categories')
@@ -240,6 +254,7 @@ export default function Products() {
         <select className="select-input" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
           {categories.map((c) => <option key={c}>{c}</option>)}
         </select>
+        <ColumnChooser columns={PRODUCT_COLUMNS} storageKey="jsv_cols_products" onChange={setVisibleCols} />
       </div>
 
       {canEdit && (
@@ -257,7 +272,7 @@ export default function Products() {
         </BulkActionsBar>
       )}
 
-      <div className="table-wrap">
+      <div className="table-wrap sticky-first-col">
         <table className="data-table">
           <thead>
             <tr>
@@ -270,14 +285,17 @@ export default function Products() {
                   />
                 </th>
               )}
-              <th>Product</th><th>Category</th><th>Supplier</th><th>Origin</th><th>MOQ</th><th>Unit Price</th><th>Docs</th><th>Status</th>{(canEdit || canDelete) && <th>Actions</th>}
+              {visibleCols.map((key) => (
+                <th key={key}>{PRODUCT_COLUMNS.find((c) => c.key === key)?.label}</th>
+              ))}
+              {(canEdit || canDelete) && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={8 + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>Loading products…</td></tr>
+              <TableSkeleton cols={visibleCols.length + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)} rows={6} />
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={8 + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>
+              <tr className="empty-row"><td colSpan={visibleCols.length + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>
                 {products.length === 0 ? (
                   <EmptyState
                     icon="🧪"
@@ -290,29 +308,38 @@ export default function Products() {
                   <EmptyState icon="🔍" title="No products match" subtitle="Try adjusting your search or filters." />
                 )}
               </td></tr>
-            ) : paged.map((p) => (
+            ) : paged.map((p) => {
+              const cell = (key) => {
+                switch (key) {
+                  case 'name': return <td key={key} className="cell-strong">{p.name}</td>
+                  case 'category': return <td key={key}>{p.category}</td>
+                  case 'supplier': return <td key={key} className="cell-muted">{p.supplier || '—'}</td>
+                  case 'origin': return <td key={key} className="cell-muted">{p.origin || '—'}</td>
+                  case 'moq': return <td key={key} className="cell-mono">{p.moq || '—'}</td>
+                  case 'unitPrice': return <td key={key} className="cell-mono">{p.unitPrice ? `₹${Number(p.unitPrice).toLocaleString('en-IN')}/kg` : '—'}</td>
+                  case 'docs': return (
+                    <td key={key}>
+                      {p.docUrl ? (
+                        <a href={p.docUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm" style={{ color: 'var(--teal-600)', textDecoration: 'none' }}>
+                          📄 View
+                        </a>
+                      ) : (
+                        <span className="cell-muted">{p.docs || '—'}</span>
+                      )}
+                    </td>
+                  )
+                  case 'status': return <td key={key}><Pill>{p.status}</Pill></td>
+                  default: return null
+                }
+              }
+              return (
               <tr key={p.id} style={{ opacity: p.status === 'Inactive' ? 0.55 : 1 }}>
                 {canEdit && (
                   <td className="header-checkbox-cell">
                     <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelected(p.id)} />
                   </td>
                 )}
-                <td className="cell-strong">{p.name}</td>
-                <td>{p.category}</td>
-                <td className="cell-muted">{p.supplier || '—'}</td>
-                <td className="cell-muted">{p.origin || '—'}</td>
-                <td className="cell-mono">{p.moq || '—'}</td>
-                <td className="cell-mono">{p.unitPrice ? `₹${Number(p.unitPrice).toLocaleString('en-IN')}/kg` : '—'}</td>
-                <td>
-                  {p.docUrl ? (
-                    <a href={p.docUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm" style={{ color: 'var(--teal-600)', textDecoration: 'none' }}>
-                      📄 View
-                    </a>
-                  ) : (
-                    <span className="cell-muted">{p.docs || '—'}</span>
-                  )}
-                </td>
-                <td><Pill>{p.status}</Pill></td>
+                {visibleCols.map((key) => cell(key))}
                 {(canEdit || canDelete) && (
                   <td>
                     <div style={{ display: 'flex', gap: 4 }}>
@@ -327,7 +354,7 @@ export default function Products() {
                   </td>
                 )}
               </tr>
-            ))}
+            )})}
           </tbody>
         </table>
       </div>

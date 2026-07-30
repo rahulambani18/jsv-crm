@@ -17,6 +17,8 @@ import { availableQty } from '../lib/stockStatus.js'
 import { exportCSV } from '../lib/exportUtils.js'
 import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
+import TableSkeleton from '../components/TableSkeleton.jsx'
+import ColumnChooser from '../components/ColumnChooser.jsx'
 
 const STATUSES = ['All statuses', 'Processing', 'Dispatched', 'Delivered', 'Cancelled']
 const PAYMENT_FILTERS = ['All payments', 'Paid', 'Pending']
@@ -50,6 +52,18 @@ function formatINR(n) {
   return '₹' + Number(n || 0).toLocaleString('en-IN')
 }
 
+const ORDER_COLUMNS = [
+  { key: 'poNumber', label: 'PO Number' },
+  { key: 'company', label: 'Company' },
+  { key: 'warehouse', label: 'Warehouse' },
+  { key: 'orderDate', label: 'Order Date' },
+  { key: 'delivery', label: 'Expected Delivery' },
+  { key: 'dispatchDate', label: 'Dispatch Date' },
+  { key: 'total', label: 'Total (incl. GST)' },
+  { key: 'status', label: 'Status' },
+  { key: 'payment', label: 'Payment' },
+]
+
 export default function Orders() {
   const { can } = useAuth()
   const canEdit = can('orders', 'edit')
@@ -60,6 +74,7 @@ export default function Orders() {
   const [customers, setCustomers] = useState([])
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
+  const [visibleCols, setVisibleCols] = useState(ORDER_COLUMNS.map((c) => c.key))
   const [warehouseFilter, setWarehouseFilter] = useState('All warehouses')
   const [statusFilter, setStatusFilter] = useState('All statuses')
   const [paymentFilter, setPaymentFilter] = useState(searchParams.get('payment') || 'All payments')
@@ -384,6 +399,7 @@ export default function Orders() {
         <select className="select-input" value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)}>
           {PAYMENT_FILTERS.map((p) => <option key={p}>{p}</option>)}
         </select>
+        <ColumnChooser columns={ORDER_COLUMNS} storageKey="jsv_cols_orders" onChange={setVisibleCols} />
       </div>
 
       {canEdit && (
@@ -410,7 +426,7 @@ export default function Orders() {
         </BulkActionsBar>
       )}
 
-      <div className="table-wrap">
+      <div className="table-wrap sticky-first-col">
         <table className="data-table">
           <thead>
             <tr>
@@ -423,14 +439,17 @@ export default function Orders() {
                   />
                 </th>
               )}
-              <th>PO Number</th><th>Company</th><th>Warehouse</th><th>Order Date</th><th>Expected Delivery</th><th>Dispatch Date</th><th>Total (incl. GST)</th><th>Status</th><th>Payment</th>{(canEdit || canDelete) && <th>Actions</th>}
+              {visibleCols.map((key) => (
+                <th key={key}>{ORDER_COLUMNS.find((c) => c.key === key)?.label}</th>
+              ))}
+              {(canEdit || canDelete) && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={9 + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>Loading orders…</td></tr>
+              <TableSkeleton cols={visibleCols.length + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)} rows={6} />
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={9 + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>
+              <tr className="empty-row"><td colSpan={visibleCols.length + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>
                 {orders.length === 0 ? (
                   <EmptyState
                     icon="🛒"
@@ -443,46 +462,61 @@ export default function Orders() {
                   <EmptyState icon="🔍" title="No orders match your filters" subtitle="Try adjusting your search or filters." />
                 )}
               </td></tr>
-            ) : paged.map((o) => (
+            ) : paged.map((o) => {
+              const cell = (key) => {
+                switch (key) {
+                  case 'poNumber': return (
+                    <td key={key} className="cell-mono">
+                      {o.poNumber || <span className="cell-muted">—</span>}
+                      <br /><span className="cell-mono cell-muted" style={{ fontSize: 11 }}>{o.orderNo}</span>
+                    </td>
+                  )
+                  case 'company': return <td key={key} className="cell-strong">{o.company}</td>
+                  case 'warehouse': return <td key={key}>{o.warehouse}</td>
+                  case 'orderDate': return <td key={key} className="cell-mono">{o.orderDate}</td>
+                  case 'delivery': return <td key={key} className="cell-mono">{o.delivery}</td>
+                  case 'dispatchDate': return <td key={key} className="cell-mono">{o.dispatchDate || <span className="cell-muted">—</span>}</td>
+                  case 'total': return (
+                    <td key={key} className="cell-mono cell-strong">
+                      {formatINR(o.total)}
+                      <br /><span className="cell-mono cell-muted" style={{ fontSize: 11, fontWeight: 400 }}>
+                        {formatINR(o.subtotal)}{Number(o.deliveryCharge) > 0 ? ` + delivery ${formatINR(o.deliveryCharge)}` : ''} + GST {formatINR(o.gstAmount)} ({o.gstRate || 18}%)
+                      </span>
+                    </td>
+                  )
+                  case 'status': return (
+                    <td key={key}>
+                      <select
+                        className={`pill-select pill-${{ Processing: 'navy', Dispatched: 'amber', Delivered: 'teal', Cancelled: 'red' }[o.status] || 'gray'}`}
+                        value={o.status}
+                        onChange={(e) => handleQuickUpdate(o.id, 'status', e.target.value)}
+                      >
+                        <option>Processing</option><option>Dispatched</option><option>Delivered</option><option>Cancelled</option>
+                      </select>
+                    </td>
+                  )
+                  case 'payment': return (
+                    <td key={key}>
+                      <select
+                        className={`pill-select pill-${{ Pending: 'amber', Partial: 'amber', Paid: 'teal' }[o.payment] || 'gray'}`}
+                        value={o.payment}
+                        onChange={(e) => handleQuickUpdate(o.id, 'payment', e.target.value)}
+                      >
+                        <option>Pending</option><option>Partial</option><option>Paid</option>
+                      </select>
+                    </td>
+                  )
+                  default: return null
+                }
+              }
+              return (
               <tr key={o.id}>
                 {canEdit && (
                   <td className="row-checkbox-cell">
                     <input type="checkbox" checked={selected.has(o.id)} onChange={() => toggleSelected(o.id)} />
                   </td>
                 )}
-                <td className="cell-mono">
-                  {o.poNumber || <span className="cell-muted">—</span>}
-                  <br /><span className="cell-mono cell-muted" style={{ fontSize: 11 }}>{o.orderNo}</span>
-                </td>
-                <td className="cell-strong">{o.company}</td>
-                <td>{o.warehouse}</td>
-                <td className="cell-mono">{o.orderDate}</td>
-                <td className="cell-mono">{o.delivery}</td>
-                <td className="cell-mono">{o.dispatchDate || <span className="cell-muted">—</span>}</td>
-                <td className="cell-mono cell-strong">
-                  {formatINR(o.total)}
-                  <br /><span className="cell-mono cell-muted" style={{ fontSize: 11, fontWeight: 400 }}>
-                    {formatINR(o.subtotal)}{Number(o.deliveryCharge) > 0 ? ` + delivery ${formatINR(o.deliveryCharge)}` : ''} + GST {formatINR(o.gstAmount)} ({o.gstRate || 18}%)
-                  </span>
-                </td>
-                <td>
-                  <select
-                    className={`pill-select pill-${{ Processing: 'navy', Dispatched: 'amber', Delivered: 'teal', Cancelled: 'red' }[o.status] || 'gray'}`}
-                    value={o.status}
-                    onChange={(e) => handleQuickUpdate(o.id, 'status', e.target.value)}
-                  >
-                    <option>Processing</option><option>Dispatched</option><option>Delivered</option><option>Cancelled</option>
-                  </select>
-                </td>
-                <td>
-                  <select
-                    className={`pill-select pill-${{ Pending: 'amber', Partial: 'amber', Paid: 'teal' }[o.payment] || 'gray'}`}
-                    value={o.payment}
-                    onChange={(e) => handleQuickUpdate(o.id, 'payment', e.target.value)}
-                  >
-                    <option>Pending</option><option>Partial</option><option>Paid</option>
-                  </select>
-                </td>
+                {visibleCols.map((key) => cell(key))}
                 {(canEdit || canDelete) && (
                   <td>
                     <div style={{ display: 'flex', gap: 4 }}>
@@ -492,7 +526,7 @@ export default function Orders() {
                   </td>
                 )}
               </tr>
-            ))}
+            )})}
           </tbody>
         </table>
       </div>

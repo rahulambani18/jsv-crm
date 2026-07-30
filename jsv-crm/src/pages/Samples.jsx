@@ -17,9 +17,23 @@ import { showToast } from '../lib/toast.js'
 import { exportCSV } from '../lib/exportUtils.js'
 import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
+import TableSkeleton from '../components/TableSkeleton.jsx'
+import ColumnChooser from '../components/ColumnChooser.jsx'
 
 const STATUSES = ['All statuses', 'Preparing', 'In Transit', 'Delivered']
 const STATUS_TONE = { Preparing: 'gray', 'In Transit': 'amber', Delivered: 'teal' }
+
+const SAMPLE_COLUMNS = [
+  { key: 'code', label: 'Code' },
+  { key: 'company', label: 'Company' },
+  { key: 'contact', label: 'Contact' },
+  { key: 'products', label: 'Products' },
+  { key: 'qty', label: 'Qty' },
+  { key: 'sent', label: 'Sent' },
+  { key: 'courier', label: 'Courier' },
+  { key: 'tracking', label: 'Tracking' },
+  { key: 'status', label: 'Status' },
+]
 
 function emptyForm() {
   return { company: '', contact: '', phone: '', email: '', products: [], qty: '', sent: '', courier: '', tracking: '', status: 'Preparing' }
@@ -32,6 +46,7 @@ export default function Samples() {
   const [samples, setSamples] = useState([])
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
+  const [visibleCols, setVisibleCols] = useState(SAMPLE_COLUMNS.map((c) => c.key))
   const [searchParams] = useSearchParams()
   const [search, setSearch] = useState(searchParams.get('q') || '')
   const [statusFilter, setStatusFilter] = useState('All statuses')
@@ -189,6 +204,7 @@ export default function Samples() {
         <select className="select-input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
           {STATUSES.map((s) => <option key={s}>{s}</option>)}
         </select>
+        <ColumnChooser columns={SAMPLE_COLUMNS} storageKey="jsv_cols_samples" onChange={setVisibleCols} />
       </div>
 
       {canEdit && (
@@ -215,7 +231,7 @@ export default function Samples() {
         rows={sendRows}
       />
 
-      <div className="table-wrap">
+      <div className="table-wrap sticky-first-col">
         <table className="data-table">
           <thead>
             <tr>
@@ -228,14 +244,17 @@ export default function Samples() {
                   />
                 </th>
               )}
-              <th>Code</th><th>Company</th><th>Contact</th><th>Products</th><th>Qty</th><th>Sent</th><th>Courier</th><th>Tracking</th><th>Status</th>{(canEdit || canDelete) && <th>Actions</th>}
+              {visibleCols.map((key) => (
+                <th key={key}>{SAMPLE_COLUMNS.find((c) => c.key === key)?.label}</th>
+              ))}
+              {(canEdit || canDelete) && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={9 + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>Loading samples…</td></tr>
+              <TableSkeleton cols={visibleCols.length + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)} rows={6} />
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={9 + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>
+              <tr className="empty-row"><td colSpan={visibleCols.length + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>
                 {samples.length === 0 ? (
                   <EmptyState
                     icon="🧫"
@@ -249,6 +268,38 @@ export default function Samples() {
                 )}
               </td></tr>
             ) : paged.map((s) => {
+              const cell = (key) => {
+                switch (key) {
+                  case 'code': return <td key={key} className="cell-mono">{s.code}</td>
+                  case 'company': return <td key={key} className="cell-strong">{s.company}</td>
+                  case 'contact': return <td key={key}>{s.contact}<br /><span className="cell-mono cell-muted" style={{ fontSize: 11.5 }}>{s.phone}</span></td>
+                  case 'products': return <td key={key}>{(s.products || []).join(', ')}</td>
+                  case 'qty': return <td key={key} className="cell-mono">{s.qty}</td>
+                  case 'sent': return <td key={key} className="cell-mono">{s.sent}</td>
+                  case 'courier': return <td key={key}>{s.courier}</td>
+                  case 'tracking': return <td key={key} className="cell-mono" style={{ fontSize: 11.5 }}>{s.tracking}</td>
+                  case 'status': return (
+                    <td key={key}>
+                      {canEdit ? (
+                        <select
+                          value={s.status}
+                          onChange={(e) => handleStatusChange(s.id, e.target.value)}
+                          className={`pill pill-${STATUS_TONE[s.status] || 'gray'}`}
+                          style={{ border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', paddingRight: 22 }}
+                          title="Change status"
+                        >
+                          <option>Preparing</option>
+                          <option>In Transit</option>
+                          <option>Delivered</option>
+                        </select>
+                      ) : (
+                        <Pill>{s.status}</Pill>
+                      )}
+                    </td>
+                  )
+                  default: return null
+                }
+              }
               return (
               <tr key={s.id}>
                 {canEdit && (
@@ -256,31 +307,7 @@ export default function Samples() {
                     <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggleSelected(s.id)} />
                   </td>
                 )}
-                <td className="cell-mono">{s.code}</td>
-                <td className="cell-strong">{s.company}</td>
-                <td>{s.contact}<br /><span className="cell-mono cell-muted" style={{ fontSize: 11.5 }}>{s.phone}</span></td>
-                <td>{(s.products || []).join(', ')}</td>
-                <td className="cell-mono">{s.qty}</td>
-                <td className="cell-mono">{s.sent}</td>
-                <td>{s.courier}</td>
-                <td className="cell-mono" style={{ fontSize: 11.5 }}>{s.tracking}</td>
-                <td>
-                  {canEdit ? (
-                    <select
-                      value={s.status}
-                      onChange={(e) => handleStatusChange(s.id, e.target.value)}
-                      className={`pill pill-${STATUS_TONE[s.status] || 'gray'}`}
-                      style={{ border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', paddingRight: 22 }}
-                      title="Change status"
-                    >
-                      <option>Preparing</option>
-                      <option>In Transit</option>
-                      <option>Delivered</option>
-                    </select>
-                  ) : (
-                    <Pill>{s.status}</Pill>
-                  )}
-                </td>
+                {visibleCols.map((key) => cell(key))}
                 {(canEdit || canDelete) && (
                   <td>
                     <div style={{ display: 'flex', gap: 4 }}>

@@ -8,6 +8,7 @@ import SendButtons from '../components/SendButtons.jsx'
 import { IconPlus } from '../components/Icons.jsx'
 import EmptyState from '../components/EmptyState.jsx'
 import '../styles/components.css'
+import TableSkeleton from '../components/TableSkeleton.jsx'
 
 const TABS = ['Today', 'Upcoming', 'Overdue', 'Completed', 'All']
 
@@ -87,14 +88,14 @@ export default function FollowUps() {
         ))}
       </div>
 
-      <div className="table-wrap">
+      <div className="table-wrap sticky-first-col">
         <table className="data-table">
           <thead>
             <tr><th>Date</th><th>Type</th><th>Lead</th><th>Contact</th><th>Notes</th><th>Status</th><th>Actions</th></tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={7}>Loading follow-ups…</td></tr>
+              <TableSkeleton cols={7} rows={6} />
             ) : filtered.length === 0 ? (
               <tr className="empty-row"><td colSpan={7}>
                 <EmptyState

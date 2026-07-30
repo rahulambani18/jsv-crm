@@ -23,6 +23,8 @@ import TemplatePickerModal from '../components/TemplatePickerModal.jsx'
 import { readSpreadsheetFile, normalizeRow } from '../lib/fileImport.js'
 import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
+import TableSkeleton from '../components/TableSkeleton.jsx'
+import ColumnChooser from '../components/ColumnChooser.jsx'
 
 const CUSTOMER_FIELD_MAP = {
   company: ['company', 'companyname', 'customer', 'customername', 'name'],
@@ -51,6 +53,18 @@ function formatINR(n) {
   return '₹' + Number(n || 0).toLocaleString('en-IN')
 }
 
+const CUSTOMER_COLUMNS = [
+  { key: 'code', label: 'Code' },
+  { key: 'company', label: 'Company' },
+  { key: 'contact', label: 'Contact Person' },
+  { key: 'mobile', label: 'Mobile' },
+  { key: 'city', label: 'City' },
+  { key: 'gst', label: 'GST' },
+  { key: 'type', label: 'Type' },
+  { key: 'industry', label: 'Industry' },
+  { key: 'outstanding', label: 'Outstanding' },
+]
+
 export default function Customers() {
   const { can } = useAuth()
   const canEdit = can('customers', 'edit')
@@ -67,6 +81,7 @@ export default function Customers() {
   const [timelineFor, setTimelineFor] = useState(null)
   const [reminderFor, setReminderFor] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [visibleCols, setVisibleCols] = useState(CUSTOMER_COLUMNS.map((c) => c.key))
   const [searchParams] = useSearchParams()
   const [search, setSearch] = useState(searchParams.get('q') || '')
   const [showModal, setShowModal] = useState(false)
@@ -339,6 +354,7 @@ export default function Customers() {
           <IconSearch width={15} height={15} />
           <input placeholder="Search company, contact, mobile, GST, city…" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
+        <ColumnChooser columns={CUSTOMER_COLUMNS} storageKey="jsv_cols_customers" onChange={setVisibleCols} />
       </div>
 
       {canEdit && (
@@ -361,7 +377,7 @@ export default function Customers() {
         </BulkActionsBar>
       )}
 
-      <div className="table-wrap">
+      <div className="table-wrap sticky-first-col">
         <table className="data-table">
           <thead>
             <tr>
@@ -374,21 +390,25 @@ export default function Customers() {
                   />
                 </th>
               )}
-              <th>Code</th><th>Company</th><th>Contact Person</th><th>Mobile</th><th>City</th><th>GST</th>
-              <th>Type</th><th>Industry</th><th>Outstanding</th>{(canEdit || canDelete) && <th>Actions</th>}
+              {visibleCols.map((key) => (
+                <th key={key}>{CUSTOMER_COLUMNS.find((c) => c.key === key)?.label}</th>
+              ))}
+              {(canEdit || canDelete) && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={9 + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>Loading customers…</td></tr>
+              <TableSkeleton cols={visibleCols.length + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)} rows={6} />
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={9 + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>
+              <tr className="empty-row"><td colSpan={visibleCols.length + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>
                 {customers.length === 0 ? (
                   <EmptyState
                     icon="👥"
                     title="No customers yet"
                     subtitle="Add your first customer to start tracking their orders and account details."
-                    actionLabel={canEdit ? 'New Customer' : undefined}
+                    secondaryActionLabel={canEdit ? 'Import Excel/CSV' : undefined}
+                    onSecondaryAction={canEdit ? (() => fileInputRef.current?.click()) : undefined}
+                    actionLabel={canEdit ? 'Create First Customer' : undefined}
                     onAction={canEdit ? openCreate : undefined}
                   />
                 ) : (
@@ -397,6 +417,25 @@ export default function Customers() {
               </td></tr>
             ) : paged.map((c) => {
               const outstanding = outstandingByCompany[c.company] || 0
+              const cell = (key) => {
+                switch (key) {
+                  case 'code': return <td key={key} className="cell-mono">{c.code}</td>
+                  case 'company': return <td key={key} className="cell-strong">{c.company}</td>
+                  case 'contact': return <td key={key}>{c.contact || <span className="cell-muted">—</span>}</td>
+                  case 'mobile': return <td key={key} className="cell-mono" style={{ fontSize: 11.5 }}>{c.mobile || <span className="cell-muted">—</span>}</td>
+                  case 'city': return <td key={key}>{c.city}</td>
+                  case 'gst': return <td key={key} className="cell-mono" style={{ fontSize: 11.5 }}>{c.gst}</td>
+                  case 'type': return <td key={key}>{c.businessType ? <span className="pill pill-navy">{c.businessType}</span> : <span className="cell-muted">—</span>}</td>
+                  case 'industry': return (
+                    <td key={key}>
+                      {c.industry || <span className="cell-muted">—</span>}
+                      {c.application && <><br /><span className="cell-muted" style={{ fontSize: 11.5 }}>{c.application}</span></>}
+                    </td>
+                  )
+                  case 'outstanding': return <td key={key} className="cell-mono">{formatINR(outstanding)}</td>
+                  default: return null
+                }
+              }
               return (
               <tr key={c.id}>
                 {canEdit && (
@@ -404,18 +443,7 @@ export default function Customers() {
                     <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleSelected(c.id)} />
                   </td>
                 )}
-                <td className="cell-mono">{c.code}</td>
-                <td className="cell-strong">{c.company}</td>
-                <td>{c.contact || <span className="cell-muted">—</span>}</td>
-                <td className="cell-mono" style={{ fontSize: 11.5 }}>{c.mobile || <span className="cell-muted">—</span>}</td>
-                <td>{c.city}</td>
-                <td className="cell-mono" style={{ fontSize: 11.5 }}>{c.gst}</td>
-                <td>{c.businessType ? <span className="pill pill-navy">{c.businessType}</span> : <span className="cell-muted">—</span>}</td>
-                <td>
-                  {c.industry || <span className="cell-muted">—</span>}
-                  {c.application && <><br /><span className="cell-muted" style={{ fontSize: 11.5 }}>{c.application}</span></>}
-                </td>
-                <td className="cell-mono">{formatINR(outstanding)}</td>
+                {visibleCols.map((key) => cell(key))}
                 {(canEdit || canDelete) && (
                   <td>
                     <RowActionsMenu

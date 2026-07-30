@@ -8,8 +8,20 @@ import ExportBar from '../components/ExportBar.jsx'
 import { IconPlus, IconSearch, IconEdit, IconTrash } from '../components/Icons.jsx'
 import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
+import TableSkeleton from '../components/TableSkeleton.jsx'
+import ColumnChooser from '../components/ColumnChooser.jsx'
 
 const DOC_TYPES = ['COA', 'MSDS', 'TDS', 'Certificate', 'Contract', 'Invoice', 'Purchase Order', 'Email', 'Other']
+
+const DOCUMENT_COLUMNS = [
+  { key: 'name', label: 'Document' },
+  { key: 'type', label: 'Type' },
+  { key: 'relatedProduct', label: 'Product' },
+  { key: 'tags', label: 'Tags' },
+  { key: 'uploadedBy', label: 'Added by' },
+  { key: 'date', label: 'Date' },
+  { key: 'link', label: 'Link' },
+]
 
 function emptyForm() {
   return { name: '', type: 'COA', relatedProduct: '', url: '', tags: '', date: new Date().toISOString().slice(0, 10), uploadedBy: '' }
@@ -22,6 +34,7 @@ export default function Documents() {
   const [docs, setDocs] = useState([])
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
+  const [visibleCols, setVisibleCols] = useState(DOCUMENT_COLUMNS.map((c) => c.key))
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('All types')
   const [showModal, setShowModal] = useState(false)
@@ -135,18 +148,21 @@ export default function Documents() {
           <option>All types</option>
           {DOC_TYPES.map((t) => <option key={t}>{t}</option>)}
         </select>
+        <ColumnChooser columns={DOCUMENT_COLUMNS} storageKey="jsv_cols_documents" onChange={setVisibleCols} />
       </div>
 
-      <div className="table-wrap">
+      <div className="table-wrap sticky-first-col">
         <table className="data-table">
           <thead>
-            <tr><th>Document</th><th>Type</th><th>Product</th><th>Tags</th><th>Added by</th><th>Date</th><th>Link</th>{(canEdit || canDelete) && <th>Actions</th>}</tr>
+            <tr>{visibleCols.map((key) => (
+              <th key={key}>{DOCUMENT_COLUMNS.find((c) => c.key === key)?.label}</th>
+            ))}{(canEdit || canDelete) && <th>Actions</th>}</tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={(canEdit || canDelete) ? 8 : 7}>Loading documents…</td></tr>
+              <TableSkeleton cols={visibleCols.length + ((canEdit || canDelete) ? 1 : 0)} rows={6} />
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={(canEdit || canDelete) ? 8 : 7}>
+              <tr className="empty-row"><td colSpan={visibleCols.length + ((canEdit || canDelete) ? 1 : 0)}>
                 {docs.length === 0 ? (
                   <EmptyState
                     icon="📁"
@@ -159,34 +175,47 @@ export default function Documents() {
                   <EmptyState icon="🔍" title="No documents match" subtitle="Try adjusting your search or filters." />
                 )}
               </td></tr>
-            ) : filtered.map((d) => (
+            ) : filtered.map((d) => {
+              const cell = (key) => {
+                switch (key) {
+                  case 'name': return (
+                    <td key={key}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 18 }}>{typeIcon[d.type] || '📁'}</span>
+                        <span style={{ fontWeight: 600, color: 'var(--ink-900)' }}>{d.name}</span>
+                      </div>
+                    </td>
+                  )
+                  case 'type': return <td key={key}><Pill tone={typeTone[d.type] || 'gray'}>{d.type}</Pill></td>
+                  case 'relatedProduct': return <td key={key} className="cell-muted">{d.relatedProduct || '—'}</td>
+                  case 'tags': return (
+                    <td key={key}>
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                        {(d.tags || []).map((tag) => (
+                          <span key={tag} style={{ fontSize: 11, background: 'var(--paper-100)', color: 'var(--ink-500)', padding: '2px 7px', borderRadius: 100 }}>{tag}</span>
+                        ))}
+                      </div>
+                    </td>
+                  )
+                  case 'uploadedBy': return <td key={key} className="cell-muted">{d.uploadedBy || '—'}</td>
+                  case 'date': return <td key={key} className="cell-mono">{d.date || '—'}</td>
+                  case 'link': return (
+                    <td key={key}>
+                      {d.url ? (
+                        <a href={d.url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm" style={{ color: 'var(--teal-600)', textDecoration: 'none' }}>
+                          📄 Open
+                        </a>
+                      ) : (
+                        <span className="cell-muted">—</span>
+                      )}
+                    </td>
+                  )
+                  default: return null
+                }
+              }
+              return (
               <tr key={d.id}>
-                <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 18 }}>{typeIcon[d.type] || '📁'}</span>
-                    <span style={{ fontWeight: 600, color: 'var(--ink-900)' }}>{d.name}</span>
-                  </div>
-                </td>
-                <td><Pill tone={typeTone[d.type] || 'gray'}>{d.type}</Pill></td>
-                <td className="cell-muted">{d.relatedProduct || '—'}</td>
-                <td>
-                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                    {(d.tags || []).map((tag) => (
-                      <span key={tag} style={{ fontSize: 11, background: 'var(--paper-100)', color: 'var(--ink-500)', padding: '2px 7px', borderRadius: 100 }}>{tag}</span>
-                    ))}
-                  </div>
-                </td>
-                <td className="cell-muted">{d.uploadedBy || '—'}</td>
-                <td className="cell-mono">{d.date || '—'}</td>
-                <td>
-                  {d.url ? (
-                    <a href={d.url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm" style={{ color: 'var(--teal-600)', textDecoration: 'none' }}>
-                      📄 Open
-                    </a>
-                  ) : (
-                    <span className="cell-muted">—</span>
-                  )}
-                </td>
+                {visibleCols.map((key) => cell(key))}
                 {(canEdit || canDelete) && (
                   <td>
                     <div style={{ display: 'flex', gap: 4 }}>
@@ -196,7 +225,7 @@ export default function Documents() {
                   </td>
                 )}
               </tr>
-            ))}
+            )})}
           </tbody>
         </table>
       </div>

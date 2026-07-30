@@ -27,6 +27,8 @@ import { exportCSV } from '../lib/exportUtils.js'
 import { showToast } from '../lib/toast.js'
 import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
+import TableSkeleton from '../components/TableSkeleton.jsx'
+import ColumnChooser from '../components/ColumnChooser.jsx'
 
 const GST_RATE = 18
 
@@ -329,6 +331,17 @@ function printInvoice(inv, order, customer) {
   setTimeout(() => { w.print() }, 600)
 }
 
+const INVOICE_COLUMNS = [
+  { key: 'invoiceNo', label: 'Invoice #' },
+  { key: 'company', label: 'Company' },
+  { key: 'issueDate', label: 'Issue Date' },
+  { key: 'dueDate', label: 'Due Date' },
+  { key: 'subtotal', label: 'Subtotal' },
+  { key: 'gst', label: 'GST' },
+  { key: 'total', label: 'Total' },
+  { key: 'status', label: 'Status' },
+]
+
 export default function Invoices() {
   const { can } = useAuth()
   const canEdit = can('invoices', 'edit')
@@ -340,6 +353,7 @@ export default function Invoices() {
   const [creditNotes, setCreditNotes] = useState([])
   const [debitNotes, setDebitNotes] = useState([])
   const [loading, setLoading] = useState(true)
+  const [visibleCols, setVisibleCols] = useState(INVOICE_COLUMNS.map((c) => c.key))
   const [searchParams] = useSearchParams()
   const [search, setSearch] = useState(searchParams.get('q') || '')
   const [statusFilter, setStatusFilter] = useState('All')
@@ -647,6 +661,7 @@ export default function Invoices() {
             Select all overdue
           </button>
         )}
+        <ColumnChooser columns={INVOICE_COLUMNS} storageKey="jsv_cols_invoices" onChange={setVisibleCols} />
       </div>
 
       <BulkActionsBar
@@ -664,7 +679,7 @@ export default function Invoices() {
         </button>
       </BulkActionsBar>
 
-      <div className="table-wrap">
+      <div className="table-wrap sticky-first-col">
         <table className="data-table">
           <thead>
             <tr>
@@ -675,15 +690,17 @@ export default function Invoices() {
                   onChange={toggleSelectAll}
                 />
               </th>
-              <th>Invoice #</th><th>Company</th><th>Issue Date</th><th>Due Date</th>
-              <th>Subtotal</th><th>GST</th><th>Total</th><th>Status</th><th>Actions</th>
+              {visibleCols.map((key) => (
+                <th key={key}>{INVOICE_COLUMNS.find((c) => c.key === key)?.label}</th>
+              ))}
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={10}>Loading invoices…</td></tr>
+              <TableSkeleton cols={visibleCols.length + 2} rows={6} />
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={10}>
+              <tr className="empty-row"><td colSpan={visibleCols.length + 2}>
                 {invoices.length === 0 ? (
                   <EmptyState
                     icon="🧾"
@@ -696,27 +713,37 @@ export default function Invoices() {
               </td></tr>
             ) : paged.map((inv) => {
               const customer = customers.find((c) => c.company === inv.company)
+              const cell = (key) => {
+                switch (key) {
+                  case 'invoiceNo': return (
+                    <td key={key} className="cell-mono cell-strong">
+                      {inv.invoiceNo}
+                      {inv.tallySyncedAt && <span title={`Exported to Tally on ${String(inv.tallySyncedAt).slice(0, 10)}`} style={{ marginLeft: 6, fontSize: 11, color: 'var(--teal-700)' }}>⇄ Tally</span>}
+                      {inv.einvoiceIrn && <span title="E-Invoice (demo IRN) generated" style={{ marginLeft: 6, fontSize: 11, color: 'var(--blue-700, #1d4ed8)' }}>🧾 IRN</span>}
+                      {inv.ewayBillNo && <span title={`E-Way Bill (demo) valid upto ${inv.ewayValidUpto}`} style={{ marginLeft: 6, fontSize: 11, color: 'var(--amber-700, #b45309)' }}>🚚 EWB</span>}
+                    </td>
+                  )
+                  case 'company': return <td key={key} className="cell-strong">{inv.company}</td>
+                  case 'issueDate': return <td key={key} className="cell-mono">{inv.issueDate}</td>
+                  case 'dueDate': return (
+                    <td key={key} className="cell-mono" style={{ color: inv.status === 'Overdue' ? 'var(--red-600)' : undefined }}>
+                      {inv.dueDate}
+                      {inv.paymentTerms && <><br /><span className="cell-mono cell-muted" style={{ fontSize: 11 }}>{inv.paymentTerms}</span></>}
+                    </td>
+                  )
+                  case 'subtotal': return <td key={key} className="cell-mono">{formatINR(inv.subtotal)}</td>
+                  case 'gst': return <td key={key} className="cell-mono">{formatINR(Number(inv.cgst || 0) + Number(inv.sgst || 0) + Number(inv.igst || 0))}</td>
+                  case 'total': return <td key={key} className="cell-mono cell-strong">{formatINR(inv.total)}</td>
+                  case 'status': return <td key={key}><Pill>{inv.status}</Pill></td>
+                  default: return null
+                }
+              }
               return (
               <tr key={inv.id}>
                 <td className="row-checkbox-cell">
                   <input type="checkbox" checked={selected.has(inv.id)} onChange={() => toggleSelected(inv.id)} />
                 </td>
-                <td className="cell-mono cell-strong">
-                  {inv.invoiceNo}
-                  {inv.tallySyncedAt && <span title={`Exported to Tally on ${String(inv.tallySyncedAt).slice(0, 10)}`} style={{ marginLeft: 6, fontSize: 11, color: 'var(--teal-700)' }}>⇄ Tally</span>}
-                  {inv.einvoiceIrn && <span title="E-Invoice (demo IRN) generated" style={{ marginLeft: 6, fontSize: 11, color: 'var(--blue-700, #1d4ed8)' }}>🧾 IRN</span>}
-                  {inv.ewayBillNo && <span title={`E-Way Bill (demo) valid upto ${inv.ewayValidUpto}`} style={{ marginLeft: 6, fontSize: 11, color: 'var(--amber-700, #b45309)' }}>🚚 EWB</span>}
-                </td>
-                <td className="cell-strong">{inv.company}</td>
-                <td className="cell-mono">{inv.issueDate}</td>
-                <td className="cell-mono" style={{ color: inv.status === 'Overdue' ? 'var(--red-600)' : undefined }}>
-                  {inv.dueDate}
-                  {inv.paymentTerms && <><br /><span className="cell-mono cell-muted" style={{ fontSize: 11 }}>{inv.paymentTerms}</span></>}
-                </td>
-                <td className="cell-mono">{formatINR(inv.subtotal)}</td>
-                <td className="cell-mono">{formatINR(Number(inv.cgst || 0) + Number(inv.sgst || 0) + Number(inv.igst || 0))}</td>
-                <td className="cell-mono cell-strong">{formatINR(inv.total)}</td>
-                <td><Pill>{inv.status}</Pill></td>
+                {visibleCols.map((key) => cell(key))}
                 <td style={{ display: 'flex', gap: 4 }}>
                   <SendButtons
                     phone={customer?.mobile}

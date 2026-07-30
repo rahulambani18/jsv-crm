@@ -48,6 +48,23 @@ export default function Shell({ children }) {
     localStorage.setItem('jsv_theme', dark ? 'dark' : 'light')
   }, [dark])
 
+  // Table density — comfortable / compact / large — persists across
+  // sessions and applies to every .data-table in the app at once.
+  const DENSITIES = ['comfortable', 'compact', 'large']
+  const DENSITY_LABEL = { comfortable: 'Comfortable', compact: 'Compact', large: 'Large' }
+  const [density, setDensity] = useState(() => localStorage.getItem('jsv_density') || 'comfortable')
+  useEffect(() => {
+    document.documentElement.setAttribute('data-density', density)
+    localStorage.setItem('jsv_density', density)
+  }, [density])
+  const [showDensity, setShowDensity] = useState(false)
+  const densityRef = useRef(null)
+  useEffect(() => {
+    function handleClick(e) { if (densityRef.current && !densityRef.current.contains(e.target)) setShowDensity(false) }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
   // Live clock + time-of-day greeting for the top bar
   const [now, setNow] = useState(new Date())
   useEffect(() => {
@@ -406,6 +423,30 @@ export default function Shell({ children }) {
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+            </div>
+            {/* Table density toggle */}
+            <div ref={densityRef} style={{ position: 'relative' }}>
+              <button
+                onClick={() => setShowDensity((v) => !v)}
+                title="Table density"
+                style={{ background: 'transparent', border: '1px solid var(--paper-200)', borderRadius: 'var(--radius-sm)', padding: '6px 10px', cursor: 'pointer', fontSize: 15, color: 'var(--ink-500)' }}
+              >
+                ☰
+              </button>
+              {showDensity && (
+                <div className="search-dropdown" style={{ position: 'absolute', top: 38, right: 0, width: 170, background: '#fff', border: '1px solid var(--paper-200)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-pop)', zIndex: 200, overflow: 'hidden' }}>
+                  <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--paper-100)', fontWeight: 700, fontSize: 12 }}>Table density</div>
+                  {DENSITIES.map((d) => (
+                    <div
+                      key={d}
+                      onClick={() => { setDensity(d); setShowDensity(false) }}
+                      style={{ padding: '9px 14px', fontSize: 13, color: density === d ? 'var(--navy-900)' : 'var(--ink-700)', fontWeight: density === d ? 700 : 400, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+                    >
+                      {DENSITY_LABEL[d]} {density === d && '✓'}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

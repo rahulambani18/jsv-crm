@@ -15,9 +15,22 @@ import { getOverdueInvoices, daysOverdue } from '../lib/overdue.js'
 import { showToast } from '../lib/toast.js'
 import { exportCSV } from '../lib/exportUtils.js'
 import '../styles/components.css'
+import TableSkeleton from '../components/TableSkeleton.jsx'
+import ColumnChooser from '../components/ColumnChooser.jsx'
 
 const PAYMENT_MODES = ['NEFT', 'RTGS', 'Cheque', 'Cash', 'UPI', 'Bank Transfer']
 const STATUS_OPTIONS = ['Completed', 'Pending', 'Failed', 'Refunded']
+
+const PAYMENT_COLUMNS = [
+  { key: 'paymentNo', label: 'Payment #' },
+  { key: 'company', label: 'Company' },
+  { key: 'amount', label: 'Amount' },
+  { key: 'date', label: 'Date' },
+  { key: 'mode', label: 'Mode' },
+  { key: 'reference', label: 'Reference' },
+  { key: 'linkedInvoice', label: 'Linked Invoice' },
+  { key: 'status', label: 'Status' },
+]
 
 function emptyForm() {
   return { company: '', invoiceId: '', amount: '', date: new Date().toISOString().slice(0, 10), mode: 'NEFT', reference: '', notes: '', status: 'Completed' }
@@ -32,6 +45,7 @@ export default function Payments() {
   const [payments, setPayments] = useState([])
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(true)
+  const [visibleCols, setVisibleCols] = useState(PAYMENT_COLUMNS.map((c) => c.key))
   const [search, setSearch] = useState('')
   const [modeFilter, setModeFilter] = useState('All modes')
   const [showModal, setShowModal] = useState(false)
@@ -223,6 +237,7 @@ export default function Payments() {
           <option>All modes</option>
           {PAYMENT_MODES.map((m) => <option key={m}>{m}</option>)}
         </select>
+        <ColumnChooser columns={PAYMENT_COLUMNS} storageKey="jsv_cols_payments" onChange={setVisibleCols} />
       </div>
 
       {(canEdit || canDelete) && (
@@ -234,7 +249,7 @@ export default function Payments() {
         />
       )}
 
-      <div className="table-wrap">
+      <div className="table-wrap sticky-first-col">
         <table className="data-table">
           <thead>
             <tr>
@@ -247,14 +262,16 @@ export default function Payments() {
                   />
                 </th>
               )}
-              <th>Payment #</th><th>Company</th><th>Amount</th><th>Date</th><th>Mode</th><th>Reference</th><th>Linked Invoice</th><th>Status</th>{canDelete && <th>Actions</th>}
+              {visibleCols.map((key) => (
+                <th key={key}>{PAYMENT_COLUMNS.find((c) => c.key === key)?.label}</th>
+              ))}{canDelete && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={8 + ((canEdit || canDelete) ? 1 : 0) + (canDelete ? 1 : 0)}>Loading payments…</td></tr>
+              <TableSkeleton cols={visibleCols.length + ((canEdit || canDelete) ? 1 : 0) + (canDelete ? 1 : 0)} rows={6} />
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={8 + ((canEdit || canDelete) ? 1 : 0) + (canDelete ? 1 : 0)}>
+              <tr className="empty-row"><td colSpan={visibleCols.length + ((canEdit || canDelete) ? 1 : 0) + (canDelete ? 1 : 0)}>
                 {payments.length === 0 ? (
                   <EmptyState
                     icon="💳"
@@ -269,6 +286,19 @@ export default function Payments() {
               </td></tr>
             ) : paged.map((p) => {
               const inv = invoices.find((i) => i.id === p.invoiceId)
+              const cell = (key) => {
+                switch (key) {
+                  case 'paymentNo': return <td key={key} className="cell-mono cell-strong">{p.paymentNo}</td>
+                  case 'company': return <td key={key} className="cell-strong">{p.company}</td>
+                  case 'amount': return <td key={key} className="cell-mono" style={{ color: 'var(--teal-700)', fontWeight: 600 }}>{formatINR(p.amount)}</td>
+                  case 'date': return <td key={key} className="cell-mono">{p.date}</td>
+                  case 'mode': return <td key={key}><span className="pill pill-navy">{p.mode}</span></td>
+                  case 'reference': return <td key={key} className="cell-mono" style={{ fontSize: 12 }}>{p.reference || '—'}</td>
+                  case 'linkedInvoice': return <td key={key} className="cell-mono" style={{ fontSize: 12 }}>{inv ? inv.invoiceNo : '—'}</td>
+                  case 'status': return <td key={key}><Pill>{p.status}</Pill></td>
+                  default: return null
+                }
+              }
               return (
                 <tr key={p.id}>
                   {(canEdit || canDelete) && (
@@ -276,14 +306,7 @@ export default function Payments() {
                       <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelected(p.id)} />
                     </td>
                   )}
-                  <td className="cell-mono cell-strong">{p.paymentNo}</td>
-                  <td className="cell-strong">{p.company}</td>
-                  <td className="cell-mono" style={{ color: 'var(--teal-700)', fontWeight: 600 }}>{formatINR(p.amount)}</td>
-                  <td className="cell-mono">{p.date}</td>
-                  <td><span className="pill pill-navy">{p.mode}</span></td>
-                  <td className="cell-mono" style={{ fontSize: 12 }}>{p.reference || '—'}</td>
-                  <td className="cell-mono" style={{ fontSize: 12 }}>{inv ? inv.invoiceNo : '—'}</td>
-                  <td><Pill>{p.status}</Pill></td>
+                  {visibleCols.map((key) => cell(key))}
                   {canDelete && (
                     <td>
                       <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(p)} title="Delete"><IconTrash width={13} height={13} /></button>

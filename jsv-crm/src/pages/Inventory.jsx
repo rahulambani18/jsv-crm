@@ -17,6 +17,7 @@ import {
   IconPlus, IconSearch, IconLayers, IconTrash, IconClock, IconUpload,
   IconBarcode, IconQrCode, IconTransfer, IconAlertTriangle,
 } from '../components/Icons.jsx'
+import TableSkeleton from '../components/TableSkeleton.jsx'
 import { useAuth } from '../lib/AuthContext.jsx'
 import { showToast } from '../lib/toast.js'
 import { exportCSV } from '../lib/exportUtils.js'
@@ -24,8 +25,24 @@ import { expiryStatus, EXPIRY_WARNING_DAYS } from '../lib/expiry.js'
 import { availableQty, stockStatus } from '../lib/stockStatus.js'
 import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
+import ColumnChooser from '../components/ColumnChooser.jsx'
 
 const MOVEMENT_TYPES = ['Received', 'Dispatched', 'Adjustment', 'Return']
+
+const INVENTORY_COLUMNS = [
+  { key: 'product', label: 'Product' },
+  { key: 'batch', label: 'Batch / Lot' },
+  { key: 'warehouse', label: 'Warehouse' },
+  { key: 'qtyOnHand', label: 'Qty On Hand' },
+  { key: 'available', label: 'Available' },
+  { key: 'reserved', label: 'Reserved' },
+  { key: 'damaged', label: 'Damaged' },
+  { key: 'unit', label: 'Unit' },
+  { key: 'reorderLevel', label: 'Reorder Level' },
+  { key: 'status', label: 'Status' },
+  { key: 'expiryDate', label: 'Expiry Date' },
+  { key: 'updatedAt', label: 'Last Updated' },
+]
 
 // Same column-name aliases the excel-stock-sync-agent uses, so a file
 // that works with one works with the other — whichever one someone
@@ -108,6 +125,7 @@ export default function Inventory() {
   const [movements, setMovements] = useState([])
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
+  const [visibleCols, setVisibleCols] = useState(INVENTORY_COLUMNS.map((c) => c.key))
   const [search, setSearch] = useState('')
   const [warehouseFilter, setWarehouseFilter] = useState('All')
   const [statusFilter, setStatusFilter] = useState('All')
@@ -745,6 +763,7 @@ export default function Inventory() {
           <input type="checkbox" checked={showArchived} onChange={(e) => { setShowArchived(e.target.checked); setSelected(new Set()) }} />
           Show archived
         </label>
+        <ColumnChooser columns={INVENTORY_COLUMNS} storageKey="jsv_cols_inventory" onChange={setVisibleCols} />
       </div>
 
       {canEdit && (
@@ -762,7 +781,7 @@ export default function Inventory() {
         </BulkActionsBar>
       )}
 
-      <div className="table-wrap">
+      <div className="table-wrap sticky-first-col">
         <table className="data-table">
           <thead>
             <tr>
@@ -775,15 +794,17 @@ export default function Inventory() {
                   />
                 </th>
               )}
-              <th>Product</th><th>Batch / Lot</th><th>Warehouse</th><th>Qty On Hand</th><th>Available</th><th>Reserved</th><th>Damaged</th><th>Unit</th>
-              <th>Reorder Level</th><th>Status</th><th>Expiry Date</th><th>Last Updated</th><th>Actions</th>
+              {visibleCols.map((key) => (
+                <th key={key}>{INVENTORY_COLUMNS.find((c) => c.key === key)?.label}</th>
+              ))}
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={13 + (canEdit ? 1 : 0)}>Loading inventory…</td></tr>
+              <TableSkeleton cols={visibleCols.length + (canEdit ? 1 : 0) + 1} rows={6} />
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={13 + (canEdit ? 1 : 0)}>
+              <tr className="empty-row"><td colSpan={visibleCols.length + (canEdit ? 1 : 0) + 1}>
                 {stock.length === 0 ? (
                   <EmptyState
                     icon="📦"
@@ -799,6 +820,103 @@ export default function Inventory() {
             ) : paged.map((s) => {
               const status = stockStatus(s)
               const productExists = products.some((p) => p.name === s.product)
+              const cell = (key) => {
+                switch (key) {
+                  case 'product': return (
+                    <td key={key} className="cell-strong">
+                      {productExists ? (
+                        <Link to={`/products?q=${encodeURIComponent(s.product)}`}>{s.product}</Link>
+                      ) : (
+                        s.product
+                      )}
+                      {s.archived && <span className="pill pill-gray" style={{ marginLeft: 6, fontSize: 10.5 }}>Archived</span>}
+                    </td>
+                  )
+                  case 'batch': return (
+                    <td key={key} className="cell-mono" style={{ fontSize: 12 }}>
+                      {s.batchNumber || <span className="cell-muted">No batch #</span>}
+                      {s.lotNumber && <><br /><span className="cell-muted">Lot {s.lotNumber}</span></>}
+                    </td>
+                  )
+                  case 'warehouse': return <td key={key}>{s.warehouse}</td>
+                  case 'qtyOnHand': return <td key={key} className="cell-mono">{Number(s.qtyOnHand).toLocaleString('en-IN')}</td>
+                  case 'available': return <td key={key} className="cell-mono cell-strong">{availableQty(s).toLocaleString('en-IN')}</td>
+                  case 'reserved': return (
+                    <td key={key} className="cell-mono">
+                      {canEdit ? (
+                        <input
+                          type="number" min="0" defaultValue={s.reservedQty || 0}
+                          style={{ width: 70 }}
+                          onBlur={(e) => handleReservedBlur(s, e.target.value)}
+                        />
+                      ) : (
+                        s.reservedQty || 0
+                      )}
+                    </td>
+                  )
+                  case 'damaged': return (
+                    <td key={key} className="cell-mono">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {canEdit ? (
+                          <input
+                            type="number" min="0" defaultValue={s.damagedQty || 0}
+                            style={{ width: 70 }}
+                            onBlur={(e) => handleDamagedBlur(s, e.target.value)}
+                          />
+                        ) : (
+                          s.damagedQty || 0
+                        )}
+                        {canEdit && Number(s.damagedQty) > 0 && (
+                          <button className="btn btn-ghost btn-sm" onClick={() => handleWriteOffDamaged(s)} title="Write off damaged stock (removes from qty on hand)">
+                            <IconTrash width={12} height={12} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  )
+                  case 'unit': return <td key={key}>{s.unit}</td>
+                  case 'reorderLevel': return (
+                    <td key={key} className="cell-mono">
+                      {canEdit ? (
+                        <input
+                          type="number" min="0" defaultValue={s.reorderLevel}
+                          style={{ width: 80 }}
+                          onBlur={(e) => handleReorderLevelBlur(s, e.target.value)}
+                        />
+                      ) : (
+                        s.reorderLevel
+                      )}
+                    </td>
+                  )
+                  case 'status': return <td key={key}><Pill tone={status === 'In Stock' ? 'teal' : status === 'Low Stock' ? 'amber' : 'red'}>{status}</Pill></td>
+                  case 'expiryDate': return (
+                    <td key={key} className="cell-mono">
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                        {canEdit ? (
+                          <input
+                            type="date" defaultValue={s.expiryDate || ''}
+                            style={{ width: 140 }}
+                            onBlur={(e) => handleExpiryDateBlur(s, e.target.value)}
+                          />
+                        ) : (
+                          s.expiryDate || <span className="cell-muted">—</span>
+                        )}
+                        {expiryStatus(s) === 'Expired' && <Pill tone="red">Expired</Pill>}
+                        {expiryStatus(s) === 'Expiring Soon' && <Pill tone="amber">Expiring Soon</Pill>}
+                      </div>
+                    </td>
+                  )
+                  case 'updatedAt': return (
+                    <td key={key} className="cell-mono">
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                        <span>{formatUpdatedAt(s.updatedAt)}</span>
+                        {s.source && <Pill tone={SOURCE_TONE[s.source] || 'gray'}>{s.source}</Pill>}
+                      </div>
+                    </td>
+                  )
+                  default: return null
+                }
+              }
               return (
                 <tr key={s.id} style={{ opacity: s.archived ? 0.55 : 1 }}>
                   {canEdit && (
@@ -806,84 +924,7 @@ export default function Inventory() {
                       <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggleSelected(s.id)} />
                     </td>
                   )}
-                  <td className="cell-strong">
-                    {productExists ? (
-                      <Link to={`/products?q=${encodeURIComponent(s.product)}`}>{s.product}</Link>
-                    ) : (
-                      s.product
-                    )}
-                    {s.archived && <span className="pill pill-gray" style={{ marginLeft: 6, fontSize: 10.5 }}>Archived</span>}
-                  </td>
-                  <td className="cell-mono" style={{ fontSize: 12 }}>
-                    {s.batchNumber || <span className="cell-muted">No batch #</span>}
-                    {s.lotNumber && <><br /><span className="cell-muted">Lot {s.lotNumber}</span></>}
-                  </td>
-                  <td>{s.warehouse}</td>
-                  <td className="cell-mono">{Number(s.qtyOnHand).toLocaleString('en-IN')}</td>
-                  <td className="cell-mono cell-strong">{availableQty(s).toLocaleString('en-IN')}</td>
-                  <td className="cell-mono">
-                    {canEdit ? (
-                      <input
-                        type="number" min="0" defaultValue={s.reservedQty || 0}
-                        style={{ width: 70 }}
-                        onBlur={(e) => handleReservedBlur(s, e.target.value)}
-                      />
-                    ) : (
-                      s.reservedQty || 0
-                    )}
-                  </td>
-                  <td className="cell-mono">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      {canEdit ? (
-                        <input
-                          type="number" min="0" defaultValue={s.damagedQty || 0}
-                          style={{ width: 70 }}
-                          onBlur={(e) => handleDamagedBlur(s, e.target.value)}
-                        />
-                      ) : (
-                        s.damagedQty || 0
-                      )}
-                      {canEdit && Number(s.damagedQty) > 0 && (
-                        <button className="btn btn-ghost btn-sm" onClick={() => handleWriteOffDamaged(s)} title="Write off damaged stock (removes from qty on hand)">
-                          <IconTrash width={12} height={12} />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                  <td>{s.unit}</td>
-                  <td className="cell-mono">
-                    {canEdit ? (
-                      <input
-                        type="number" min="0" defaultValue={s.reorderLevel}
-                        style={{ width: 80 }}
-                        onBlur={(e) => handleReorderLevelBlur(s, e.target.value)}
-                      />
-                    ) : (
-                      s.reorderLevel
-                    )}
-                  </td>
-                  <td><Pill tone={status === 'In Stock' ? 'teal' : status === 'Low Stock' ? 'amber' : 'red'}>{status}</Pill></td>
-                  <td className="cell-mono">
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
-                      {canEdit ? (
-                        <input
-                          type="date" defaultValue={s.expiryDate || ''}
-                          style={{ width: 140 }}
-                          onBlur={(e) => handleExpiryDateBlur(s, e.target.value)}
-                        />
-                      ) : (
-                        s.expiryDate || <span className="cell-muted">—</span>
-                      )}
-                      {expiryStatus(s) === 'Expired' && <Pill tone="red">Expired</Pill>}
-                      {expiryStatus(s) === 'Expiring Soon' && <Pill tone="amber">Expiring Soon</Pill>}
-                    </div>
-                  </td>
-                  <td className="cell-mono">
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
-                      <span>{formatUpdatedAt(s.updatedAt)}</span>
-                      {s.source && <Pill tone={SOURCE_TONE[s.source] || 'gray'}>{s.source}</Pill>}
-                    </div>
-                  </td>
+                  {visibleCols.map((key) => cell(key))}
                   <td>
                     <div style={{ display: 'flex', gap: 4 }}>
                       {canEdit && status !== 'In Stock' && (

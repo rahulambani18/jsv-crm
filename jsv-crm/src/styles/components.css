@@ -333,6 +333,119 @@ table.data-table {
   font-size: 13.5px;
 }
 
+/* ---------- Sticky first column ---------- */
+/* Add "sticky-first-col" alongside "table-wrap" to pin the leftmost
+   column (checkbox or ID/name) while the table scrolls horizontally. */
+.table-wrap.sticky-first-col table.data-table th:first-child,
+.table-wrap.sticky-first-col table.data-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: #fff;
+}
+.table-wrap.sticky-first-col table.data-table th:first-child {
+  z-index: 3;
+  background: var(--paper-0);
+}
+.table-wrap.sticky-first-col table.data-table tbody tr:hover td:first-child {
+  background: var(--paper-100);
+}
+.table-wrap.sticky-first-col table.data-table th:first-child::after,
+.table-wrap.sticky-first-col table.data-table td:first-child::after {
+  content: '';
+  position: absolute;
+  top: 0; right: 0; bottom: 0;
+  width: 6px;
+  transform: translateX(100%);
+  background: linear-gradient(to right, rgba(15, 30, 61, 0.06), transparent);
+  pointer-events: none;
+}
+
+/* ---------- Density ---------- */
+/* Controlled by data-density on <html>, set from the topbar toggle in
+   Shell.jsx. Affects every .data-table on every page at once. */
+[data-density='compact'] .data-table thead th,
+[data-density='compact'] .data-table tbody td {
+  padding: 8px 14px;
+  font-size: 12.5px;
+}
+[data-density='comfortable'] .data-table thead th,
+[data-density='comfortable'] .data-table tbody td {
+  padding: 15px 18px;
+}
+[data-density='large'] .data-table thead th,
+[data-density='large'] .data-table tbody td {
+  padding: 20px 20px;
+  font-size: 14.5px;
+}
+
+/* ---------- Skeleton loading ---------- */
+.skeleton-cell {
+  display: block;
+  height: 13px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--paper-100) 25%, var(--paper-200) 37%, var(--paper-100) 63%);
+  background-size: 400% 100%;
+  animation: skeleton-shimmer 1.4s ease infinite;
+}
+@keyframes skeleton-shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+[data-theme='dark'] .skeleton-cell {
+  background: linear-gradient(90deg, rgba(255,255,255,0.06) 25%, rgba(255,255,255,0.12) 37%, rgba(255,255,255,0.06) 63%);
+  background-size: 400% 100%;
+}
+
+/* ---------- Breadcrumb ---------- */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink-400);
+  margin-bottom: 6px;
+}
+.breadcrumb-item {
+  color: var(--ink-400);
+  text-decoration: none;
+  cursor: pointer;
+}
+.breadcrumb-item:hover { color: var(--navy-700); text-decoration: underline; }
+.breadcrumb-item.current {
+  color: var(--ink-700);
+  font-weight: 600;
+  cursor: default;
+  text-decoration: none;
+}
+.breadcrumb-sep { color: var(--paper-200); }
+
+/* ---------- Column chooser ---------- */
+.col-chooser-panel {
+  position: absolute; right: 0; top: 100%; margin-top: 4px;
+  background: #fff; border: 1px solid var(--paper-200);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-pop);
+  z-index: 50; width: 230px; overflow: hidden;
+}
+.col-chooser-header {
+  padding: 10px 14px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--ink-400); border-bottom: 1px solid var(--paper-100);
+}
+.col-chooser-list { max-height: 320px; overflow-y: auto; padding: 4px 0; }
+.col-chooser-row {
+  display: flex; align-items: center; gap: 8px; padding: 7px 14px;
+  font-size: 13px; color: var(--ink-800);
+}
+.col-chooser-row label { display: flex; align-items: center; gap: 8px; flex: 1; cursor: pointer; }
+.col-chooser-reorder { display: flex; gap: 2px; }
+.col-chooser-reorder button {
+  border: none; background: transparent; color: var(--ink-400); cursor: pointer;
+  padding: 2px 4px; font-size: 11px; line-height: 1; border-radius: 4px;
+}
+.col-chooser-reorder button:hover:not(:disabled) { background: var(--paper-100); color: var(--ink-800); }
+.col-chooser-reorder button:disabled { opacity: 0.3; cursor: default; }
+
 /* ---------- Pagination ---------- */
 .pagination-bar {
   display: flex;
@@ -382,10 +495,32 @@ table.data-table {
   gap: 3px;
 }
 .empty-state-icon {
-  font-size: 38px;
+  font-size: 34px;
   line-height: 1;
-  margin-bottom: 12px;
-  filter: grayscale(15%);
+  margin-bottom: 14px;
+  width: 72px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, var(--paper-50), var(--paper-100));
+  border: 1px solid var(--paper-200);
+}
+.empty-state-title { margin-top: 2px; }
+.empty-state-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.empty-state-or {
+  font-size: 11px;
+  color: var(--ink-300);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 .empty-state-title {
   font-weight: 600;

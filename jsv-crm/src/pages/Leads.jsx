@@ -18,9 +18,22 @@ import { exportCSV } from '../lib/exportUtils.js'
 import { findDuplicate, duplicateMessage } from '../lib/duplicateCheck.js'
 import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
+import TableSkeleton from '../components/TableSkeleton.jsx'
+import ColumnChooser from '../components/ColumnChooser.jsx'
 
 const STATUSES = ['All statuses', ...PIPELINE_STAGES]
 const PRIORITY_FILTERS = ['All priorities', 'High', 'Medium', 'Low']
+
+const LEAD_COLUMNS = [
+  { key: 'id', label: 'Lead' },
+  { key: 'company', label: 'Company' },
+  { key: 'contact', label: 'Contact' },
+  { key: 'city', label: 'City' },
+  { key: 'priority', label: 'Priority' },
+  { key: 'status', label: 'Status' },
+  { key: 'estValue', label: 'Est. Value' },
+  { key: 'nextFollowUp', label: 'Next Follow-up' },
+]
 
 function emptyForm() {
   return { company: '', contact: '', phone: '', city: '', priority: 'Medium', status: 'New Lead', estValue: '', nextFollowUp: '', industry: '', products: [] }
@@ -34,6 +47,7 @@ export default function Leads() {
   const [products, setProducts] = useState([])
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
+  const [visibleCols, setVisibleCols] = useState(LEAD_COLUMNS.map((c) => c.key))
   const [searchParams] = useSearchParams()
   const [search, setSearch] = useState(searchParams.get('q') || '')
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'All statuses')
@@ -211,6 +225,7 @@ export default function Leads() {
         <select className="select-input" value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)}>
           {PRIORITY_FILTERS.map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
+        <ColumnChooser columns={LEAD_COLUMNS} storageKey="jsv_cols_leads" onChange={setVisibleCols} />
       </div>
 
       {canEdit && (
@@ -237,7 +252,7 @@ export default function Leads() {
         </BulkActionsBar>
       )}
 
-      <div className="table-wrap">
+      <div className="table-wrap sticky-first-col">
         <table className="data-table">
           <thead>
             <tr>
@@ -250,15 +265,17 @@ export default function Leads() {
                   />
                 </th>
               )}
-              <th>Lead</th><th>Company</th><th>Contact</th><th>City</th>
-              <th>Priority</th><th>Status</th><th>Est. Value</th><th>Next Follow-up</th>{(canEdit || canDelete) && <th>Actions</th>}
+              {visibleCols.map((key) => (
+                <th key={key}>{LEAD_COLUMNS.find((c) => c.key === key)?.label}</th>
+              ))}
+              {(canEdit || canDelete) && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={8 + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>Loading leads…</td></tr>
+              <TableSkeleton cols={visibleCols.length + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)} rows={6} />
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={8 + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>
+              <tr className="empty-row"><td colSpan={visibleCols.length + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>
                 {leads.length === 0 ? (
                   <EmptyState
                     icon="🎯"
@@ -271,21 +288,28 @@ export default function Leads() {
                   <EmptyState icon="🔍" title="No leads match your filters" subtitle="Try adjusting your search or filters." />
                 )}
               </td></tr>
-            ) : paged.map((l) => (
+            ) : paged.map((l) => {
+              const cell = (key) => {
+                switch (key) {
+                  case 'id': return <td key={key} className="cell-mono cell-muted">{l.id.toUpperCase()}</td>
+                  case 'company': return <td key={key} className="cell-strong">{l.company}</td>
+                  case 'contact': return <td key={key}>{l.contact}<br /><span className="cell-mono cell-muted" style={{ fontSize: 11.5 }}>{l.phone}</span></td>
+                  case 'city': return <td key={key}>{l.city}</td>
+                  case 'priority': return <td key={key}><Pill>{l.priority}</Pill></td>
+                  case 'status': return <td key={key}><Pill>{l.status}</Pill></td>
+                  case 'estValue': return <td key={key} className="cell-mono">₹{Number(l.estValue).toLocaleString('en-IN')}</td>
+                  case 'nextFollowUp': return <td key={key} className="cell-mono">{l.nextFollowUp}</td>
+                  default: return null
+                }
+              }
+              return (
               <tr key={l.id}>
                 {canEdit && (
                   <td className="row-checkbox-cell">
                     <input type="checkbox" checked={selected.has(l.id)} onChange={() => toggleSelected(l.id)} />
                   </td>
                 )}
-                <td className="cell-mono cell-muted">{l.id.toUpperCase()}</td>
-                <td className="cell-strong">{l.company}</td>
-                <td>{l.contact}<br /><span className="cell-mono cell-muted" style={{ fontSize: 11.5 }}>{l.phone}</span></td>
-                <td>{l.city}</td>
-                <td><Pill>{l.priority}</Pill></td>
-                <td><Pill>{l.status}</Pill></td>
-                <td className="cell-mono">₹{Number(l.estValue).toLocaleString('en-IN')}</td>
-                <td className="cell-mono">{l.nextFollowUp}</td>
+                {visibleCols.map((key) => cell(key))}
                 {(canEdit || canDelete) && (
                   <td>
                     <div style={{ display: 'flex', gap: 4 }}>
@@ -301,7 +325,7 @@ export default function Leads() {
                   </td>
                 )}
               </tr>
-            ))}
+            )})}
           </tbody>
         </table>
       </div>

@@ -16,6 +16,17 @@ import { showToast } from '../lib/toast.js'
 import { exportCSV } from '../lib/exportUtils.js'
 import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
+import TableSkeleton from '../components/TableSkeleton.jsx'
+import ColumnChooser from '../components/ColumnChooser.jsx'
+
+const QUOTATION_COLUMNS = [
+  { key: 'quoteNo', label: 'Quote #' },
+  { key: 'company', label: 'Company' },
+  { key: 'items', label: 'Items' },
+  { key: 'total', label: 'Total' },
+  { key: 'validUntil', label: 'Valid Until' },
+  { key: 'status', label: 'Status' },
+]
 
 function emptyLineItem() {
   return { product: '', qty: '', packingSize: '', price: '' }
@@ -37,6 +48,7 @@ export default function Quotations() {
   const [users, setUsers] = useState([])
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(true)
+  const [visibleCols, setVisibleCols] = useState(QUOTATION_COLUMNS.map((c) => c.key))
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(emptyForm())
   const [saving, setSaving] = useState(false)
@@ -269,6 +281,7 @@ export default function Quotations() {
           <IconSearch width={15} height={15} />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search quote #, company…" />
         </div>
+        <ColumnChooser columns={QUOTATION_COLUMNS} storageKey="jsv_cols_quotations" onChange={setVisibleCols} />
       </div>
 
       {canEdit && (
@@ -296,7 +309,7 @@ export default function Quotations() {
         rows={sendRows}
       />
 
-      <div className="table-wrap">
+      <div className="table-wrap sticky-first-col">
         <table className="data-table">
           <thead>
             <tr>
@@ -309,14 +322,17 @@ export default function Quotations() {
                   />
                 </th>
               )}
-              <th>Quote #</th><th>Company</th><th>Items</th><th>Total</th><th>Valid Until</th><th>Status</th><th>Actions</th>
+              {visibleCols.map((key) => (
+                <th key={key}>{QUOTATION_COLUMNS.find((c) => c.key === key)?.label}</th>
+              ))}
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className="empty-row"><td colSpan={7 + (canEdit ? 1 : 0)}>Loading quotations…</td></tr>
+              <TableSkeleton cols={visibleCols.length + (canEdit ? 1 : 0) + 1} rows={6} />
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={7 + (canEdit ? 1 : 0)}>
+              <tr className="empty-row"><td colSpan={visibleCols.length + (canEdit ? 1 : 0) + 1}>
                 {quotations.length === 0 ? (
                   <EmptyState
                     icon="📄"
@@ -331,6 +347,17 @@ export default function Quotations() {
               </td></tr>
             ) : paged.map((q) => {
               const customer = customers.find((c) => c.company === q.company)
+              const cell = (key) => {
+                switch (key) {
+                  case 'quoteNo': return <td key={key} className="cell-mono">{q.quoteNo}</td>
+                  case 'company': return <td key={key} className="cell-strong">{q.company}</td>
+                  case 'items': return <td key={key}>{q.items}</td>
+                  case 'total': return <td key={key} className="cell-mono">{fmt(q.total)}</td>
+                  case 'validUntil': return <td key={key} className="cell-mono">{q.validUntil}</td>
+                  case 'status': return <td key={key}><Pill>{q.status}</Pill></td>
+                  default: return null
+                }
+              }
               return (
               <tr key={q.id}>
                 {canEdit && (
@@ -338,12 +365,7 @@ export default function Quotations() {
                     <input type="checkbox" checked={selected.has(q.id)} onChange={() => toggleSelected(q.id)} />
                   </td>
                 )}
-                <td className="cell-mono">{q.quoteNo}</td>
-                <td className="cell-strong">{q.company}</td>
-                <td>{q.items}</td>
-                <td className="cell-mono">{fmt(q.total)}</td>
-                <td className="cell-mono">{q.validUntil}</td>
-                <td><Pill>{q.status}</Pill></td>
+                {visibleCols.map((key) => cell(key))}
                 <td style={{ display: 'flex', gap: 4 }}>
                   <SendButtons
                     phone={customer?.mobile}

@@ -11,6 +11,15 @@ import { showToast } from '../lib/toast.js'
 import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 import '../styles/users.css'
+import ColumnChooser from '../components/ColumnChooser.jsx'
+
+const USER_COLUMNS = [
+  { key: 'name', label: 'Name' },
+  { key: 'email', label: 'Email / Username' },
+  { key: 'role', label: 'Role' },
+  { key: 'status', label: 'Status' },
+  { key: 'lastActive', label: 'Last Active' },
+]
 
 function emptyUserForm() {
   return { name: '', username: '', password: '', roleId: '' }
@@ -23,6 +32,7 @@ export default function UsersAndRoles() {
   const [users, setUsers] = useState([])
   const [roles, setRoles] = useState([])
   const [loading, setLoading] = useState(true)
+  const [visibleCols, setVisibleCols] = useState(USER_COLUMNS.map((c) => c.key))
 
   const [showUserModal, setShowUserModal] = useState(false)
   const [userForm, setUserForm] = useState(emptyUserForm())
@@ -286,6 +296,7 @@ export default function UsersAndRoles() {
         <>
           <PageHeader
             title=""
+            hideBreadcrumb
             subtitle={`${users.length} user${users.length === 1 ? '' : 's'} in your workspace`}
             actions={
               canEdit && (
@@ -295,14 +306,19 @@ export default function UsersAndRoles() {
               )
             }
           />
-          <div className="table-wrap">
+          <div className="filters-bar">
+            <ColumnChooser columns={USER_COLUMNS} storageKey="jsv_cols_users" onChange={setVisibleCols} />
+          </div>
+          <div className="table-wrap sticky-first-col">
             <table className="data-table">
               <thead>
-                <tr><th>Name</th><th>Email / Username</th><th>Role</th><th>Status</th><th>Last Active</th>{canEdit && <th>Actions</th>}</tr>
+                <tr>{visibleCols.map((key) => (
+                  <th key={key}>{USER_COLUMNS.find((c) => c.key === key)?.label}</th>
+                ))}{canEdit && <th>Actions</th>}</tr>
               </thead>
               <tbody>
                 {users.length === 0 ? (
-                  <tr className="empty-row"><td colSpan={canEdit ? 6 : 5}>
+                  <tr className="empty-row"><td colSpan={visibleCols.length + (canEdit ? 1 : 0)}>
                     <EmptyState
                       icon="👤"
                       title="No users yet"
@@ -311,35 +327,47 @@ export default function UsersAndRoles() {
                       onAction={canEdit ? () => setShowUserModal(true) : undefined}
                     />
                   </td></tr>
-                ) : users.map((u) => (
+                ) : users.map((u) => {
+                  const cell = (key) => {
+                    switch (key) {
+                      case 'name': return (
+                        <td key={key} className="cell-strong">
+                          {canEdit ? (
+                            <input
+                              defaultValue={u.name}
+                              onBlur={(e) => { if (e.target.value !== u.name) api.users.update(u.id, { name: e.target.value }).then(refresh) }}
+                              style={{ border: 'none', background: 'transparent', fontWeight: 600, fontSize: 13.5, width: '100%', outline: 'none', cursor: 'text' }}
+                              title="Click to edit name"
+                            />
+                          ) : u.name}
+                        </td>
+                      )
+                      case 'email': return (
+                        <td key={key} className="cell-mono" style={{ fontSize: 12 }}>
+                          {u.email?.endsWith('@jsv.internal')
+                            ? u.email.replace('@jsv.internal', '')
+                            : u.email}
+                        </td>
+                      )
+                      case 'role': return (
+                        <td key={key}>
+                          {canEdit ? (
+                            <select value={u.roleId || ''} onChange={(e) => handleUserRoleChange(u.id, e.target.value)} style={{ fontSize: 12.5, padding: '5px 8px' }}>
+                              {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                            </select>
+                          ) : (
+                            <Pill tone="navy">{roleById[u.roleId]?.name || '—'}</Pill>
+                          )}
+                        </td>
+                      )
+                      case 'status': return <td key={key}><Pill tone="teal">{u.status || 'Active'}</Pill></td>
+                      case 'lastActive': return <td key={key} className="cell-mono">{u.lastActive || '—'}</td>
+                      default: return null
+                    }
+                  }
+                  return (
                   <tr key={u.id}>
-                    <td className="cell-strong">
-                      {canEdit ? (
-                        <input
-                          defaultValue={u.name}
-                          onBlur={(e) => { if (e.target.value !== u.name) api.users.update(u.id, { name: e.target.value }).then(refresh) }}
-                          style={{ border: 'none', background: 'transparent', fontWeight: 600, fontSize: 13.5, width: '100%', outline: 'none', cursor: 'text' }}
-                          title="Click to edit name"
-                        />
-                      ) : u.name}
-                    </td>
-                    <td className="cell-mono" style={{ fontSize: 12 }}>
-                      {/* Show username (strip @jsv.internal) or real email */}
-                      {u.email?.endsWith('@jsv.internal')
-                        ? u.email.replace('@jsv.internal', '')
-                        : u.email}
-                    </td>
-                    <td>
-                      {canEdit ? (
-                        <select value={u.roleId || ''} onChange={(e) => handleUserRoleChange(u.id, e.target.value)} style={{ fontSize: 12.5, padding: '5px 8px' }}>
-                          {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-                        </select>
-                      ) : (
-                        <Pill tone="navy">{roleById[u.roleId]?.name || '—'}</Pill>
-                      )}
-                    </td>
-                    <td><Pill tone="teal">{u.status || 'Active'}</Pill></td>
-                    <td className="cell-mono">{u.lastActive || '—'}</td>
+                    {visibleCols.map((key) => cell(key))}
                     {canEdit && (
                       <td>
                         <div style={{ display: 'flex', gap: 4 }}>
@@ -379,7 +407,7 @@ export default function UsersAndRoles() {
                       </td>
                     )}
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </div>
@@ -474,7 +502,7 @@ export default function UsersAndRoles() {
       )}
 
       {tab === 'audit' && (
-        <div className="table-wrap">
+        <div className="table-wrap sticky-first-col">
           <div className="audit-row audit-header">
             <div>Time</div><div>User</div><div>Action</div><div>Detail</div>
           </div>
