@@ -1,4 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
+import {
+  PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+} from 'recharts'
 import { api } from '../lib/api.js'
 import { useAuth } from '../lib/AuthContext.jsx'
 import PageHeader from '../components/PageHeader.jsx'
@@ -7,16 +11,23 @@ import Modal from '../components/Modal.jsx'
 import ExportBar from '../components/ExportBar.jsx'
 import TallyImportButton from '../components/TallyImportButton.jsx'
 import BulkActionsBar from '../components/BulkActionsBar.jsx'
-import { IconPlus, IconSearch, IconTrash, IconDollarSign, IconCalendar, IconReceipt, IconFlame, IconChevronRight } from '../components/Icons.jsx'
+import { IconPlus, IconSearch, IconTrash, IconDollarSign, IconCalendar, IconReceipt, IconFlame, IconChevronRight, IconRupee, IconAlertTriangle } from '../components/Icons.jsx'
 import StatCard from '../components/StatCard.jsx'
 import Pagination from '../components/Pagination.jsx'
 import EmptyState from '../components/EmptyState.jsx'
 import { getOverdueInvoices, daysOverdue } from '../lib/overdue.js'
+import {
+  buildPaymentModeBreakdown, buildPaymentAgingBuckets,
+  buildOutstandingSummary, buildPartialPayments,
+} from '../lib/paymentAnalytics.js'
 import { showToast } from '../lib/toast.js'
 import { exportCSV } from '../lib/exportUtils.js'
 import '../styles/components.css'
 import TableSkeleton from '../components/TableSkeleton.jsx'
 import ColumnChooser from '../components/ColumnChooser.jsx'
+
+const MODE_COLORS = ['#0d9488', '#0f1e3d', '#d97706', '#6b81a8', '#b42318', '#a3a9b3']
+const AGING_COLORS = ['#0d9488', '#d97706', '#c2551a', '#b42318']
 
 const PAYMENT_MODES = ['NEFT', 'RTGS', 'Cheque', 'Cash', 'UPI', 'Bank Transfer']
 const STATUS_OPTIONS = ['Completed', 'Pending', 'Failed', 'Refunded']
@@ -64,6 +75,11 @@ export default function Payments() {
 
   const overdueInvoices = useMemo(() => getOverdueInvoices(invoices), [invoices])
   const overdueAmount = useMemo(() => overdueInvoices.reduce((s, i) => s + Number(i.total || 0), 0), [overdueInvoices])
+
+  const modeData = useMemo(() => buildPaymentModeBreakdown(payments), [payments])
+  const agingData = useMemo(() => buildPaymentAgingBuckets(invoices, payments), [invoices, payments])
+  const outstandingSummary = useMemo(() => buildOutstandingSummary(invoices, payments), [invoices, payments])
+  const partialPayments = useMemo(() => buildPartialPayments(invoices, payments), [invoices, payments])
 
   function openPaymentForInvoice(inv) {
     setForm({ ...emptyForm(), invoiceId: inv.id, company: inv.company, amount: inv.total })
@@ -196,6 +212,80 @@ export default function Payments() {
         <StatCard icon={IconReceipt} tone="blue" label="Payments Count" value={payments.length} />
         <StatCard icon={IconFlame} tone="red" label="Overdue Invoices" value={`${overdueInvoices.length} · ${formatINR(overdueAmount)}`} mono />
       </div>
+
+      <div className="panel-row">
+        <div className="panel">
+          <p className="panel-title">Payment Mode Breakdown</p>
+          {modeData.length === 0 ? (
+            <p style={{ color: 'var(--ink-300)', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>No completed payments yet.</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={230}>
+              <PieChart>
+                <Pie data={modeData} dataKey="value" nameKey="name" innerRadius={48} outerRadius={80} paddingAngle={2}>
+                  {modeData.map((_, i) => <Cell key={i} fill={MODE_COLORS[i % MODE_COLORS.length]} />)}
+                </Pie>
+                <Tooltip formatter={(v) => formatINR(v)} />
+                <Legend wrapperStyle={{ fontSize: 11.5 }} />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        <div className="panel">
+          <p className="panel-title">Payment Aging (Outstanding)</p>
+          {agingData.every((b) => b.amount === 0) ? (
+            <p style={{ color: 'var(--ink-300)', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>Nothing outstanding right now.</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={230}>
+              <BarChart data={agingData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--paper-200)" vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--ink-500)' }} axisLine={false} tickLine={false} />
+                <YAxis tickFormatter={(v) => `₹${v / 1000}k`} tick={{ fontSize: 11, fill: 'var(--ink-500)' }} axisLine={false} tickLine={false} />
+                <Tooltip formatter={(v) => formatINR(v)} />
+                <Bar dataKey="amount" radius={[4, 4, 0, 0]} barSize={44}>
+                  {agingData.map((b, i) => <Cell key={b.bucket} fill={AGING_COLORS[i % AGING_COLORS.length]} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
+
+      <div className="stat-grid">
+        <StatCard icon={IconRupee} tone="red" label="Outstanding Summary" value={formatINR(outstandingSummary.totalOutstanding)} mono />
+        <StatCard icon={IconReceipt} tone="amber" label="Open Invoices" value={outstandingSummary.invoiceCount} />
+        <StatCard icon={IconAlertTriangle} tone="amber" label="Partial Payments" value={partialPayments.length} />
+        <StatCard
+          icon={IconFlame}
+          tone="red"
+          label="Oldest Overdue"
+          value={outstandingSummary.oldestDueDate ? `${outstandingSummary.maxDaysOverdue}d (due ${outstandingSummary.oldestDueDate})` : '—'}
+        />
+      </div>
+
+      {partialPayments.length > 0 && (
+        <div className="panel" style={{ marginBottom: 20 }}>
+          <p className="panel-title">Partial Payments ({partialPayments.length})</p>
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr><th>Invoice</th><th>Company</th><th>Total</th><th>Paid</th><th>Remaining</th></tr>
+              </thead>
+              <tbody>
+                {partialPayments.map(({ invoice, paid, total, remaining }) => (
+                  <tr key={invoice.id}>
+                    <td className="cell-mono cell-strong">{invoice.invoiceNo}</td>
+                    <td className="cell-strong">{invoice.company}</td>
+                    <td className="cell-mono">{formatINR(total)}</td>
+                    <td className="cell-mono" style={{ color: 'var(--teal-700)', fontWeight: 600 }}>{formatINR(paid)}</td>
+                    <td className="cell-mono" style={{ color: 'var(--red-600)', fontWeight: 600 }}>{formatINR(remaining)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {overdueInvoices.length > 0 && (
         <div className="panel" style={{ marginBottom: 20 }}>
