@@ -19,10 +19,15 @@ import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 import TableSkeleton from '../components/TableSkeleton.jsx'
 import ColumnChooser from '../components/ColumnChooser.jsx'
+import ShippingDocsModal, { SHIPPING_DOC_FIELDS, docsCollectedCount } from '../components/ShippingDocsModal.jsx'
 
 const STATUSES = ['All statuses', 'Processing', 'Dispatched', 'Delivered', 'Cancelled']
 const PAYMENT_FILTERS = ['All payments', 'Paid', 'Pending']
 const PAYMENT_TERMS = ['Due on Receipt', 'Net 15', 'Net 30', 'Net 45', 'Net 60', 'Custom']
+const DOCS_FILTERS = ['All orders', 'Missing documents']
+// Shipping documents only apply once an order has actually shipped —
+// Processing/Cancelled orders show a plain dash instead of a checklist.
+const DOCS_ELIGIBLE_STATUSES = ['Dispatched', 'Delivered']
 
 function termsToDays(terms) {
   if (terms === 'Due on Receipt') return 0
@@ -62,6 +67,7 @@ const ORDER_COLUMNS = [
   { key: 'total', label: 'Total (incl. GST)' },
   { key: 'status', label: 'Status' },
   { key: 'payment', label: 'Payment' },
+  { key: 'shippingDocs', label: 'Shipping Docs' },
 ]
 
 export default function Orders() {
@@ -78,6 +84,7 @@ export default function Orders() {
   const [warehouseFilter, setWarehouseFilter] = useState('All warehouses')
   const [statusFilter, setStatusFilter] = useState('All statuses')
   const [paymentFilter, setPaymentFilter] = useState(searchParams.get('payment') || 'All payments')
+  const [docsFilter, setDocsFilter] = useState('All orders')
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyForm())
@@ -87,6 +94,7 @@ export default function Orders() {
   const [invoices, setInvoices] = useState([])
   const [payments, setPayments] = useState([])
   const [stock, setStock] = useState([])
+  const [shippingDocsOrder, setShippingDocsOrder] = useState(null)
 
   useEffect(() => { refresh() }, [])
   useEffect(() => { api.users.list().then(setUsers).catch(() => {}) }, [])
@@ -118,13 +126,15 @@ export default function Orders() {
     const matchesWarehouse = warehouseFilter === 'All warehouses' || o.warehouse === warehouseFilter
     const matchesStatus = statusFilter === 'All statuses' || o.status === statusFilter
     const matchesPayment = paymentFilter === 'All payments' || o.payment === paymentFilter
+    const matchesDocs = docsFilter === 'All orders' ||
+      (DOCS_ELIGIBLE_STATUSES.includes(o.status) && docsCollectedCount(o.shippingDocs) < SHIPPING_DOC_FIELDS.length)
     const matchesSearch = !search || [o.orderNo, o.company, o.poNumber].some((v) => (v || '').toLowerCase().includes(search.toLowerCase()))
-    return matchesWarehouse && matchesStatus && matchesPayment && matchesSearch
-  }), [orders, warehouseFilter, statusFilter, paymentFilter, search])
+    return matchesWarehouse && matchesStatus && matchesPayment && matchesDocs && matchesSearch
+  }), [orders, warehouseFilter, statusFilter, paymentFilter, docsFilter, search])
 
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
-  useEffect(() => { setPage(1) }, [warehouseFilter, statusFilter, paymentFilter, search])
+  useEffect(() => { setPage(1) }, [warehouseFilter, statusFilter, paymentFilter, docsFilter, search])
   const paged = useMemo(() => filtered.slice((page - 1) * pageSize, page * pageSize), [filtered, page, pageSize])
 
   const totals = useMemo(() => calcOrderTotals(form.lineItems, GST_RATE, form.deliveryCharge), [form.lineItems, form.deliveryCharge])
@@ -235,8 +245,8 @@ export default function Orders() {
     const rows = filtered.filter((o) => selected.has(o.id))
     exportCSV(
       'Orders',
-      ['PO Number', 'Order #', 'Company', 'Warehouse', 'Order Date', 'Expected Delivery', 'Dispatch Date', 'Total', 'Status', 'Payment'],
-      rows.map((o) => [o.poNumber, o.orderNo, o.company, o.warehouse, o.orderDate, o.delivery, o.dispatchDate, `₹${Number(o.total).toLocaleString('en-IN')}`, o.status, o.payment])
+      ['PO Number', 'Order #', 'Company', 'Warehouse', 'Order Date', 'Expected Delivery', 'Dispatch Date', 'Total', 'Status', 'Payment', 'Shipping Docs'],
+      rows.map((o) => [o.poNumber, o.orderNo, o.company, o.warehouse, o.orderDate, o.delivery, o.dispatchDate, `₹${Number(o.total).toLocaleString('en-IN')}`, o.status, o.payment, DOCS_ELIGIBLE_STATUSES.includes(o.status) ? `${docsCollectedCount(o.shippingDocs)}/${SHIPPING_DOC_FIELDS.length}` : '—'])
     )
   }
 
@@ -326,6 +336,17 @@ export default function Orders() {
     }
   }
 
+  async function handleSaveShippingDocs(orderId, shippingDocs) {
+    const prev = orders
+    setOrders((os) => os.map((o) => (o.id === orderId ? { ...o, shippingDocs } : o)))
+    try {
+      await api.orders.update(orderId, { shippingDocs })
+    } catch (err) {
+      setOrders(prev)
+      throw err
+    }
+  }
+
   async function handleSave(e) {
     e.preventDefault()
     setSaving(true)
@@ -372,8 +393,8 @@ export default function Orders() {
           <div style={{ display: 'flex', gap: 10 }}>
             <ExportBar
               title="Orders"
-              headers={['PO Number', 'Order #', 'Company', 'Warehouse', 'Order Date', 'Expected Delivery', 'Dispatch Date', 'Total', 'Status', 'Payment']}
-              rows={filtered.map((o) => [o.poNumber, o.orderNo, o.company, o.warehouse, o.orderDate, o.delivery, o.dispatchDate, `₹${Number(o.total).toLocaleString('en-IN')}`, o.status, o.payment])}
+              headers={['PO Number', 'Order #', 'Company', 'Warehouse', 'Order Date', 'Expected Delivery', 'Dispatch Date', 'Total', 'Status', 'Payment', 'Shipping Docs']}
+              rows={filtered.map((o) => [o.poNumber, o.orderNo, o.company, o.warehouse, o.orderDate, o.delivery, o.dispatchDate, `₹${Number(o.total).toLocaleString('en-IN')}`, o.status, o.payment, DOCS_ELIGIBLE_STATUSES.includes(o.status) ? `${docsCollectedCount(o.shippingDocs)}/${SHIPPING_DOC_FIELDS.length}` : '—'])}
               count={filtered.length}
             />
             {canEdit && (
@@ -398,6 +419,9 @@ export default function Orders() {
         </select>
         <select className="select-input" value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)}>
           {PAYMENT_FILTERS.map((p) => <option key={p}>{p}</option>)}
+        </select>
+        <select className="select-input" value={docsFilter} onChange={(e) => setDocsFilter(e.target.value)}>
+          {DOCS_FILTERS.map((d) => <option key={d}>{d}</option>)}
         </select>
         <ColumnChooser columns={ORDER_COLUMNS} storageKey="jsv_cols_orders" onChange={setVisibleCols} />
       </div>
@@ -504,6 +528,29 @@ export default function Orders() {
                       >
                         <option>Pending</option><option>Partial</option><option>Paid</option>
                       </select>
+                    </td>
+                  )
+                  case 'shippingDocs': return (
+                    <td key={key}>
+                      {DOCS_ELIGIBLE_STATUSES.includes(o.status) ? (
+                        (() => {
+                          const count = docsCollectedCount(o.shippingDocs)
+                          const complete = count === SHIPPING_DOC_FIELDS.length
+                          return (
+                            <button
+                              type="button"
+                              className={`pill pill-${complete ? 'teal' : 'amber'}`}
+                              style={{ border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+                              onClick={() => setShippingDocsOrder(o)}
+                              title="View / update shipping documents"
+                            >
+                              {complete ? '✓ All docs' : `⚠ ${count}/${SHIPPING_DOC_FIELDS.length} docs`}
+                            </button>
+                          )
+                        })()
+                      ) : (
+                        <span className="cell-muted">—</span>
+                      )}
                     </td>
                   )
                   default: return null
@@ -727,6 +774,14 @@ export default function Orders() {
             </div>
           </form>
         </Modal>
+      )}
+
+      {shippingDocsOrder && (
+        <ShippingDocsModal
+          order={shippingDocsOrder}
+          onClose={() => setShippingDocsOrder(null)}
+          onSave={(docs) => handleSaveShippingDocs(shippingDocsOrder.id, docs)}
+        />
       )}
     </div>
   )
