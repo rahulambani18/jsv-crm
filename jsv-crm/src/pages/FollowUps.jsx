@@ -9,8 +9,18 @@ import { IconPlus } from '../components/Icons.jsx'
 import EmptyState from '../components/EmptyState.jsx'
 import '../styles/components.css'
 import TableSkeleton from '../components/TableSkeleton.jsx'
+import ColumnChooser from '../components/ColumnChooser.jsx'
 
 const TABS = ['Today', 'Upcoming', 'Overdue', 'Completed', 'All']
+
+const FOLLOWUP_COLUMNS = [
+  { key: 'date', label: 'Date' },
+  { key: 'type', label: 'Type' },
+  { key: 'lead', label: 'Lead' },
+  { key: 'contact', label: 'Contact' },
+  { key: 'notes', label: 'Notes' },
+  { key: 'status', label: 'Status' },
+]
 
 function emptyForm() {
   return { date: '', type: 'Call', lead: '', contact: '', notes: '', status: 'Upcoming' }
@@ -22,6 +32,7 @@ export default function FollowUps() {
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('Today')
+  const [visibleCols, setVisibleCols] = useState(FOLLOWUP_COLUMNS.map((c) => c.key))
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(emptyForm())
   const [saving, setSaving] = useState(false)
@@ -88,16 +99,25 @@ export default function FollowUps() {
         ))}
       </div>
 
+      <div className="filters-bar" style={{ justifyContent: 'flex-end' }}>
+        <ColumnChooser columns={FOLLOWUP_COLUMNS} storageKey="jsv_cols_followups" onChange={setVisibleCols} />
+      </div>
+
       <div className="table-wrap sticky-first-col">
         <table className="data-table">
           <thead>
-            <tr><th>Date</th><th>Type</th><th>Lead</th><th>Contact</th><th>Notes</th><th>Status</th><th>Actions</th></tr>
+            <tr>
+              {visibleCols.map((key) => (
+                <th key={key}>{FOLLOWUP_COLUMNS.find((c) => c.key === key)?.label}</th>
+              ))}
+              <th>Actions</th>
+            </tr>
           </thead>
           <tbody>
             {loading ? (
-              <TableSkeleton cols={7} rows={6} />
+              <TableSkeleton cols={visibleCols.length + 1} rows={6} />
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={7}>
+              <tr className="empty-row"><td colSpan={visibleCols.length + 1}>
                 <EmptyState
                   icon="⏰"
                   title="No follow-ups in this view"
@@ -108,14 +128,20 @@ export default function FollowUps() {
               </td></tr>
             ) : filtered.map((f) => {
               const { phone, email } = contactInfoFor(f)
+              const cell = (key) => {
+                switch (key) {
+                  case 'date': return <td key={key} className="cell-mono">{f.date}</td>
+                  case 'type': return <td key={key}>{f.type}</td>
+                  case 'lead': return <td key={key} className="cell-strong">{f.lead}</td>
+                  case 'contact': return <td key={key}>{f.contact}</td>
+                  case 'notes': return <td key={key} style={{ maxWidth: 320 }}>{f.notes}</td>
+                  case 'status': return <td key={key}><Pill>{f.status}</Pill></td>
+                  default: return null
+                }
+              }
               return (
               <tr key={f.id}>
-                <td className="cell-mono">{f.date}</td>
-                <td>{f.type}</td>
-                <td className="cell-strong">{f.lead}</td>
-                <td>{f.contact}</td>
-                <td style={{ maxWidth: 320 }}>{f.notes}</td>
-                <td><Pill>{f.status}</Pill></td>
+                {visibleCols.map((key) => cell(key))}
                 <td style={{ display: 'flex', gap: 4 }}>
                   <SendButtons
                     phone={phone}

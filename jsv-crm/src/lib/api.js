@@ -328,14 +328,29 @@ async function loadProfileWithRole(authUser) {
     .eq('id', authUser.id)
     .single()
 
-  // Auto-create profile if missing
+  // Auto-create profile if missing. This only fires for an auth user
+  // who has no matching `profiles` row yet — e.g. an account created
+  // directly in the Supabase dashboard rather than through this app's
+  // own "Add User" flow. Defaulting that person to Sales Executive is
+  // wrong when they're the very first person in the workspace (they
+  // ARE the admin, there's simply no one else yet to have made them
+  // one) — so check whether any profile already exists before picking
+  // a default role: nobody yet → Admin, someone already → Sales
+  // Executive, same as before.
   if (error || !profile) {
     try {
+      const { count } = await supabase
+        .from('profiles')
+        .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', '00000000-0000-0000-0000-000000000001')
+      const defaultRoleId = count && count > 0
+        ? '00000000-0000-0000-0000-000000000003' // Sales Executive
+        : '00000000-0000-0000-0000-000000000002' // Admin — first user in the workspace
       await supabase.from('profiles').insert({
         id: authUser.id,
         workspace_id: '00000000-0000-0000-0000-000000000001',
         full_name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'User',
-        role_id: '00000000-0000-0000-0000-000000000003',
+        role_id: defaultRoleId,
       })
     } catch {}
     const { data: newProfile } = await supabase

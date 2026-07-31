@@ -15,6 +15,7 @@ import ReportShareModal from '../components/ReportShareModal.jsx'
 import { IconUsers, IconTrend, IconCart, IconRupee } from '../components/Icons.jsx'
 import { REPORT_PERIODS, periodRange, isWithinRange, periodLabel } from '../lib/reportPeriods.js'
 import { showToast } from '../lib/toast.js'
+import CardSkeleton from '../components/CardSkeleton.jsx'
 import '../styles/components.css'
 
 const COLORS = ['#0f1e3d', '#0d9488', '#d97706', '#6b81a8', '#b42318', '#a3a9b3']
@@ -135,7 +136,33 @@ export default function Reports() {
     }
   }
 
-  if (loading) return <div className="loading-screen">Loading reports…</div>
+  if (loading) {
+    return (
+      <div>
+        <PageHeader title="Reports" subtitle="Lead conversion, sales performance, revenue, industries and orders." />
+        <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }} aria-hidden="true">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="panel" style={{ padding: '16px 18px' }}>
+              <span className="skeleton-cell" style={{ width: '50%', height: 11, marginBottom: 12 }} />
+              <span className="skeleton-cell" style={{ width: '70%', height: 20 }} />
+            </div>
+          ))}
+        </div>
+        <div className="panel-row" aria-hidden="true">
+          <div className="panel">
+            <span className="skeleton-cell" style={{ width: '40%', height: 13, marginBottom: 16 }} />
+            {Array.from({ length: 5 }).map((_, i) => (
+              <span key={i} className="skeleton-cell" style={{ width: `${50 + (i * 9) % 40}%`, height: 12, marginBottom: 12 }} />
+            ))}
+          </div>
+          <div className="panel">
+            <span className="skeleton-cell" style={{ width: '45%', height: 13, marginBottom: 16 }} />
+            <span className="skeleton-cell" style={{ width: '100%', height: 200 }} />
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div>

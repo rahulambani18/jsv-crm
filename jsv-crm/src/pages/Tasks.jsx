@@ -6,6 +6,8 @@ import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
 import ExportBar from '../components/ExportBar.jsx'
 import { IconPlus, IconSearch, IconEdit, IconTrash } from '../components/Icons.jsx'
+import EmptyState from '../components/EmptyState.jsx'
+import CardSkeleton from '../components/CardSkeleton.jsx'
 import '../styles/components.css'
 
 const TASK_TYPES = ['Call', 'Email', 'Document', 'Internal', 'Follow-up', 'Other']
@@ -138,9 +140,17 @@ export default function Tasks() {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {loading ? (
-          <div className="panel" style={{ textAlign: 'center', color: 'var(--ink-300)', padding: '40px 0' }}>Loading tasks…</div>
+          <CardSkeleton rows={4} />
         ) : filtered.length === 0 ? (
-          <div className="panel" style={{ textAlign: 'center', color: 'var(--ink-300)', padding: '40px 0' }}>No tasks in this view.</div>
+          <div className="panel" style={{ padding: '20px 0' }}>
+            <EmptyState
+              icon="✅"
+              title={tasks.length === 0 ? 'No tasks yet' : 'No tasks in this view'}
+              subtitle={tasks.length === 0 ? 'Create your first task to start tracking your to-dos.' : 'Switch tabs or adjust your search to see other tasks.'}
+              actionLabel={canEdit ? 'New Task' : undefined}
+              onAction={canEdit ? openCreate : undefined}
+            />
+          </div>
         ) : filtered.map((t) => (
           <div key={t.id} className="panel" style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '14px 18px' }}>
             {/* Checkbox */}
