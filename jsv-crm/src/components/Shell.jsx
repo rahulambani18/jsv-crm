@@ -10,6 +10,7 @@ import {
 import { api } from '../lib/api.js'
 import { availableQty } from '../lib/stockStatus.js'
 import jsvMark from '../assets/jsv-mark.png'
+import Modal from './Modal.jsx'
 import '../styles/shell.css'
 
 const NAV = [
@@ -309,6 +310,78 @@ export default function Shell({ children }) {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
+  // Keyboard shortcuts — "/" or Cmd/Ctrl+K opens global search, "g" then a
+  // letter jumps to a section, "?" opens the cheat sheet, Escape closes
+  // whatever's open. Nav jumps and "/" are disabled while typing in a
+  // field so they don't hijack normal typing; Cmd/Ctrl+K and Escape
+  // always work.
+  const [showShortcuts, setShowShortcuts] = useState(false)
+  const gPressedRef = useRef(false)
+  const gTimerRef = useRef(null)
+  const SHORTCUT_NAV = {
+    d: { path: '/', label: 'Dashboard' },
+    l: { path: '/leads', label: 'Leads' },
+    c: { path: '/customers', label: 'Customers' },
+    o: { path: '/orders', label: 'Orders' },
+    q: { path: '/quotations', label: 'Quotations' },
+    i: { path: '/invoices', label: 'Invoices' },
+    p: { path: '/payments', label: 'Payments' },
+    s: { path: '/samples', label: 'Samples' },
+    t: { path: '/tasks', label: 'Tasks' },
+    m: { path: '/meetings', label: 'Meetings' },
+  }
+
+  useEffect(() => {
+    function isTypingTarget(el) {
+      if (!el) return false
+      return el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable
+    }
+
+    function handleKeyDown(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setShowSearch(true)
+        return
+      }
+
+      if (e.key === 'Escape') {
+        setShowSearch(false); setShowNotifs(false); setShowDensity(false)
+        setShowHelp(false); setShowProfile(false); setShowShortcuts(false)
+        return
+      }
+
+      if (isTypingTarget(e.target)) return
+
+      if (e.key === '/') {
+        e.preventDefault()
+        setShowSearch(true)
+        return
+      }
+
+      if (e.key === '?') {
+        e.preventDefault()
+        setShowShortcuts((v) => !v)
+        return
+      }
+
+      if (gPressedRef.current) {
+        gPressedRef.current = false
+        clearTimeout(gTimerRef.current)
+        const dest = SHORTCUT_NAV[e.key.toLowerCase()]
+        if (dest) { e.preventDefault(); navigate(dest.path) }
+        return
+      }
+
+      if (e.key.toLowerCase() === 'g') {
+        gPressedRef.current = true
+        gTimerRef.current = setTimeout(() => { gPressedRef.current = false }, 800)
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => { document.removeEventListener('keydown', handleKeyDown); clearTimeout(gTimerRef.current) }
+  }, [navigate])
+
   const initials = (user?.name || 'U').trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase()
 
   return (
@@ -543,6 +616,12 @@ export default function Shell({ children }) {
                   >
                     👥 Manage users & roles
                   </div>
+                  <div
+                    onClick={() => { setShowShortcuts(true); setShowHelp(false) }}
+                    style={{ padding: '10px 14px', fontSize: 13, color: 'var(--ink-800)', cursor: 'pointer', borderBottom: '1px solid var(--paper-100)' }}
+                  >
+                    ⌨️ Keyboard shortcuts
+                  </div>
                   <div style={{ padding: '10px 14px', fontSize: 12, color: 'var(--ink-400)' }}>JSV CRM · v1.0</div>
                 </div>
               )}
@@ -596,6 +675,37 @@ export default function Shell({ children }) {
         </header>
         <main className="page-content">{children}</main>
       </div>
+
+      {showShortcuts && (
+        <Modal title="Keyboard shortcuts" onClose={() => setShowShortcuts(false)}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {[
+              { keys: ['/'], label: 'Focus global search' },
+              { keys: ['Ctrl', 'K'], label: 'Focus global search' },
+              { keys: ['Esc'], label: 'Close any open panel' },
+              { keys: ['?'], label: 'Show this cheat sheet' },
+            ].map((row) => (
+              <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13 }}>
+                <span style={{ color: 'var(--ink-700)' }}>{row.label}</span>
+                <span style={{ display: 'flex', gap: 4 }}>
+                  {row.keys.map((k) => (
+                    <kbd key={k} style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, background: 'var(--paper-100)', border: '1px solid var(--paper-200)', borderRadius: 4, padding: '2px 6px' }}>{k}</kbd>
+                  ))}
+                </span>
+              </div>
+            ))}
+            <div style={{ borderTop: '1px solid var(--paper-100)', margin: '4px 0 2px', paddingTop: 10, fontSize: 11.5, fontWeight: 700, color: 'var(--ink-400)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+              Jump to a section — press <kbd style={{ fontFamily: 'var(--font-mono)', background: 'var(--paper-100)', border: '1px solid var(--paper-200)', borderRadius: 4, padding: '1px 5px' }}>g</kbd> then:
+            </div>
+            {Object.entries(SHORTCUT_NAV).map(([key, { label }]) => (
+              <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13 }}>
+                <span style={{ color: 'var(--ink-700)' }}>{label}</span>
+                <kbd style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, background: 'var(--paper-100)', border: '1px solid var(--paper-200)', borderRadius: 4, padding: '2px 6px' }}>{key}</kbd>
+              </div>
+            ))}
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

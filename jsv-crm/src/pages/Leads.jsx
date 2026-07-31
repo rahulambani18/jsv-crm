@@ -20,6 +20,8 @@ import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 import TableSkeleton from '../components/TableSkeleton.jsx'
 import ColumnChooser from '../components/ColumnChooser.jsx'
+import { usePersistedFilter } from '../lib/usePersistedFilter.js'
+import { useAutoRefresh } from '../lib/useAutoRefresh.js'
 
 const STATUSES = ['All statuses', ...PIPELINE_STAGES]
 const PRIORITY_FILTERS = ['All priorities', 'High', 'Medium', 'Low']
@@ -49,9 +51,9 @@ export default function Leads() {
   const [loading, setLoading] = useState(true)
   const [visibleCols, setVisibleCols] = useState(LEAD_COLUMNS.map((c) => c.key))
   const [searchParams] = useSearchParams()
-  const [search, setSearch] = useState(searchParams.get('q') || '')
-  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'All statuses')
-  const [priorityFilter, setPriorityFilter] = useState(searchParams.get('priority') || 'All priorities')
+  const [search, setSearch] = usePersistedFilter('jsv_filter_leads_search', searchParams.get('q'), '')
+  const [statusFilter, setStatusFilter] = usePersistedFilter('jsv_filter_leads_status', searchParams.get('status'), 'All statuses')
+  const [priorityFilter, setPriorityFilter] = usePersistedFilter('jsv_filter_leads_priority', searchParams.get('priority'), 'All priorities')
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(emptyForm())
   const [saving, setSaving] = useState(false)
@@ -61,9 +63,10 @@ export default function Leads() {
   useEffect(() => { refresh() }, [])
   useEffect(() => { api.users.list().then(setUsers).catch(() => {}) }, [])
   useEffect(() => { api.customers.list().then(setCustomers).catch(() => {}) }, [])
+  useAutoRefresh(() => refresh(true), 60000)
 
-  function refresh() {
-    setLoading(true)
+  function refresh(silent = false) {
+    if (!silent) setLoading(true)
     Promise.all([api.leads.list(), api.products.list()]).then(([l, p]) => {
       setLeads(l); setProducts(p); setLoading(false)
     })
@@ -196,7 +199,7 @@ export default function Leads() {
     <div>
       <PageHeader
         title="Leads"
-        subtitle={`${leads.length} lead${leads.length === 1 ? '' : 's'}`}
+        subtitle={leads.length === 0 ? 'No leads yet' : `${leads.length} lead${leads.length === 1 ? '' : 's'}`}
         actions={
           <div style={{ display: 'flex', gap: 10 }}>
             <ExportBar

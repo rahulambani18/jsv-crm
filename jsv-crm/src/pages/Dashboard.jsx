@@ -7,6 +7,7 @@ import { PIPELINE_STAGES } from '../data/seed.js'
 import { APP_TODAY, getOverdueInvoices, daysOverdue } from '../lib/overdue.js'
 import { getExpiringStock, expiryStatus, daysToExpiry } from '../lib/expiry.js'
 import { availableQty, stockStatus } from '../lib/stockStatus.js'
+import { useAutoRefresh } from '../lib/useAutoRefresh.js'
 import StatCard from '../components/StatCard.jsx'
 import Pill from '../components/Pill.jsx'
 import {
@@ -33,8 +34,9 @@ export default function Dashboard() {
   const [stock, setStock] = useState([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    Promise.all([
+  function loadData(silent = false) {
+    if (!silent) setLoading(true)
+    return Promise.all([
       api.leads.list(), api.customers.list(), api.quotations.list(),
       api.orders.list(), api.followUps.list(), api.invoices.list(), api.stock.list(),
     ]).then(([l, c, q, o, f, inv, st]) => {
@@ -42,7 +44,12 @@ export default function Dashboard() {
       setInvoices(inv); setStock(st)
       setLoading(false)
     })
-  }, [])
+  }
+
+  useEffect(() => { loadData() }, [])
+  // Keep the dashboard current without a manual reload — refreshes
+  // quietly in the background, no skeleton flash on every tick.
+  useAutoRefresh(() => loadData(true), 60000)
 
   const today = APP_TODAY
   const overdueInvoices = useMemo(() => getOverdueInvoices(invoices, today), [invoices, today])

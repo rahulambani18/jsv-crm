@@ -16,6 +16,8 @@ import { IconUsers, IconTrend, IconCart, IconRupee } from '../components/Icons.j
 import { REPORT_PERIODS, periodRange, isWithinRange, periodLabel } from '../lib/reportPeriods.js'
 import { showToast } from '../lib/toast.js'
 import CardSkeleton from '../components/CardSkeleton.jsx'
+import { usePersistedFilter } from '../lib/usePersistedFilter.js'
+import { useAutoRefresh } from '../lib/useAutoRefresh.js'
 import '../styles/components.css'
 
 const COLORS = ['#0f1e3d', '#0d9488', '#d97706', '#6b81a8', '#b42318', '#a3a9b3']
@@ -29,15 +31,23 @@ export default function Reports() {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchParams, setSearchParams] = useSearchParams()
-  const [period, setPeriod] = useState(REPORT_PERIODS.includes(searchParams.get('period')) ? searchParams.get('period') : 'All')
+  const [period, setPeriod] = usePersistedFilter(
+    'jsv_filter_reports_period',
+    REPORT_PERIODS.includes(searchParams.get('period')) ? searchParams.get('period') : undefined,
+    'All'
+  )
   const [showShare, setShowShare] = useState(false)
   const [qrLoading, setQrLoading] = useState(false)
 
-  useEffect(() => {
-    Promise.all([api.leads.list(), api.orders.list()]).then(([l, o]) => {
+  function loadData(silent = false) {
+    if (!silent) setLoading(true)
+    return Promise.all([api.leads.list(), api.orders.list()]).then(([l, o]) => {
       setLeads(l); setOrders(o); setLoading(false)
     })
-  }, [])
+  }
+
+  useEffect(() => { loadData() }, [])
+  useAutoRefresh(() => loadData(true), 60000)
 
   useEffect(() => {
     setSearchParams(period === 'All' ? {} : { period }, { replace: true })

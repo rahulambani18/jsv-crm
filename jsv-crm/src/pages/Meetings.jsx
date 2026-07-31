@@ -8,6 +8,8 @@ import ExportBar from '../components/ExportBar.jsx'
 import { IconPlus, IconSearch, IconEdit, IconTrash } from '../components/Icons.jsx'
 import EmptyState from '../components/EmptyState.jsx'
 import CardSkeleton from '../components/CardSkeleton.jsx'
+import { usePersistedFilter } from '../lib/usePersistedFilter.js'
+import { useAutoRefresh } from '../lib/useAutoRefresh.js'
 import '../styles/components.css'
 
 const MEETING_TYPES = ['Site Visit', 'Office Meeting', 'Video Call', 'Call', 'Exhibition', 'Other']
@@ -24,17 +26,18 @@ export default function Meetings() {
   const canDelete = can('meetings', 'delete')
   const [meetings, setMeetings] = useState([])
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState('All')
-  const [search, setSearch] = useState('')
+  const [tab, setTab] = usePersistedFilter('jsv_filter_meetings_tab', undefined, 'All')
+  const [search, setSearch] = usePersistedFilter('jsv_filter_meetings_search', undefined, '')
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyForm())
   const [saving, setSaving] = useState(false)
 
   useEffect(() => { refresh() }, [])
+  useAutoRefresh(() => refresh(true), 60000)
 
-  function refresh() {
-    setLoading(true)
+  function refresh(silent = false) {
+    if (!silent) setLoading(true)
     api.meetings.list().then((d) => { setMeetings(d); setLoading(false) })
   }
 

@@ -25,6 +25,8 @@ import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 import TableSkeleton from '../components/TableSkeleton.jsx'
 import ColumnChooser from '../components/ColumnChooser.jsx'
+import { usePersistedFilter } from '../lib/usePersistedFilter.js'
+import { useAutoRefresh } from '../lib/useAutoRefresh.js'
 
 const CUSTOMER_FIELD_MAP = {
   company: ['company', 'companyname', 'customer', 'customername', 'name'],
@@ -83,7 +85,7 @@ export default function Customers() {
   const [loading, setLoading] = useState(true)
   const [visibleCols, setVisibleCols] = useState(CUSTOMER_COLUMNS.map((c) => c.key))
   const [searchParams] = useSearchParams()
-  const [search, setSearch] = useState(searchParams.get('q') || '')
+  const [search, setSearch] = usePersistedFilter('jsv_filter_customers_search', searchParams.get('q'), '')
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyForm())
@@ -94,9 +96,10 @@ export default function Customers() {
 
   useEffect(() => { refresh() }, [])
   useEffect(() => { api.users.list().then(setUsers).catch(() => {}) }, [])
+  useAutoRefresh(() => refresh(true), 60000)
 
-  function refresh() {
-    setLoading(true)
+  function refresh(silent = false) {
+    if (!silent) setLoading(true)
     Promise.all([
       api.customers.list(), api.invoices.list(), api.payments.list(),
       api.leads.list(), api.samples.list(), api.quotations.list(),
@@ -309,7 +312,7 @@ export default function Customers() {
     <div>
       <PageHeader
         title="Customers"
-        subtitle={`${customers.length} customer${customers.length === 1 ? '' : 's'}`}
+        subtitle={customers.length === 0 ? 'No customers yet' : `${customers.length} customer${customers.length === 1 ? '' : 's'}`}
         actions={
           canEdit && (
             <>

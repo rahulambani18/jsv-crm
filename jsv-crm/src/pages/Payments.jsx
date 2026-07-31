@@ -25,6 +25,8 @@ import { exportCSV } from '../lib/exportUtils.js'
 import '../styles/components.css'
 import TableSkeleton from '../components/TableSkeleton.jsx'
 import ColumnChooser from '../components/ColumnChooser.jsx'
+import { usePersistedFilter } from '../lib/usePersistedFilter.js'
+import { useAutoRefresh } from '../lib/useAutoRefresh.js'
 
 const MODE_COLORS = ['#0d9488', '#0f1e3d', '#d97706', '#6b81a8', '#b42318', '#a3a9b3']
 const AGING_COLORS = ['#0d9488', '#d97706', '#c2551a', '#b42318']
@@ -57,17 +59,18 @@ export default function Payments() {
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(true)
   const [visibleCols, setVisibleCols] = useState(PAYMENT_COLUMNS.map((c) => c.key))
-  const [search, setSearch] = useState('')
-  const [modeFilter, setModeFilter] = useState('All modes')
+  const [search, setSearch] = usePersistedFilter('jsv_filter_payments_search', undefined, '')
+  const [modeFilter, setModeFilter] = usePersistedFilter('jsv_filter_payments_mode', undefined, 'All modes')
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(emptyForm())
   const [saving, setSaving] = useState(false)
   const [selected, setSelected] = useState(new Set())
 
   useEffect(() => { refresh() }, [])
+  useAutoRefresh(() => refresh(true), 60000)
 
-  function refresh() {
-    setLoading(true)
+  function refresh(silent = false) {
+    if (!silent) setLoading(true)
     Promise.all([api.payments.list(), api.invoices.list()]).then(([p, i]) => {
       setPayments(p); setInvoices(i); setLoading(false)
     })
@@ -187,7 +190,7 @@ export default function Payments() {
     <div>
       <PageHeader
         title="Payments"
-        subtitle={`${payments.length} payment${payments.length === 1 ? '' : 's'} received`}
+        subtitle={payments.length === 0 ? 'No payments yet' : `${payments.length} payment${payments.length === 1 ? '' : 's'} received`}
         actions={
           <div style={{ display: 'flex', gap: 10 }}>
             <TallyImportButton onImport={handleTallyImport} />

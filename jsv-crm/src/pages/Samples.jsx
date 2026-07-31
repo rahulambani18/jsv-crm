@@ -19,6 +19,8 @@ import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 import TableSkeleton from '../components/TableSkeleton.jsx'
 import ColumnChooser from '../components/ColumnChooser.jsx'
+import { usePersistedFilter } from '../lib/usePersistedFilter.js'
+import { useAutoRefresh } from '../lib/useAutoRefresh.js'
 
 const STATUSES = ['All statuses', 'Preparing', 'In Transit', 'Delivered']
 const STATUS_TONE = { Preparing: 'gray', 'In Transit': 'amber', Delivered: 'teal' }
@@ -48,8 +50,8 @@ export default function Samples() {
   const [loading, setLoading] = useState(true)
   const [visibleCols, setVisibleCols] = useState(SAMPLE_COLUMNS.map((c) => c.key))
   const [searchParams] = useSearchParams()
-  const [search, setSearch] = useState(searchParams.get('q') || '')
-  const [statusFilter, setStatusFilter] = useState('All statuses')
+  const [search, setSearch] = usePersistedFilter('jsv_filter_samples_search', searchParams.get('q'), '')
+  const [statusFilter, setStatusFilter] = usePersistedFilter('jsv_filter_samples_status', undefined, 'All statuses')
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(emptyForm())
   const [saving, setSaving] = useState(false)
@@ -59,9 +61,10 @@ export default function Samples() {
 
   useEffect(() => { refresh() }, [])
   useEffect(() => { api.users.list().then(setUsers).catch(() => {}) }, [])
+  useAutoRefresh(() => refresh(true), 60000)
 
-  function refresh() {
-    setLoading(true)
+  function refresh(silent = false) {
+    if (!silent) setLoading(true)
     Promise.all([api.samples.list(), api.products.list()]).then(([s, p]) => {
       setSamples(s); setProducts(p); setLoading(false)
     })
@@ -178,7 +181,7 @@ export default function Samples() {
     <div>
       <PageHeader
         title="Samples"
-        subtitle={`${samples.length} sample${samples.length === 1 ? '' : 's'}`}
+        subtitle={samples.length === 0 ? 'No samples yet' : `${samples.length} sample${samples.length === 1 ? '' : 's'}`}
         actions={
           <div style={{ display: 'flex', gap: 10 }}>
             <ExportBar

@@ -18,6 +18,8 @@ import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 import TableSkeleton from '../components/TableSkeleton.jsx'
 import ColumnChooser from '../components/ColumnChooser.jsx'
+import { usePersistedFilter } from '../lib/usePersistedFilter.js'
+import { useAutoRefresh } from '../lib/useAutoRefresh.js'
 
 const QUOTATION_COLUMNS = [
   { key: 'quoteNo', label: 'Quote #' },
@@ -41,7 +43,7 @@ export default function Quotations() {
   const canEdit = can('quotations', 'edit')
   const canDelete = can('quotations', 'delete')
   const [searchParams] = useSearchParams()
-  const [search, setSearch] = useState(searchParams.get('q') || '')
+  const [search, setSearch] = usePersistedFilter('jsv_filter_quotations_search', searchParams.get('q'), '')
   const [quotations, setQuotations] = useState([])
   const [products, setProducts] = useState([])
   const [customers, setCustomers] = useState([])
@@ -59,9 +61,10 @@ export default function Quotations() {
   useEffect(() => { refresh() }, [])
   useEffect(() => { api.users.list().then(setUsers).catch(() => {}) }, [])
   useEffect(() => { api.invoices.list().then(setInvoices).catch(() => {}) }, [])
+  useAutoRefresh(() => refresh(true), 60000)
 
-  function refresh() {
-    setLoading(true)
+  function refresh(silent = false) {
+    if (!silent) setLoading(true)
     Promise.all([api.quotations.list(), api.products.list(), api.customers.list()]).then(([q, p, c]) => {
       setQuotations(q); setProducts(p); setCustomers(c); setLoading(false)
     })
@@ -260,7 +263,7 @@ export default function Quotations() {
     <div>
       <PageHeader
         title="Quotations"
-        subtitle={`${quotations.length} quote${quotations.length === 1 ? '' : 's'}`}
+        subtitle={quotations.length === 0 ? 'No quotations yet' : `${quotations.length} quote${quotations.length === 1 ? '' : 's'}`}
         actions={
           <div style={{ display: 'flex', gap: 10 }}>
             <ExportBar

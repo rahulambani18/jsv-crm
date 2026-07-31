@@ -12,6 +12,8 @@ import { buildAgingReport, worstBucket, AGING_BUCKETS } from '../lib/aging.js'
 import { APP_TODAY } from '../lib/overdue.js'
 import '../styles/components.css'
 import ColumnChooser from '../components/ColumnChooser.jsx'
+import { usePersistedFilter } from '../lib/usePersistedFilter.js'
+import { useAutoRefresh } from '../lib/useAutoRefresh.js'
 
 const STATUS_LABEL = {
   current: 'Current', due0to30: '0–30 days', due30to60: '30–60 days', due60plus: '60+ days',
@@ -45,15 +47,19 @@ export default function Reconciliation() {
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
   const [visibleCols, setVisibleCols] = useState(RECONCILIATION_COLUMNS.map((c) => c.key))
-  const [search, setSearch] = useState('')
-  const [bucketFilter, setBucketFilter] = useState('all')
+  const [search, setSearch] = usePersistedFilter('jsv_filter_reconciliation_search', undefined, '')
+  const [bucketFilter, setBucketFilter] = usePersistedFilter('jsv_filter_reconciliation_bucket', undefined, 'all')
 
-  useEffect(() => {
+  function loadData(silent = false) {
     if (!canView) { setLoading(false); return }
+    if (!silent) setLoading(true)
     Promise.all([api.invoices.list(), api.payments.list(), api.customers.list()]).then(([i, p, c]) => {
       setInvoices(i); setPayments(p); setCustomers(c); setLoading(false)
     })
-  }, [canView])
+  }
+
+  useEffect(() => { loadData() }, [canView])
+  useAutoRefresh(() => loadData(true), 60000)
 
   const { rows, totals } = useMemo(() => buildAgingReport(invoices, payments), [invoices, payments])
 

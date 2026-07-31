@@ -8,6 +8,8 @@ import ExportBar from '../components/ExportBar.jsx'
 import { IconPlus, IconSearch, IconEdit, IconTrash } from '../components/Icons.jsx'
 import EmptyState from '../components/EmptyState.jsx'
 import CardSkeleton from '../components/CardSkeleton.jsx'
+import { usePersistedFilter } from '../lib/usePersistedFilter.js'
+import { useAutoRefresh } from '../lib/useAutoRefresh.js'
 import '../styles/components.css'
 
 const TASK_TYPES = ['Call', 'Email', 'Document', 'Internal', 'Follow-up', 'Other']
@@ -25,17 +27,18 @@ export default function Tasks() {
   const canDelete = can('tasks', 'delete')
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState('All')
-  const [search, setSearch] = useState('')
+  const [tab, setTab] = usePersistedFilter('jsv_filter_tasks_tab', undefined, 'All')
+  const [search, setSearch] = usePersistedFilter('jsv_filter_tasks_search', undefined, '')
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyForm())
   const [saving, setSaving] = useState(false)
 
   useEffect(() => { refresh() }, [])
+  useAutoRefresh(() => refresh(true), 60000)
 
-  function refresh() {
-    setLoading(true)
+  function refresh(silent = false) {
+    if (!silent) setLoading(true)
     api.tasks.list().then((d) => { setTasks(d); setLoading(false) })
   }
 

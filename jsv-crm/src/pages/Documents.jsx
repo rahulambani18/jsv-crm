@@ -10,6 +10,8 @@ import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 import TableSkeleton from '../components/TableSkeleton.jsx'
 import ColumnChooser from '../components/ColumnChooser.jsx'
+import { usePersistedFilter } from '../lib/usePersistedFilter.js'
+import { useAutoRefresh } from '../lib/useAutoRefresh.js'
 
 const DOC_TYPES = ['COA', 'MSDS', 'TDS', 'Certificate', 'Contract', 'Invoice', 'Purchase Order', 'Email', 'Other']
 
@@ -35,8 +37,8 @@ export default function Documents() {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [visibleCols, setVisibleCols] = useState(DOCUMENT_COLUMNS.map((c) => c.key))
-  const [search, setSearch] = useState('')
-  const [typeFilter, setTypeFilter] = useState('All types')
+  const [search, setSearch] = usePersistedFilter('jsv_filter_documents_search', undefined, '')
+  const [typeFilter, setTypeFilter] = usePersistedFilter('jsv_filter_documents_type', undefined, 'All types')
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyForm())
@@ -45,9 +47,10 @@ export default function Documents() {
   const [uploadError, setUploadError] = useState('')
 
   useEffect(() => { refresh() }, [])
+  useAutoRefresh(() => refresh(true), 60000)
 
-  function refresh() {
-    setLoading(true)
+  function refresh(silent = false) {
+    if (!silent) setLoading(true)
     Promise.all([api.documents.list(), api.products.list()]).then(([d, p]) => {
       setDocs(d); setProducts(p); setLoading(false)
     })
@@ -121,7 +124,7 @@ export default function Documents() {
     <div>
       <PageHeader
         title="Documents"
-        subtitle={`${docs.length} document${docs.length === 1 ? '' : 's'} — COAs, MSDS, certificates, contracts`}
+        subtitle={docs.length === 0 ? 'No documents yet' : `${docs.length} document${docs.length === 1 ? '' : 's'} — COAs, MSDS, certificates, contracts`}
         actions={
           <div style={{ display: 'flex', gap: 10 }}>
             <ExportBar

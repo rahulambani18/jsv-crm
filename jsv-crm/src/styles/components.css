@@ -214,6 +214,12 @@
   gap: 10px;
   margin-bottom: 16px;
   flex-wrap: wrap;
+  position: sticky;
+  top: 56px;
+  z-index: 8;
+  background: var(--paper-0);
+  padding: 10px 0;
+  box-shadow: 0 4px 8px -6px rgba(15, 30, 61, 0.12);
 }
 .search-input {
   flex: 1;
@@ -558,6 +564,13 @@ table.data-table {
 .pill-red { background: var(--red-100); color: var(--red-600); }
 .pill-gray { background: var(--paper-100); color: var(--ink-500); }
 .pill-outline { background: transparent; border: 1px solid var(--paper-200); color: var(--ink-700); }
+
+.pill-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.pill-dot-navy { background: #fff; }
+.pill-dot-amber { background: var(--amber-600); }
+.pill-dot-teal { background: var(--teal-600); }
+.pill-dot-red { background: var(--red-600); }
+.pill-dot-gray { background: var(--ink-400); }
 
 /* Inline status/payment dropdowns styled to look like the pill badges
    they replace, so tables that let every viewer change these two fields

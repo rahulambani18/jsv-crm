@@ -297,7 +297,7 @@ export default function UsersAndRoles() {
           <PageHeader
             title=""
             hideBreadcrumb
-            subtitle={`${users.length} user${users.length === 1 ? '' : 's'} in your workspace`}
+            subtitle={users.length === 0 ? 'No users yet' : `${users.length} user${users.length === 1 ? '' : 's'} in your workspace`}
             actions={
               canEdit && (
                 <button className="btn btn-primary" onClick={() => setShowUserModal(true)}>

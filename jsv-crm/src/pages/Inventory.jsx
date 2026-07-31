@@ -26,6 +26,8 @@ import { availableQty, stockStatus } from '../lib/stockStatus.js'
 import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 import ColumnChooser from '../components/ColumnChooser.jsx'
+import { usePersistedFilter } from '../lib/usePersistedFilter.js'
+import { useAutoRefresh } from '../lib/useAutoRefresh.js'
 
 const MOVEMENT_TYPES = ['Received', 'Dispatched', 'Adjustment', 'Return']
 
@@ -126,9 +128,9 @@ export default function Inventory() {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [visibleCols, setVisibleCols] = useState(INVENTORY_COLUMNS.map((c) => c.key))
-  const [search, setSearch] = useState('')
-  const [warehouseFilter, setWarehouseFilter] = useState('All')
-  const [statusFilter, setStatusFilter] = useState('All')
+  const [search, setSearch] = usePersistedFilter('jsv_filter_inventory_search', undefined, '')
+  const [warehouseFilter, setWarehouseFilter] = usePersistedFilter('jsv_filter_inventory_warehouse', undefined, 'All')
+  const [statusFilter, setStatusFilter] = usePersistedFilter('jsv_filter_inventory_status', undefined, 'All')
   const [showArchived, setShowArchived] = useState(false)
 
   const [showEntryModal, setShowEntryModal] = useState(false)
@@ -157,6 +159,7 @@ export default function Inventory() {
   const [showExpiryBanner, setShowExpiryBanner] = useState(true)
 
   useEffect(() => { refresh() }, [])
+  useAutoRefresh(() => refresh(true), 60000)
 
   // Location/godown suggestions: the starter list plus any locations
   // already in use across stock, so the list grows on its own as
@@ -180,15 +183,15 @@ export default function Inventory() {
     return stock.filter((s) => s.product === transferForm.product && s.warehouse === transferForm.fromWarehouse && !s.archived)
   }, [stock, transferForm.product, transferForm.fromWarehouse])
 
-  async function refresh() {
-    setLoading(true)
+  async function refresh(silent = false) {
+    if (!silent) setLoading(true)
     try {
       const [s, m, p] = await Promise.all([api.stock.list(), api.stockMovements.list(), api.products.list()])
       setStock(s)
       setMovements(m)
       setProducts(p)
     } catch (err) {
-      showToast('Could not load inventory: ' + (err.message || 'Unknown error'), 'error')
+      if (!silent) showToast('Could not load inventory: ' + (err.message || 'Unknown error'), 'error')
     } finally {
       setLoading(false)
     }

@@ -16,6 +16,8 @@ import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 import TableSkeleton from '../components/TableSkeleton.jsx'
 import ColumnChooser from '../components/ColumnChooser.jsx'
+import { usePersistedFilter } from '../lib/usePersistedFilter.js'
+import { useAutoRefresh } from '../lib/useAutoRefresh.js'
 
 const PRODUCT_COLUMNS = [
   { key: 'name', label: 'Product' },
@@ -50,8 +52,8 @@ export default function Products() {
   const [loading, setLoading] = useState(true)
   const [visibleCols, setVisibleCols] = useState(PRODUCT_COLUMNS.map((c) => c.key))
   const [searchParams] = useSearchParams()
-  const [search, setSearch] = useState(searchParams.get('q') || '')
-  const [categoryFilter, setCategoryFilter] = useState('All categories')
+  const [search, setSearch] = usePersistedFilter('jsv_filter_products_search', searchParams.get('q'), '')
+  const [categoryFilter, setCategoryFilter] = usePersistedFilter('jsv_filter_products_category', undefined, 'All categories')
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyForm())
@@ -62,9 +64,10 @@ export default function Products() {
   const [selected, setSelected] = useState(new Set())
 
   useEffect(() => { refresh() }, [])
+  useAutoRefresh(() => refresh(true), 60000)
 
-  function refresh() {
-    setLoading(true)
+  function refresh(silent = false) {
+    if (!silent) setLoading(true)
     api.products.list().then((data) => { setProducts(data); setLoading(false) })
   }
 

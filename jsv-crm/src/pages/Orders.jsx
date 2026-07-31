@@ -20,6 +20,8 @@ import EmptyState from '../components/EmptyState.jsx'
 import TableSkeleton from '../components/TableSkeleton.jsx'
 import ColumnChooser from '../components/ColumnChooser.jsx'
 import ShippingDocsModal, { SHIPPING_DOC_FIELDS, docsCollectedCount } from '../components/ShippingDocsModal.jsx'
+import { usePersistedFilter } from '../lib/usePersistedFilter.js'
+import { useAutoRefresh } from '../lib/useAutoRefresh.js'
 
 const STATUSES = ['All statuses', 'Processing', 'Dispatched', 'Delivered', 'Cancelled']
 const PAYMENT_FILTERS = ['All payments', 'Paid', 'Pending']
@@ -75,16 +77,16 @@ export default function Orders() {
   const canEdit = can('orders', 'edit')
   const canDelete = can('orders', 'delete')
   const [searchParams] = useSearchParams()
-  const [search, setSearch] = useState(searchParams.get('q') || '')
+  const [search, setSearch] = usePersistedFilter('jsv_filter_orders_search', searchParams.get('q'), '')
   const [orders, setOrders] = useState([])
   const [customers, setCustomers] = useState([])
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [visibleCols, setVisibleCols] = useState(ORDER_COLUMNS.map((c) => c.key))
-  const [warehouseFilter, setWarehouseFilter] = useState('All warehouses')
-  const [statusFilter, setStatusFilter] = useState('All statuses')
-  const [paymentFilter, setPaymentFilter] = useState(searchParams.get('payment') || 'All payments')
-  const [docsFilter, setDocsFilter] = useState('All orders')
+  const [warehouseFilter, setWarehouseFilter] = usePersistedFilter('jsv_filter_orders_warehouse', undefined, 'All warehouses')
+  const [statusFilter, setStatusFilter] = usePersistedFilter('jsv_filter_orders_status', undefined, 'All statuses')
+  const [paymentFilter, setPaymentFilter] = usePersistedFilter('jsv_filter_orders_payment', searchParams.get('payment'), 'All payments')
+  const [docsFilter, setDocsFilter] = usePersistedFilter('jsv_filter_orders_docs', undefined, 'All orders')
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyForm())
@@ -113,12 +115,16 @@ export default function Orders() {
 
   const WAREHOUSE_FILTERS = useMemo(() => ['All warehouses', ...warehouseNames], [warehouseNames])
 
-  function refresh() {
-    setLoading(true)
+  function refresh(silent = false) {
+    if (!silent) setLoading(true)
     Promise.all([api.orders.list(), api.customers.list(), api.products.list()]).then(([o, c, p]) => {
       setOrders(o); setCustomers(c); setProducts(p); setLoading(false)
     })
   }
+
+  // Keep the list current in the background without disrupting whatever
+  // the user is doing (editing, a bulk selection, a scroll position).
+  useAutoRefresh(() => refresh(true), 60000)
 
 
 
@@ -388,7 +394,7 @@ export default function Orders() {
     <div>
       <PageHeader
         title="Orders"
-        subtitle={`${orders.length} order${orders.length === 1 ? '' : 's'}`}
+        subtitle={orders.length === 0 ? 'No orders yet' : `${orders.length} order${orders.length === 1 ? '' : 's'}`}
         actions={
           <div style={{ display: 'flex', gap: 10 }}>
             <ExportBar

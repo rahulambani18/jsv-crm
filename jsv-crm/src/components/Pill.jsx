@@ -19,7 +19,12 @@ const STATUS_TONE = {
   Active: 'teal', Inactive: 'gray',
 }
 
-export default function Pill({ children, tone }) {
+export default function Pill({ children, tone, dot = true }) {
   const resolved = tone || STATUS_TONE[children] || 'gray'
-  return <span className={`pill pill-${resolved}`}>{children}</span>
+  return (
+    <span className={`pill pill-${resolved}`}>
+      {dot && <span className={`pill-dot pill-dot-${resolved}`} />}
+      {children}
+    </span>
+  )
 }
