@@ -141,6 +141,19 @@
   color: var(--ink-900);
   margin: 0 0 14px;
 }
+
+/* Brief highlight applied to a panel/table after a stat card scrolls it into view */
+.section-flash {
+  animation: sectionFlash 1.4s ease-out;
+  border-radius: var(--radius-lg);
+}
+@keyframes sectionFlash {
+  0% { box-shadow: 0 0 0 3px var(--teal-200, #99f6e4); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .section-flash { animation: none; }
+}
 .panel-row {
   display: grid;
   grid-template-columns: 1fr 1fr;

@@ -14,6 +14,7 @@ import '../styles/components.css'
 import ColumnChooser from '../components/ColumnChooser.jsx'
 import { usePersistedFilter } from '../lib/usePersistedFilter.js'
 import { useAutoRefresh } from '../lib/useAutoRefresh.js'
+import { useSectionScroll } from '../lib/useSectionScroll.js'
 
 const STATUS_LABEL = {
   current: 'Current', due0to30: '0–30 days', due30to60: '30–60 days', due60plus: '60+ days',
@@ -49,6 +50,12 @@ export default function Reconciliation() {
   const [visibleCols, setVisibleCols] = useState(RECONCILIATION_COLUMNS.map((c) => c.key))
   const [search, setSearch] = usePersistedFilter('jsv_filter_reconciliation_search', undefined, '')
   const [bucketFilter, setBucketFilter] = usePersistedFilter('jsv_filter_reconciliation_bucket', undefined, 'all')
+  const { sectionRef, scrollTo, flashClass } = useSectionScroll()
+
+  function filterAndScroll(bucket) {
+    setBucketFilter(bucket)
+    scrollTo('table')
+  }
 
   function loadData(silent = false) {
     if (!canView) { setLoading(false); return }
@@ -96,11 +103,11 @@ export default function Reconciliation() {
       />
 
       <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
-        <StatCard icon={IconRupee} tone="blue" label="Total Outstanding" value={formatINR(totals.total)} mono />
-        <StatCard icon={IconTrend} tone="teal" label="Current (Not Due)" value={formatINR(totals.current)} mono />
-        <StatCard icon={IconReceipt} tone="amber" label="0–30 Days" value={formatINR(totals.due0to30)} mono />
-        <StatCard icon={IconReceipt} tone="amber" label="30–60 Days" value={formatINR(totals.due30to60)} mono />
-        <StatCard icon={IconFlame} tone="red" label="60+ Days" value={formatINR(totals.due60plus)} mono />
+        <StatCard icon={IconRupee} tone="blue" label="Total Outstanding" value={formatINR(totals.total)} mono onClick={() => filterAndScroll('all')} />
+        <StatCard icon={IconTrend} tone="teal" label="Current (Not Due)" value={formatINR(totals.current)} mono onClick={() => filterAndScroll('current')} />
+        <StatCard icon={IconReceipt} tone="amber" label="0–30 Days" value={formatINR(totals.due0to30)} mono onClick={() => filterAndScroll('due0to30')} />
+        <StatCard icon={IconReceipt} tone="amber" label="30–60 Days" value={formatINR(totals.due30to60)} mono onClick={() => filterAndScroll('due30to60')} />
+        <StatCard icon={IconFlame} tone="red" label="60+ Days" value={formatINR(totals.due60plus)} mono onClick={() => filterAndScroll('due60plus')} />
       </div>
 
       <div className="filters-bar">
@@ -115,7 +122,7 @@ export default function Reconciliation() {
         <ColumnChooser columns={RECONCILIATION_COLUMNS} storageKey="jsv_cols_reconciliation" onChange={setVisibleCols} />
       </div>
 
-      <div className="table-wrap sticky-first-col">
+      <div ref={sectionRef('table')} className={`table-wrap sticky-first-col ${flashClass('table')}`}>
         <table className="data-table">
           <thead>
             <tr>

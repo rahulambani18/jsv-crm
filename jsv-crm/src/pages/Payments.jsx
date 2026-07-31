@@ -27,6 +27,7 @@ import TableSkeleton from '../components/TableSkeleton.jsx'
 import ColumnChooser from '../components/ColumnChooser.jsx'
 import { usePersistedFilter } from '../lib/usePersistedFilter.js'
 import { useAutoRefresh } from '../lib/useAutoRefresh.js'
+import { useSectionScroll } from '../lib/useSectionScroll.js'
 
 const MODE_COLORS = ['#0d9488', '#0f1e3d', '#d97706', '#6b81a8', '#b42318', '#a3a9b3']
 const AGING_COLORS = ['#0d9488', '#d97706', '#c2551a', '#b42318']
@@ -65,6 +66,13 @@ export default function Payments() {
   const [form, setForm] = useState(emptyForm())
   const [saving, setSaving] = useState(false)
   const [selected, setSelected] = useState(new Set())
+  const { sectionRef, scrollTo, flashClass } = useSectionScroll()
+
+  function showAllPayments() {
+    setSearch('')
+    setModeFilter('All modes')
+    scrollTo('table')
+  }
 
   useEffect(() => { refresh() }, [])
   useAutoRefresh(() => refresh(true), 60000)
@@ -210,10 +218,10 @@ export default function Payments() {
       />
 
       <div className="stat-grid">
-        <StatCard icon={IconDollarSign} tone="teal" label="Total Received" value={formatINR(totalReceived)} mono />
-        <StatCard icon={IconCalendar} tone="blue" label="This Month" value={formatINR(payments.filter((p) => (p.date || '').startsWith('2026-07')).reduce((s, p) => s + Number(p.amount || 0), 0))} mono />
-        <StatCard icon={IconReceipt} tone="blue" label="Payments Count" value={payments.length} />
-        <StatCard icon={IconFlame} tone="red" label="Overdue Invoices" value={`${overdueInvoices.length} · ${formatINR(overdueAmount)}`} mono />
+        <StatCard icon={IconDollarSign} tone="teal" label="Total Received" value={formatINR(totalReceived)} mono onClick={showAllPayments} />
+        <StatCard icon={IconCalendar} tone="blue" label="This Month" value={formatINR(payments.filter((p) => (p.date || '').startsWith('2026-07')).reduce((s, p) => s + Number(p.amount || 0), 0))} mono onClick={showAllPayments} />
+        <StatCard icon={IconReceipt} tone="blue" label="Payments Count" value={payments.length} onClick={showAllPayments} />
+        <StatCard icon={IconFlame} tone="red" label="Overdue Invoices" value={`${overdueInvoices.length} · ${formatINR(overdueAmount)}`} mono onClick={overdueInvoices.length > 0 ? () => scrollTo('overdue') : undefined} />
       </div>
 
       <div className="panel-row">
@@ -255,19 +263,20 @@ export default function Payments() {
       </div>
 
       <div className="stat-grid">
-        <StatCard icon={IconRupee} tone="red" label="Outstanding Summary" value={formatINR(outstandingSummary.totalOutstanding)} mono />
-        <StatCard icon={IconReceipt} tone="amber" label="Open Invoices" value={outstandingSummary.invoiceCount} />
-        <StatCard icon={IconAlertTriangle} tone="amber" label="Partial Payments" value={partialPayments.length} />
+        <StatCard icon={IconRupee} tone="red" label="Outstanding Summary" value={formatINR(outstandingSummary.totalOutstanding)} mono onClick={() => scrollTo(overdueInvoices.length > 0 ? 'overdue' : 'partial')} />
+        <StatCard icon={IconReceipt} tone="amber" label="Open Invoices" value={outstandingSummary.invoiceCount} onClick={() => scrollTo(overdueInvoices.length > 0 ? 'overdue' : 'partial')} />
+        <StatCard icon={IconAlertTriangle} tone="amber" label="Partial Payments" value={partialPayments.length} onClick={partialPayments.length > 0 ? () => scrollTo('partial') : undefined} />
         <StatCard
           icon={IconFlame}
           tone="red"
           label="Oldest Overdue"
           value={outstandingSummary.oldestDueDate ? `${outstandingSummary.maxDaysOverdue}d (due ${outstandingSummary.oldestDueDate})` : '—'}
+          onClick={overdueInvoices.length > 0 ? () => scrollTo('overdue') : undefined}
         />
       </div>
 
       {partialPayments.length > 0 && (
-        <div className="panel" style={{ marginBottom: 20 }}>
+        <div ref={sectionRef('partial')} className={`panel ${flashClass('partial')}`} style={{ marginBottom: 20 }}>
           <p className="panel-title">Partial Payments ({partialPayments.length})</p>
           <div className="table-wrap">
             <table className="data-table">
@@ -291,7 +300,7 @@ export default function Payments() {
       )}
 
       {overdueInvoices.length > 0 && (
-        <div className="panel" style={{ marginBottom: 20 }}>
+        <div ref={sectionRef('overdue')} className={`panel ${flashClass('overdue')}`} style={{ marginBottom: 20 }}>
           <p className="panel-title">Overdue Invoices Needing Follow-up ({overdueInvoices.length})</p>
           <div className="attention-list">
             {overdueInvoices
@@ -342,7 +351,7 @@ export default function Payments() {
         />
       )}
 
-      <div className="table-wrap sticky-first-col">
+      <div ref={sectionRef('table')} className={`table-wrap sticky-first-col ${flashClass('table')}`}>
         <table className="data-table">
           <thead>
             <tr>

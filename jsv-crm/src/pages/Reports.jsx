@@ -18,6 +18,7 @@ import { showToast } from '../lib/toast.js'
 import CardSkeleton from '../components/CardSkeleton.jsx'
 import { usePersistedFilter } from '../lib/usePersistedFilter.js'
 import { useAutoRefresh } from '../lib/useAutoRefresh.js'
+import { useSectionScroll } from '../lib/useSectionScroll.js'
 import '../styles/components.css'
 
 const COLORS = ['#0f1e3d', '#0d9488', '#d97706', '#6b81a8', '#b42318', '#a3a9b3']
@@ -38,6 +39,7 @@ export default function Reports() {
   )
   const [showShare, setShowShare] = useState(false)
   const [qrLoading, setQrLoading] = useState(false)
+  const { sectionRef, scrollTo, flashClass } = useSectionScroll()
 
   function loadData(silent = false) {
     if (!silent) setLoading(true)
@@ -211,14 +213,14 @@ export default function Reports() {
       </div>
 
       <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-        <StatCard icon={IconUsers} tone="blue" label="Total Leads" value={totalLeads} />
-        <StatCard icon={IconTrend} tone="teal" label="Conversion Rate" value={`${conversionRate}%`} />
-        <StatCard icon={IconCart} tone="amber" label="Total Orders" value={orders.length} />
-        <StatCard icon={IconRupee} tone="blue" label="Total Revenue" value={formatINR(totalRevenue)} mono />
+        <StatCard icon={IconUsers} tone="blue" label="Total Leads" value={totalLeads} onClick={() => scrollTo('funnel')} />
+        <StatCard icon={IconTrend} tone="teal" label="Conversion Rate" value={`${conversionRate}%`} onClick={() => scrollTo('funnel')} />
+        <StatCard icon={IconCart} tone="amber" label="Total Orders" value={orders.length} onClick={() => scrollTo('warehouse')} />
+        <StatCard icon={IconRupee} tone="blue" label="Total Revenue" value={formatINR(totalRevenue)} mono onClick={() => scrollTo('revenue')} />
       </div>
 
       <div className="panel-row">
-        <div className="panel">
+        <div ref={sectionRef('funnel')} className={`panel ${flashClass('funnel')}`}>
           <p className="panel-title">Lead Conversion Funnel</p>
           <div className="funnel">
             {funnelData.map((row) => (
@@ -231,7 +233,7 @@ export default function Reports() {
           </div>
         </div>
 
-        <div className="panel">
+        <div ref={sectionRef('revenue')} className={`panel ${flashClass('revenue')}`}>
           <p className="panel-title">Revenue (Last 7 Months)</p>
           <ResponsiveContainer width="100%" height={230}>
             <LineChart data={revenueByMonth}>
@@ -262,7 +264,7 @@ export default function Reports() {
           )}
         </div>
 
-        <div className="panel">
+        <div ref={sectionRef('warehouse')} className={`panel ${flashClass('warehouse')}`}>
           <p className="panel-title">Orders by Warehouse</p>
           {warehouseData.length === 0 ? (
             <p style={{ color: 'var(--ink-300)', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>No orders yet.</p>
