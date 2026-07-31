@@ -25,6 +25,7 @@ import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 import TableSkeleton from '../components/TableSkeleton.jsx'
 import ColumnChooser from '../components/ColumnChooser.jsx'
+import ClearFiltersButton from '../components/ClearFiltersButton.jsx'
 import { usePersistedFilter } from '../lib/usePersistedFilter.js'
 import { useAutoRefresh } from '../lib/useAutoRefresh.js'
 
@@ -85,7 +86,7 @@ export default function Customers() {
   const [loading, setLoading] = useState(true)
   const [visibleCols, setVisibleCols] = useState(CUSTOMER_COLUMNS.map((c) => c.key))
   const [searchParams] = useSearchParams()
-  const [search, setSearch] = usePersistedFilter('jsv_filter_customers_search', searchParams.get('q'), '')
+  const [search, setSearch, searchMeta] = usePersistedFilter('jsv_filter_customers_search', searchParams.get('q'), '')
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyForm())
@@ -358,6 +359,7 @@ export default function Customers() {
           <input placeholder="Search company, contact, mobile, GST, city…" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <ColumnChooser columns={CUSTOMER_COLUMNS} storageKey="jsv_cols_customers" onChange={setVisibleCols} />
+        <ClearFiltersButton filters={[searchMeta]} onClear={() => searchMeta.clear()} />
       </div>
 
       {canEdit && (

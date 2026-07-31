@@ -29,6 +29,7 @@ import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 import TableSkeleton from '../components/TableSkeleton.jsx'
 import ColumnChooser from '../components/ColumnChooser.jsx'
+import ClearFiltersButton from '../components/ClearFiltersButton.jsx'
 import { usePersistedFilter } from '../lib/usePersistedFilter.js'
 import { useAutoRefresh } from '../lib/useAutoRefresh.js'
 
@@ -357,9 +358,9 @@ export default function Invoices() {
   const [loading, setLoading] = useState(true)
   const [visibleCols, setVisibleCols] = useState(INVOICE_COLUMNS.map((c) => c.key))
   const [searchParams] = useSearchParams()
-  const [search, setSearch] = usePersistedFilter('jsv_filter_invoices_search', searchParams.get('q'), '')
-  const [statusFilter, setStatusFilter] = usePersistedFilter('jsv_filter_invoices_status', undefined, 'All')
-  const [overdueOnly, setOverdueOnly] = usePersistedFilter('jsv_filter_invoices_overdueOnly', searchParams.get('overdue') === '1' ? true : undefined, false)
+  const [search, setSearch, searchMeta] = usePersistedFilter('jsv_filter_invoices_search', searchParams.get('q'), '')
+  const [statusFilter, setStatusFilter, statusMeta] = usePersistedFilter('jsv_filter_invoices_status', undefined, 'All')
+  const [overdueOnly, setOverdueOnly, overdueMeta] = usePersistedFilter('jsv_filter_invoices_overdueOnly', searchParams.get('overdue') === '1' ? true : undefined, false)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyForm())
@@ -665,6 +666,10 @@ export default function Invoices() {
           </button>
         )}
         <ColumnChooser columns={INVOICE_COLUMNS} storageKey="jsv_cols_invoices" onChange={setVisibleCols} />
+        <ClearFiltersButton
+          filters={[searchMeta, statusMeta, overdueMeta]}
+          onClear={() => { searchMeta.clear(); statusMeta.clear(); overdueMeta.clear() }}
+        />
       </div>
 
       <BulkActionsBar

@@ -10,6 +10,7 @@ import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 import TableSkeleton from '../components/TableSkeleton.jsx'
 import ColumnChooser from '../components/ColumnChooser.jsx'
+import ClearFiltersButton from '../components/ClearFiltersButton.jsx'
 import { usePersistedFilter } from '../lib/usePersistedFilter.js'
 import { useAutoRefresh } from '../lib/useAutoRefresh.js'
 
@@ -37,8 +38,8 @@ export default function Documents() {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [visibleCols, setVisibleCols] = useState(DOCUMENT_COLUMNS.map((c) => c.key))
-  const [search, setSearch] = usePersistedFilter('jsv_filter_documents_search', undefined, '')
-  const [typeFilter, setTypeFilter] = usePersistedFilter('jsv_filter_documents_type', undefined, 'All types')
+  const [search, setSearch, searchMeta] = usePersistedFilter('jsv_filter_documents_search', undefined, '')
+  const [typeFilter, setTypeFilter, typeMeta] = usePersistedFilter('jsv_filter_documents_type', undefined, 'All types')
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyForm())
@@ -152,6 +153,7 @@ export default function Documents() {
           {DOC_TYPES.map((t) => <option key={t}>{t}</option>)}
         </select>
         <ColumnChooser columns={DOCUMENT_COLUMNS} storageKey="jsv_cols_documents" onChange={setVisibleCols} />
+        <ClearFiltersButton filters={[searchMeta, typeMeta]} onClear={() => { searchMeta.clear(); typeMeta.clear() }} />
       </div>
 
       <div className="table-wrap sticky-first-col">

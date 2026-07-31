@@ -26,6 +26,7 @@ import { availableQty, stockStatus } from '../lib/stockStatus.js'
 import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 import ColumnChooser from '../components/ColumnChooser.jsx'
+import ClearFiltersButton from '../components/ClearFiltersButton.jsx'
 import { usePersistedFilter } from '../lib/usePersistedFilter.js'
 import { useAutoRefresh } from '../lib/useAutoRefresh.js'
 
@@ -128,9 +129,9 @@ export default function Inventory() {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [visibleCols, setVisibleCols] = useState(INVENTORY_COLUMNS.map((c) => c.key))
-  const [search, setSearch] = usePersistedFilter('jsv_filter_inventory_search', undefined, '')
-  const [warehouseFilter, setWarehouseFilter] = usePersistedFilter('jsv_filter_inventory_warehouse', undefined, 'All')
-  const [statusFilter, setStatusFilter] = usePersistedFilter('jsv_filter_inventory_status', undefined, 'All')
+  const [search, setSearch, searchMeta] = usePersistedFilter('jsv_filter_inventory_search', undefined, '')
+  const [warehouseFilter, setWarehouseFilter, warehouseMeta] = usePersistedFilter('jsv_filter_inventory_warehouse', undefined, 'All')
+  const [statusFilter, setStatusFilter, statusMeta] = usePersistedFilter('jsv_filter_inventory_status', undefined, 'All')
   const [showArchived, setShowArchived] = useState(false)
 
   const [showEntryModal, setShowEntryModal] = useState(false)
@@ -767,6 +768,10 @@ export default function Inventory() {
           Show archived
         </label>
         <ColumnChooser columns={INVENTORY_COLUMNS} storageKey="jsv_cols_inventory" onChange={setVisibleCols} />
+        <ClearFiltersButton
+          filters={[searchMeta, warehouseMeta, statusMeta]}
+          onClear={() => { searchMeta.clear(); warehouseMeta.clear(); statusMeta.clear() }}
+        />
       </div>
 
       {canEdit && (

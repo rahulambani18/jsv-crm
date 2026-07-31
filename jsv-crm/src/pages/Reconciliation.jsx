@@ -12,6 +12,7 @@ import { buildAgingReport, worstBucket, AGING_BUCKETS } from '../lib/aging.js'
 import { APP_TODAY } from '../lib/overdue.js'
 import '../styles/components.css'
 import ColumnChooser from '../components/ColumnChooser.jsx'
+import ClearFiltersButton from '../components/ClearFiltersButton.jsx'
 import { usePersistedFilter } from '../lib/usePersistedFilter.js'
 import { useAutoRefresh } from '../lib/useAutoRefresh.js'
 import { useSectionScroll } from '../lib/useSectionScroll.js'
@@ -48,8 +49,8 @@ export default function Reconciliation() {
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
   const [visibleCols, setVisibleCols] = useState(RECONCILIATION_COLUMNS.map((c) => c.key))
-  const [search, setSearch] = usePersistedFilter('jsv_filter_reconciliation_search', undefined, '')
-  const [bucketFilter, setBucketFilter] = usePersistedFilter('jsv_filter_reconciliation_bucket', undefined, 'all')
+  const [search, setSearch, searchMeta] = usePersistedFilter('jsv_filter_reconciliation_search', undefined, '')
+  const [bucketFilter, setBucketFilter, bucketMeta] = usePersistedFilter('jsv_filter_reconciliation_bucket', undefined, 'all')
   const { sectionRef, scrollTo, flashClass } = useSectionScroll()
 
   function filterAndScroll(bucket) {
@@ -120,6 +121,7 @@ export default function Reconciliation() {
           {AGING_BUCKETS.map((b) => <option key={b.key} value={b.key}>{b.label}</option>)}
         </select>
         <ColumnChooser columns={RECONCILIATION_COLUMNS} storageKey="jsv_cols_reconciliation" onChange={setVisibleCols} />
+        <ClearFiltersButton filters={[searchMeta, bucketMeta]} onClear={() => { searchMeta.clear(); bucketMeta.clear() }} />
       </div>
 
       <div ref={sectionRef('table')} className={`table-wrap sticky-first-col ${flashClass('table')}`}>

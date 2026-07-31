@@ -19,6 +19,7 @@ import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 import TableSkeleton from '../components/TableSkeleton.jsx'
 import ColumnChooser from '../components/ColumnChooser.jsx'
+import ClearFiltersButton from '../components/ClearFiltersButton.jsx'
 import ShippingDocsModal, { SHIPPING_DOC_FIELDS, docsCollectedCount } from '../components/ShippingDocsModal.jsx'
 import { usePersistedFilter } from '../lib/usePersistedFilter.js'
 import { useAutoRefresh } from '../lib/useAutoRefresh.js'
@@ -77,16 +78,16 @@ export default function Orders() {
   const canEdit = can('orders', 'edit')
   const canDelete = can('orders', 'delete')
   const [searchParams] = useSearchParams()
-  const [search, setSearch] = usePersistedFilter('jsv_filter_orders_search', searchParams.get('q'), '')
+  const [search, setSearch, searchMeta] = usePersistedFilter('jsv_filter_orders_search', searchParams.get('q'), '')
   const [orders, setOrders] = useState([])
   const [customers, setCustomers] = useState([])
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [visibleCols, setVisibleCols] = useState(ORDER_COLUMNS.map((c) => c.key))
-  const [warehouseFilter, setWarehouseFilter] = usePersistedFilter('jsv_filter_orders_warehouse', undefined, 'All warehouses')
-  const [statusFilter, setStatusFilter] = usePersistedFilter('jsv_filter_orders_status', undefined, 'All statuses')
-  const [paymentFilter, setPaymentFilter] = usePersistedFilter('jsv_filter_orders_payment', searchParams.get('payment'), 'All payments')
-  const [docsFilter, setDocsFilter] = usePersistedFilter('jsv_filter_orders_docs', undefined, 'All orders')
+  const [warehouseFilter, setWarehouseFilter, warehouseMeta] = usePersistedFilter('jsv_filter_orders_warehouse', undefined, 'All warehouses')
+  const [statusFilter, setStatusFilter, statusMeta] = usePersistedFilter('jsv_filter_orders_status', undefined, 'All statuses')
+  const [paymentFilter, setPaymentFilter, paymentMeta] = usePersistedFilter('jsv_filter_orders_payment', searchParams.get('payment'), 'All payments')
+  const [docsFilter, setDocsFilter, docsMeta] = usePersistedFilter('jsv_filter_orders_docs', undefined, 'All orders')
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyForm())
@@ -430,6 +431,10 @@ export default function Orders() {
           {DOCS_FILTERS.map((d) => <option key={d}>{d}</option>)}
         </select>
         <ColumnChooser columns={ORDER_COLUMNS} storageKey="jsv_cols_orders" onChange={setVisibleCols} />
+        <ClearFiltersButton
+          filters={[searchMeta, warehouseMeta, statusMeta, paymentMeta, docsMeta]}
+          onClear={() => { searchMeta.clear(); warehouseMeta.clear(); statusMeta.clear(); paymentMeta.clear(); docsMeta.clear() }}
+        />
       </div>
 
       {canEdit && (

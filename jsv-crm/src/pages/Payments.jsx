@@ -25,6 +25,7 @@ import { exportCSV } from '../lib/exportUtils.js'
 import '../styles/components.css'
 import TableSkeleton from '../components/TableSkeleton.jsx'
 import ColumnChooser from '../components/ColumnChooser.jsx'
+import ClearFiltersButton from '../components/ClearFiltersButton.jsx'
 import { usePersistedFilter } from '../lib/usePersistedFilter.js'
 import { useAutoRefresh } from '../lib/useAutoRefresh.js'
 import { useSectionScroll } from '../lib/useSectionScroll.js'
@@ -60,8 +61,8 @@ export default function Payments() {
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(true)
   const [visibleCols, setVisibleCols] = useState(PAYMENT_COLUMNS.map((c) => c.key))
-  const [search, setSearch] = usePersistedFilter('jsv_filter_payments_search', undefined, '')
-  const [modeFilter, setModeFilter] = usePersistedFilter('jsv_filter_payments_mode', undefined, 'All modes')
+  const [search, setSearch, searchMeta] = usePersistedFilter('jsv_filter_payments_search', undefined, '')
+  const [modeFilter, setModeFilter, modeMeta] = usePersistedFilter('jsv_filter_payments_mode', undefined, 'All modes')
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(emptyForm())
   const [saving, setSaving] = useState(false)
@@ -340,6 +341,7 @@ export default function Payments() {
           {PAYMENT_MODES.map((m) => <option key={m}>{m}</option>)}
         </select>
         <ColumnChooser columns={PAYMENT_COLUMNS} storageKey="jsv_cols_payments" onChange={setVisibleCols} />
+        <ClearFiltersButton filters={[searchMeta, modeMeta]} onClear={() => { searchMeta.clear(); modeMeta.clear() }} />
       </div>
 
       {(canEdit || canDelete) && (

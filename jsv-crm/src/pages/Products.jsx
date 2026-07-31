@@ -16,6 +16,7 @@ import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 import TableSkeleton from '../components/TableSkeleton.jsx'
 import ColumnChooser from '../components/ColumnChooser.jsx'
+import ClearFiltersButton from '../components/ClearFiltersButton.jsx'
 import { usePersistedFilter } from '../lib/usePersistedFilter.js'
 import { useAutoRefresh } from '../lib/useAutoRefresh.js'
 
@@ -52,8 +53,8 @@ export default function Products() {
   const [loading, setLoading] = useState(true)
   const [visibleCols, setVisibleCols] = useState(PRODUCT_COLUMNS.map((c) => c.key))
   const [searchParams] = useSearchParams()
-  const [search, setSearch] = usePersistedFilter('jsv_filter_products_search', searchParams.get('q'), '')
-  const [categoryFilter, setCategoryFilter] = usePersistedFilter('jsv_filter_products_category', undefined, 'All categories')
+  const [search, setSearch, searchMeta] = usePersistedFilter('jsv_filter_products_search', searchParams.get('q'), '')
+  const [categoryFilter, setCategoryFilter, categoryMeta] = usePersistedFilter('jsv_filter_products_category', undefined, 'All categories')
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyForm())
@@ -258,6 +259,7 @@ export default function Products() {
           {categories.map((c) => <option key={c}>{c}</option>)}
         </select>
         <ColumnChooser columns={PRODUCT_COLUMNS} storageKey="jsv_cols_products" onChange={setVisibleCols} />
+        <ClearFiltersButton filters={[searchMeta, categoryMeta]} onClear={() => { searchMeta.clear(); categoryMeta.clear() }} />
       </div>
 
       {canEdit && (

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 // Remembers a filter's last value in localStorage so the page opens the
 // way the user left it instead of resetting every time. A value coming
@@ -10,6 +10,12 @@ import { useEffect, useState } from 'react'
 // urlValue — the value read from the URL on this load, or undefined/''/null
 //            if the URL didn't specify one
 // fallback — the value to use if there's nothing in the URL or storage yet
+//
+// Returns [value, setValue, meta] — meta.clear() resets to fallback and
+// meta.isDefault reports whether the current value already is the
+// fallback, so callers can show/hide a "Clear filters" control. Existing
+// 2-item destructuring (`const [x, setX] = usePersistedFilter(...)`)
+// keeps working unchanged.
 export function usePersistedFilter(key, urlValue, fallback) {
   const hasUrlValue = urlValue !== undefined && urlValue !== null && urlValue !== ''
 
@@ -27,5 +33,8 @@ export function usePersistedFilter(key, urlValue, fallback) {
     try { localStorage.setItem(key, JSON.stringify(value)) } catch { /* storage unavailable — just don't persist */ }
   }, [key, value])
 
-  return [value, setValue]
+  const clear = useCallback(() => setValue(fallback), [fallback])
+  const isDefault = JSON.stringify(value) === JSON.stringify(fallback)
+
+  return [value, setValue, { clear, isDefault }]
 }

@@ -20,6 +20,7 @@ import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 import TableSkeleton from '../components/TableSkeleton.jsx'
 import ColumnChooser from '../components/ColumnChooser.jsx'
+import ClearFiltersButton from '../components/ClearFiltersButton.jsx'
 import { usePersistedFilter } from '../lib/usePersistedFilter.js'
 import { useAutoRefresh } from '../lib/useAutoRefresh.js'
 
@@ -51,9 +52,9 @@ export default function Leads() {
   const [loading, setLoading] = useState(true)
   const [visibleCols, setVisibleCols] = useState(LEAD_COLUMNS.map((c) => c.key))
   const [searchParams] = useSearchParams()
-  const [search, setSearch] = usePersistedFilter('jsv_filter_leads_search', searchParams.get('q'), '')
-  const [statusFilter, setStatusFilter] = usePersistedFilter('jsv_filter_leads_status', searchParams.get('status'), 'All statuses')
-  const [priorityFilter, setPriorityFilter] = usePersistedFilter('jsv_filter_leads_priority', searchParams.get('priority'), 'All priorities')
+  const [search, setSearch, searchMeta] = usePersistedFilter('jsv_filter_leads_search', searchParams.get('q'), '')
+  const [statusFilter, setStatusFilter, statusMeta] = usePersistedFilter('jsv_filter_leads_status', searchParams.get('status'), 'All statuses')
+  const [priorityFilter, setPriorityFilter, priorityMeta] = usePersistedFilter('jsv_filter_leads_priority', searchParams.get('priority'), 'All priorities')
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(emptyForm())
   const [saving, setSaving] = useState(false)
@@ -229,6 +230,10 @@ export default function Leads() {
           {PRIORITY_FILTERS.map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
         <ColumnChooser columns={LEAD_COLUMNS} storageKey="jsv_cols_leads" onChange={setVisibleCols} />
+        <ClearFiltersButton
+          filters={[searchMeta, statusMeta, priorityMeta]}
+          onClear={() => { searchMeta.clear(); statusMeta.clear(); priorityMeta.clear() }}
+        />
       </div>
 
       {canEdit && (

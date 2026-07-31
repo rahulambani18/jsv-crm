@@ -19,6 +19,7 @@ import '../styles/components.css'
 import EmptyState from '../components/EmptyState.jsx'
 import TableSkeleton from '../components/TableSkeleton.jsx'
 import ColumnChooser from '../components/ColumnChooser.jsx'
+import ClearFiltersButton from '../components/ClearFiltersButton.jsx'
 import { usePersistedFilter } from '../lib/usePersistedFilter.js'
 import { useAutoRefresh } from '../lib/useAutoRefresh.js'
 
@@ -50,8 +51,8 @@ export default function Samples() {
   const [loading, setLoading] = useState(true)
   const [visibleCols, setVisibleCols] = useState(SAMPLE_COLUMNS.map((c) => c.key))
   const [searchParams] = useSearchParams()
-  const [search, setSearch] = usePersistedFilter('jsv_filter_samples_search', searchParams.get('q'), '')
-  const [statusFilter, setStatusFilter] = usePersistedFilter('jsv_filter_samples_status', undefined, 'All statuses')
+  const [search, setSearch, searchMeta] = usePersistedFilter('jsv_filter_samples_search', searchParams.get('q'), '')
+  const [statusFilter, setStatusFilter, statusMeta] = usePersistedFilter('jsv_filter_samples_status', undefined, 'All statuses')
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(emptyForm())
   const [saving, setSaving] = useState(false)
@@ -208,6 +209,7 @@ export default function Samples() {
           {STATUSES.map((s) => <option key={s}>{s}</option>)}
         </select>
         <ColumnChooser columns={SAMPLE_COLUMNS} storageKey="jsv_cols_samples" onChange={setVisibleCols} />
+        <ClearFiltersButton filters={[searchMeta, statusMeta]} onClear={() => { searchMeta.clear(); statusMeta.clear() }} />
       </div>
 
       {canEdit && (

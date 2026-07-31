@@ -16,6 +16,7 @@ import { IconUsers, IconTrend, IconCart, IconRupee } from '../components/Icons.j
 import { REPORT_PERIODS, periodRange, isWithinRange, periodLabel } from '../lib/reportPeriods.js'
 import { showToast } from '../lib/toast.js'
 import CardSkeleton from '../components/CardSkeleton.jsx'
+import ClearFiltersButton from '../components/ClearFiltersButton.jsx'
 import { usePersistedFilter } from '../lib/usePersistedFilter.js'
 import { useAutoRefresh } from '../lib/useAutoRefresh.js'
 import { useSectionScroll } from '../lib/useSectionScroll.js'
@@ -32,7 +33,7 @@ export default function Reports() {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchParams, setSearchParams] = useSearchParams()
-  const [period, setPeriod] = usePersistedFilter(
+  const [period, setPeriod, periodMeta] = usePersistedFilter(
     'jsv_filter_reports_period',
     REPORT_PERIODS.includes(searchParams.get('period')) ? searchParams.get('period') : undefined,
     'All'
@@ -210,6 +211,7 @@ export default function Reports() {
             {p}
           </button>
         ))}
+        <ClearFiltersButton filters={[periodMeta]} onClear={() => periodMeta.clear()} />
       </div>
 
       <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>

@@ -10,6 +10,7 @@ import EmptyState from '../components/EmptyState.jsx'
 import '../styles/components.css'
 import TableSkeleton from '../components/TableSkeleton.jsx'
 import ColumnChooser from '../components/ColumnChooser.jsx'
+import ClearFiltersButton from '../components/ClearFiltersButton.jsx'
 import { usePersistedFilter } from '../lib/usePersistedFilter.js'
 import { useAutoRefresh } from '../lib/useAutoRefresh.js'
 
@@ -33,7 +34,7 @@ export default function FollowUps() {
   const [leads, setLeads] = useState([])
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = usePersistedFilter('jsv_filter_followups_tab', undefined, 'Today')
+  const [tab, setTab, tabMeta] = usePersistedFilter('jsv_filter_followups_tab', undefined, 'Today')
   const [visibleCols, setVisibleCols] = useState(FOLLOWUP_COLUMNS.map((c) => c.key))
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(emptyForm())
@@ -103,6 +104,7 @@ export default function FollowUps() {
       </div>
 
       <div className="filters-bar" style={{ justifyContent: 'flex-end' }}>
+        <ClearFiltersButton filters={[tabMeta]} onClear={() => tabMeta.clear()} />
         <ColumnChooser columns={FOLLOWUP_COLUMNS} storageKey="jsv_cols_followups" onChange={setVisibleCols} />
       </div>
 

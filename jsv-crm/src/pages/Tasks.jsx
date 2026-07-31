@@ -8,6 +8,7 @@ import ExportBar from '../components/ExportBar.jsx'
 import { IconPlus, IconSearch, IconEdit, IconTrash } from '../components/Icons.jsx'
 import EmptyState from '../components/EmptyState.jsx'
 import CardSkeleton from '../components/CardSkeleton.jsx'
+import ClearFiltersButton from '../components/ClearFiltersButton.jsx'
 import { usePersistedFilter } from '../lib/usePersistedFilter.js'
 import { useAutoRefresh } from '../lib/useAutoRefresh.js'
 import '../styles/components.css'
@@ -27,8 +28,8 @@ export default function Tasks() {
   const canDelete = can('tasks', 'delete')
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = usePersistedFilter('jsv_filter_tasks_tab', undefined, 'All')
-  const [search, setSearch] = usePersistedFilter('jsv_filter_tasks_search', undefined, '')
+  const [tab, setTab, tabMeta] = usePersistedFilter('jsv_filter_tasks_tab', undefined, 'All')
+  const [search, setSearch, searchMeta] = usePersistedFilter('jsv_filter_tasks_search', undefined, '')
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyForm())
@@ -131,6 +132,7 @@ export default function Tasks() {
           <IconSearch width={15} height={15} />
           <input placeholder="Search tasks, assignee, company…" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
+        <ClearFiltersButton filters={[tabMeta, searchMeta]} onClear={() => { tabMeta.clear(); searchMeta.clear() }} />
       </div>
 
       <div className="tabs-bar" style={{ marginBottom: 16 }}>
