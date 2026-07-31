@@ -13,6 +13,7 @@ import ColumnChooser from '../components/ColumnChooser.jsx'
 import ClearFiltersButton from '../components/ClearFiltersButton.jsx'
 import { usePersistedFilter } from '../lib/usePersistedFilter.js'
 import { useAutoRefresh } from '../lib/useAutoRefresh.js'
+import { showToast } from '../lib/toast.js'
 
 const TABS = ['Today', 'Upcoming', 'Overdue', 'Completed', 'All']
 
@@ -29,6 +30,15 @@ function emptyForm() {
   return { date: '', type: 'Call', lead: '', contact: '', notes: '', status: 'Upcoming' }
 }
 
+function todayISO() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function addDaysISO(dateStr, days) {
+  const d = dateStr ? new Date(dateStr) : new Date()
+  return new Date(d.getTime() + days * 86400000).toISOString().slice(0, 10)
+}
+
 export default function FollowUps() {
   const [items, setItems] = useState([])
   const [leads, setLeads] = useState([])
@@ -39,6 +49,10 @@ export default function FollowUps() {
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(emptyForm())
   const [saving, setSaving] = useState(false)
+  const [completing, setCompleting] = useState(null) // the follow-up being marked complete
+  const [scheduleNext, setScheduleNext] = useState(true)
+  const [nextForm, setNextForm] = useState({ date: '', type: 'Call', notes: '' })
+  const [completingSaving, setCompletingSaving] = useState(false)
 
   useEffect(() => { refresh() }, [])
   useEffect(() => { Promise.all([api.leads.list(), api.customers.list()]).then(([l, c]) => { setLeads(l); setCustomers(c) }).catch(() => {}) }, [])
@@ -73,6 +87,39 @@ export default function FollowUps() {
     setShowModal(false)
     setForm(emptyForm())
     refresh()
+  }
+
+  function openComplete(f) {
+    setCompleting(f)
+    setScheduleNext(true)
+    setNextForm({ date: addDaysISO(todayISO(), 7), type: f.type, notes: '' })
+  }
+
+  async function handleMarkComplete(e) {
+    e.preventDefault()
+    setCompletingSaving(true)
+    try {
+      await api.followUps.update(completing.id, { status: 'Completed' })
+      if (scheduleNext) {
+        await api.followUps.insert({
+          date: nextForm.date,
+          type: nextForm.type,
+          lead: completing.lead,
+          contact: completing.contact,
+          notes: nextForm.notes,
+          status: nextForm.date === todayISO() ? 'Today' : 'Upcoming',
+        })
+        showToast(`Follow-up completed — next one scheduled for ${nextForm.date}`)
+      } else {
+        showToast('Follow-up marked complete')
+      }
+      setCompleting(null)
+      refresh()
+    } catch (err) {
+      showToast('Could not update: ' + (err.message || 'Unknown error'), 'error')
+    } finally {
+      setCompletingSaving(false)
+    }
   }
 
   return (
@@ -148,6 +195,16 @@ export default function FollowUps() {
               <tr key={f.id}>
                 {visibleCols.map((key) => cell(key))}
                 <td style={{ display: 'flex', gap: 4 }}>
+                  {f.status !== 'Completed' && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      title="Mark complete and optionally schedule the next follow-up"
+                      onClick={() => openComplete(f)}
+                    >
+                      ✓ Complete
+                    </button>
+                  )}
                   <SendButtons
                     phone={phone}
                     email={email}
@@ -207,6 +264,51 @@ export default function FollowUps() {
                 <option>Today</option><option>Upcoming</option><option>Overdue</option><option>Completed</option>
               </select>
             </div>
+          </form>
+        </Modal>
+      )}
+
+      {completing && (
+        <Modal
+          title="Mark Follow-up Complete"
+          onClose={() => setCompleting(null)}
+          footer={
+            <>
+              <button className="btn btn-secondary" onClick={() => setCompleting(null)}>Cancel</button>
+              <button className="btn btn-primary" form="complete-followup-form" type="submit" disabled={completingSaving}>
+                {completingSaving ? 'Saving…' : 'Done'}
+              </button>
+            </>
+          }
+        >
+          <form id="complete-followup-form" onSubmit={handleMarkComplete}>
+            <p className="sub" style={{ marginTop: -4, marginBottom: 14 }}>
+              {completing.lead} · {completing.type} on {completing.date}
+            </p>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, cursor: 'pointer' }}>
+              <input type="checkbox" checked={scheduleNext} onChange={(e) => setScheduleNext(e.target.checked)} />
+              <span style={{ fontSize: 13.5, fontWeight: 500 }}>Schedule the next follow-up</span>
+            </label>
+            {scheduleNext && (
+              <>
+                <div className="field-row">
+                  <div className="field">
+                    <label>Next Date</label>
+                    <input type="date" required value={nextForm.date} onChange={(e) => setNextForm({ ...nextForm, date: e.target.value })} />
+                  </div>
+                  <div className="field">
+                    <label>Type</label>
+                    <select value={nextForm.type} onChange={(e) => setNextForm({ ...nextForm, type: e.target.value })}>
+                      <option>Call</option><option>Email</option><option>Meeting</option><option>Sample Dispatch</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="field">
+                  <label>Notes</label>
+                  <textarea rows={2} placeholder="What's this follow-up about?" value={nextForm.notes} onChange={(e) => setNextForm({ ...nextForm, notes: e.target.value })} />
+                </div>
+              </>
+            )}
           </form>
         </Modal>
       )}
