@@ -475,10 +475,21 @@ export default function Shell({ children }) {
             <div ref={searchRef} style={{ position: 'relative' }}>
               <button
                 onClick={() => setShowSearch((v) => !v)}
-                title="Search everything"
-                style={{ background: 'transparent', border: '1px solid var(--paper-200)', borderRadius: 'var(--radius-sm)', padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--ink-500)' }}
+                title="Search everything (⌘K)"
+                style={{ position: 'relative', background: 'transparent', border: '1px solid var(--paper-200)', borderRadius: 'var(--radius-sm)', padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--ink-500)' }}
               >
                 <IconSearch width={15} height={15} />
+                <span
+                  className="shortcut-badge"
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute', top: -7, right: -8, background: 'var(--navy-900)', color: '#fff',
+                    fontSize: 8.5, fontWeight: 700, fontFamily: 'var(--font-mono)', borderRadius: 4,
+                    padding: '1.5px 3.5px', lineHeight: 1.2, letterSpacing: 0.2, border: '1.5px solid var(--paper-0)',
+                  }}
+                >
+                  ⌘K
+                </span>
               </button>
               {showSearch && (
                 <div className="search-dropdown" style={{ position: 'absolute', top: 38, right: 0, width: 360, background: '#fff', border: '1px solid var(--paper-200)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-pop)', zIndex: 200, overflow: 'hidden' }}>

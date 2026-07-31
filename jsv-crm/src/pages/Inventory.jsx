@@ -15,7 +15,7 @@ import BulkActionsBar from '../components/BulkActionsBar.jsx'
 import Pagination from '../components/Pagination.jsx'
 import {
   IconPlus, IconSearch, IconLayers, IconTrash, IconClock, IconUpload,
-  IconBarcode, IconQrCode, IconTransfer, IconAlertTriangle,
+  IconBarcode, IconQrCode, IconTransfer, IconAlertTriangle, IconPause, IconPlay,
 } from '../components/Icons.jsx'
 import TableSkeleton from '../components/TableSkeleton.jsx'
 import { useAuth } from '../lib/AuthContext.jsx'
@@ -160,7 +160,13 @@ export default function Inventory() {
   const [showExpiryBanner, setShowExpiryBanner] = useState(true)
 
   useEffect(() => { refresh() }, [])
-  useAutoRefresh(() => refresh(true), 60000)
+  // Auto-refresh pause toggle — Inventory is where people linger longest
+  // inside modals (stock entry, transfers, QR codes), so a background
+  // refresh swapping the list under them is more disruptive here than
+  // elsewhere. Persisted so the choice sticks across visits.
+  const [autoRefreshPaused, setAutoRefreshPaused] = useState(() => localStorage.getItem('jsv_autorefresh_paused_inventory') === 'true')
+  useEffect(() => { localStorage.setItem('jsv_autorefresh_paused_inventory', autoRefreshPaused) }, [autoRefreshPaused])
+  useAutoRefresh(() => refresh(true), 60000, autoRefreshPaused)
 
   // Location/godown suggestions: the starter list plus any locations
   // already in use across stock, so the list grows on its own as
@@ -768,6 +774,15 @@ export default function Inventory() {
           Show archived
         </label>
         <ColumnChooser columns={INVENTORY_COLUMNS} storageKey="jsv_cols_inventory" onChange={setVisibleCols} />
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          onClick={() => setAutoRefreshPaused((v) => !v)}
+          title={autoRefreshPaused ? 'Auto-refresh is paused — click to resume' : 'Pause auto-refresh (useful while a modal is open)'}
+        >
+          {autoRefreshPaused ? <IconPlay width={13} height={13} /> : <IconPause width={13} height={13} />}
+          {autoRefreshPaused ? 'Refresh paused' : 'Auto-refresh on'}
+        </button>
         <ClearFiltersButton
           filters={[searchMeta, warehouseMeta, statusMeta]}
           onClear={() => { searchMeta.clear(); warehouseMeta.clear(); statusMeta.clear() }}

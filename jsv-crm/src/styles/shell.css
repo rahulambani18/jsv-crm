@@ -303,6 +303,7 @@
   .topbar-right { gap: 6px !important; }
   .topbar-clock { display: none; }           /* live clock is a nice-to-have, not worth the space on a phone */
   .topbar-iso { display: none; }              /* ISO badge text is long; drop it below tablet width */
+  .shortcut-badge { display: none; }          /* ⌘K isn't a thing on a phone keyboard */
   .notif-dropdown, .search-dropdown {
     position: fixed !important;
     top: 56px !important;

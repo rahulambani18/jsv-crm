@@ -117,3 +117,9 @@ export const IconAlertTriangle = (p) => (
 export const IconKey = (p) => (
   <svg {...base} {...p}><circle cx="8" cy="14" r="4"/><path d="M11 11l9-9"/><path d="M16 6l2.5 2.5"/><path d="M13 9l2 2"/></svg>
 )
+export const IconPause = (p) => (
+  <svg {...base} {...p}><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+)
+export const IconPlay = (p) => (
+  <svg {...base} {...p}><path d="M7 4.5v15l13-7.5-13-7.5z"/></svg>
+)
