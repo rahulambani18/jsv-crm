@@ -5,7 +5,7 @@ import {
   IconGrid, IconUsers, IconClock, IconUserCheck, IconFlask,
   IconFile, IconCart, IconBox, IconChart, IconLogout, IconPanel, IconShield,
   IconCheckSquare, IconCalendar, IconFolder, IconReceipt, IconCreditCard, IconSearch,
-  IconLayers, IconTrend,
+  IconLayers, IconTrend, IconChevronLeft, IconChevronRight,
 } from './Icons.jsx'
 import { api } from '../lib/api.js'
 import { availableQty } from '../lib/stockStatus.js'
@@ -38,6 +38,12 @@ const ADMIN_NAV = [
 export default function Shell({ children }) {
   const { user, signOut, can } = useAuth()
   const [navOpen, setNavOpen] = useState(false)
+  // Desktop-only "collapse to icons" state — persists across sessions.
+  // Separate from navOpen (which is the mobile off-canvas show/hide).
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('jsv_sidebar_collapsed') === 'true')
+  useEffect(() => {
+    localStorage.setItem('jsv_sidebar_collapsed', collapsed)
+  }, [collapsed])
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -308,13 +314,22 @@ export default function Shell({ children }) {
   return (
     <div className="shell">
       {navOpen && <div className="sidebar-backdrop" onClick={() => setNavOpen(false)} />}
-      <aside className={`sidebar ${navOpen ? 'open' : ''}`}>
+      <aside className={`sidebar ${navOpen ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
         <div className="sidebar-brand">
           <img src={jsvMark} alt="JSV" style={{ height: 30, width: 'auto', flexShrink: 0 }} />
           <div className="brand-text">
             <h1>JSV CRM</h1>
             <p>Food Additives &amp; Chemicals</p>
           </div>
+          <button
+            type="button"
+            className="sidebar-collapse-toggle"
+            onClick={() => setCollapsed((v) => !v)}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {collapsed ? <IconChevronRight width={14} height={14} /> : <IconChevronLeft width={14} height={14} />}
+          </button>
         </div>
 
         <div className="sidebar-section">
@@ -328,9 +343,10 @@ export default function Shell({ children }) {
               end={to === '/'}
               className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
               onClick={() => setNavOpen(false)}
+              title={collapsed ? label : undefined}
             >
               <Icon />
-              {label}
+              <span className="nav-label">{label}</span>
             </NavLink>
           ))}
 
@@ -343,9 +359,10 @@ export default function Shell({ children }) {
                   to={to}
                   className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
                   onClick={() => setNavOpen(false)}
+                  title={collapsed ? label : undefined}
                 >
                   <Icon />
-                  {label}
+                  <span className="nav-label">{label}</span>
                 </NavLink>
               ))}
             </>
@@ -353,13 +370,13 @@ export default function Shell({ children }) {
         </nav>
 
         <div className="sidebar-footer">
-          <span className="iso-pill"><span className="dot" /> ISO 9001:2015 Certified</span>
+          <span className="iso-pill"><span className="dot" /> <span className="nav-label">ISO 9001:2015 Certified</span></span>
           <div className="user-row">
             <span className="name">{user?.name || 'User'} {user?.role ? `(${user.role})` : ''}</span>
             <span className="role">{user?.role || user?.title || 'Sales Executive'}</span>
           </div>
-          <button className="signout-btn" onClick={signOut}>
-            <IconLogout /> Sign out
+          <button className="signout-btn" onClick={signOut} title={collapsed ? 'Sign out' : undefined}>
+            <IconLogout /> <span className="nav-label">Sign out</span>
           </button>
         </div>
       </aside>

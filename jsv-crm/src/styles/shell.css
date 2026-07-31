@@ -23,7 +23,24 @@
   gap: 10px;
   padding: 20px 18px;
   border-bottom: 1px solid rgba(255,255,255,0.08);
+  position: relative;
 }
+
+.sidebar-collapse-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: var(--navy-900);
+  color: var(--navy-200);
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.sidebar-collapse-toggle:hover { background: rgba(255,255,255,0.1); color: #fff; }
 
 .brand-mark {
   width: 36px;
@@ -234,6 +251,46 @@
 }
 @media (min-width: 901px) {
   .sidebar-backdrop { display: none; }
+  .sidebar-collapse-toggle { display: flex; }
+
+  .sidebar.collapsed {
+    width: 68px;
+  }
+  .sidebar.collapsed .sidebar-brand {
+    padding: 20px 12px;
+    justify-content: center;
+  }
+  .sidebar.collapsed .brand-text { display: none; }
+  .sidebar.collapsed .sidebar-collapse-toggle {
+    position: absolute;
+    right: -11px;
+    top: 24px;
+    margin-left: 0;
+    background: var(--navy-800, var(--navy-900));
+  }
+  .sidebar.collapsed .sidebar-section,
+  .sidebar.collapsed .sidebar-label,
+  .sidebar.collapsed .nav-label,
+  .sidebar.collapsed .iso-pill,
+  .sidebar.collapsed .user-row {
+    display: none;
+  }
+  .sidebar.collapsed .nav-item {
+    justify-content: center;
+    padding: 10px 0;
+    margin: 1px 10px;
+  }
+  .sidebar.collapsed .sidebar-footer {
+    padding: 14px 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .sidebar.collapsed .signout-btn {
+    width: 40px;
+    height: 36px;
+    padding: 0;
+  }
 }
 @keyframes backdrop-fade-in {
   from { opacity: 0; }
