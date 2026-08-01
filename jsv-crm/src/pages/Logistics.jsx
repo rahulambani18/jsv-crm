@@ -68,6 +68,7 @@ export default function Logistics() {
   const [orders, setOrders] = useState([])
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
 
@@ -89,10 +90,17 @@ export default function Logistics() {
   useAutoRefresh(() => refresh(true), 60000)
 
   function refresh(silent = false) {
-    if (!silent) setLoading(true)
-    Promise.all([api.shipments.list(), api.customers.list(), api.orders.list(), api.invoices.list()]).then(([s, c, o, inv]) => {
-      setShipments(s); setCustomers(c); setOrders(o); setInvoices(inv); setLoading(false)
-    })
+    if (!silent) { setLoading(true); setLoadError(null) }
+    Promise.all([api.shipments.list(), api.customers.list(), api.orders.list(), api.invoices.list()])
+      .then(([s, c, o, inv]) => {
+        setShipments(s); setCustomers(c); setOrders(o); setInvoices(inv); setLoading(false); setLoadError(null)
+      })
+      .catch((err) => {
+        console.error('Logistics: failed to load data', err)
+        setLoading(false)
+        setLoadError(err?.message || 'Something went wrong loading this page.')
+        if (!silent) showToast('Could not load shipments. ' + (err?.message || 'Please try again.'), 'error')
+      })
   }
 
   const companyOptions = useMemo(() => customers.map((c) => c.company), [customers])
@@ -338,6 +346,16 @@ export default function Logistics() {
               <tbody>
                 {loading ? (
                   <TableSkeleton cols={visibleCols.length + ((canEdit || canDelete) ? 1 : 0)} rows={6} />
+                ) : loadError ? (
+                  <tr className="empty-row"><td colSpan={visibleCols.length + ((canEdit || canDelete) ? 1 : 0)}>
+                    <EmptyState
+                      icon="⚠️"
+                      title="Couldn't load shipments"
+                      subtitle={loadError}
+                      actionLabel="Retry"
+                      onAction={() => refresh()}
+                    />
+                  </td></tr>
                 ) : filtered.length === 0 ? (
                   <tr className="empty-row"><td colSpan={visibleCols.length + ((canEdit || canDelete) ? 1 : 0)}>
                     {shipments.length === 0 ? (

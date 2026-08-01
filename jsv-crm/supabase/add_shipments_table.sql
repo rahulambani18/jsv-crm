@@ -10,6 +10,7 @@ create table if not exists shipments (
   workspace_id uuid references workspaces(id),
   shipment_no text not null,
   order_no text,
+  invoice_no text,
   company text,
   origin text,
   destination text,
