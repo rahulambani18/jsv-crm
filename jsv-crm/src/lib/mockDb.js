@@ -7,6 +7,7 @@ import {
   seedQuotations, seedOrders, seedFollowUps, seedRoles, seedUsers,
   seedTasks, seedMeetings, seedDocuments,
   seedInvoices, seedPayments, seedStock, seedStockMovements,
+  seedShipments,
 } from '../data/seed.js'
 
 const store = {
@@ -28,6 +29,7 @@ const store = {
   stockMovements: [...seedStockMovements],
   creditNotes: [],
   debitNotes: [],
+  shipments: [...seedShipments],
   userPermissions: {}, // { [userId]: { [moduleKey]: { view, edit, delete } } }
 }
 
@@ -104,6 +106,7 @@ export const mockDb = {
   stockMovements: table('stockMovements'),
   creditNotes: table('creditNotes'),
   debitNotes: table('debitNotes'),
+  shipments: table('shipments'),
   userPermissions: {
     async get(userId) {
       await delay(80)

@@ -5,7 +5,7 @@
 import { supabase, isMock, db as mock } from './supabaseClient.js'
 import { mockAuth, mockAuditLog } from './mockDb.js'
 
-const TABLES = ['products', 'leads', 'customers', 'samples', 'quotations', 'orders', 'followUps', 'roles', 'users', 'tasks', 'meetings', 'documents', 'invoices', 'payments', 'stock', 'stockMovements', 'creditNotes', 'debitNotes']
+const TABLES = ['products', 'leads', 'customers', 'samples', 'quotations', 'orders', 'followUps', 'roles', 'users', 'tasks', 'meetings', 'documents', 'invoices', 'payments', 'stock', 'stockMovements', 'creditNotes', 'debitNotes', 'shipments']
 const SQL_TABLE_NAME = {
   products: 'products',
   leads: 'leads',
@@ -25,6 +25,7 @@ const SQL_TABLE_NAME = {
   stockMovements: 'stock_movements',
   creditNotes: 'credit_notes',
   debitNotes: 'debit_notes',
+  shipments: 'shipments',
 }
 
 // Pages write/read plain camelCase fields (estValue, nextFollowUp,
@@ -62,11 +63,12 @@ const MODULE_LABEL = {
   meetings: 'Meeting', documents: 'Document', invoices: 'Invoice', payments: 'Payment',
   stock: 'Stock', stockMovements: 'Stock Movement',
   creditNotes: 'Credit Note', debitNotes: 'Debit Note',
+  shipments: 'Shipment',
 }
 
 function pickLabel(record) {
   if (!record) return ''
-  const candidates = [record.company, record.name, record.title, record.orderNo, record.invoiceNo, record.quoteNo, record.paymentNo, record.noteNo, record.code, record.fullName]
+  const candidates = [record.company, record.name, record.title, record.orderNo, record.invoiceNo, record.quoteNo, record.paymentNo, record.noteNo, record.shipmentNo, record.code, record.fullName]
   return String(candidates.find((v) => v) || record.id || '').slice(0, 200)
 }
 
@@ -399,7 +401,7 @@ async function buildUserObject(authUser, profile) {
   })
 
   // Admin always gets full access regardless of permission rows
-  const ALL_MODULES = ['dashboard','leads','follow_ups','customers','samples','quotations','orders','inventory','products','reports','users','tasks','meetings','documents','invoices','payments']
+  const ALL_MODULES = ['dashboard','leads','follow_ups','customers','samples','quotations','orders','inventory','products','reports','users','tasks','meetings','documents','invoices','payments','logistics']
   if (roleName === 'Admin') {
     ALL_MODULES.forEach((m) => { permissions[m] = { view: true, edit: true, delete: true } })
   }

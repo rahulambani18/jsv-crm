@@ -218,6 +218,7 @@ export const MODULES = [
   { key: 'tasks', label: 'Tasks' },
   { key: 'meetings', label: 'Meetings' },
   { key: 'documents', label: 'Documents' },
+  { key: 'logistics', label: 'Logistics' },
   { key: 'users', label: 'Users & Roles' },
 ]
 
@@ -273,6 +274,7 @@ export const seedRoles = [
       tasks: { view: true, edit: true },
       meetings: { view: true, edit: true },
       documents: { view: true, edit: true },
+      logistics: { view: true, edit: true },
       users: { view: false, edit: false },
     },
   },
@@ -291,4 +293,52 @@ export const seedInvoices = [
 
 export const seedPayments = [
   { id: 'pay1', paymentNo: 'PAY-2026-0021', invoiceId: 'inv1', company: 'Patel Agro Industries', amount: 186501, date: '2026-06-18', mode: 'NEFT', reference: 'NEFT2026061800123', notes: 'Full payment received', status: 'Completed' },
+]
+
+// ---------- Logistics / Transport ----------
+// Standalone shipment/trip records — optionally reference an order via
+// orderNo, but don't require one (e.g. a sample courier run or a direct
+// pickup). freightPaidBy/freightPaymentStatus drive the Transporters
+// ledger tab (amounts owed to each transporter for "To Pay"/prepaid trips).
+export const seedShipments = [
+  {
+    id: 'sh1', shipmentNo: 'SHP-2026-0041', orderNo: 'ORD-2026-0301', invoiceNo: 'INV-2026-0041', company: 'Patel Agro Industries',
+    origin: 'Mumbai (Bhiwandi)', destination: 'Rajkot, Gujarat', transporter: 'VRL Logistics',
+    vehicleNo: 'MH04AB1234', driverName: 'Suresh Yadav', driverPhone: '+91 98200 11223', mode: 'Road',
+    lrNumber: 'LR-88213', dispatchDate: '2026-06-16', expectedDelivery: '2026-06-18', actualDelivery: '2026-06-18',
+    status: 'Delivered', distanceKm: 280, freightCost: 8500, freightPaidBy: 'Us (Prepaid)', freightPaymentStatus: 'Paid', amountPaid: 8500,
+    ewayBillNo: '', notes: 'Standard drum packaging, handled with care slip attached.',
+  },
+  {
+    id: 'sh2', shipmentNo: 'SHP-2026-0042', orderNo: 'ORD-2026-0302', invoiceNo: 'INV-2026-0042', company: 'Himalaya Dairy Co.',
+    origin: 'Delhi (Siraspur)', destination: 'Chandigarh, Punjab', transporter: 'Delhivery',
+    vehicleNo: 'DL1LAB4567', driverName: 'Ramesh Kumar', driverPhone: '+91 98110 22334', mode: 'Road',
+    lrNumber: 'LR-88254', dispatchDate: '2026-06-27', expectedDelivery: '2026-06-29', actualDelivery: '2026-06-29',
+    status: 'Delivered', distanceKm: 250, freightCost: 6200, freightPaidBy: 'Us (Prepaid)', freightPaymentStatus: 'Unpaid', amountPaid: 0,
+    ewayBillNo: '', notes: '',
+  },
+  {
+    id: 'sh3', shipmentNo: 'SHP-2026-0043', orderNo: '', invoiceNo: '', company: 'Vitalia Beverages Ltd',
+    origin: 'Mumbai (Bhiwandi)', destination: 'Gurugram, Haryana', transporter: 'VRL Logistics',
+    vehicleNo: 'MH04CD5566', driverName: 'Anil Sharma', driverPhone: '+91 98200 44556', mode: 'Road',
+    lrNumber: 'LR-88301', dispatchDate: '2026-06-30', expectedDelivery: '2026-07-03', actualDelivery: '',
+    status: 'In Transit', distanceKm: 1420, freightCost: 21000, freightPaidBy: 'Us (Prepaid)', freightPaymentStatus: 'Partial', amountPaid: 10000,
+    ewayBillNo: '', notes: 'Full truckload — combined with another customer\'s order.',
+  },
+  {
+    id: 'sh4', shipmentNo: 'SHP-2026-0044', orderNo: '', invoiceNo: '', company: 'Devansh Foods Pvt Ltd',
+    origin: 'Mumbai (Bhiwandi)', destination: 'Ahmedabad, Gujarat', transporter: 'Blue Dart',
+    vehicleNo: '', driverName: '', driverPhone: '', mode: 'Road',
+    lrNumber: '', dispatchDate: '2026-07-01', expectedDelivery: '2026-07-04', actualDelivery: '',
+    status: 'Pending', distanceKm: 530, freightCost: 4800, freightPaidBy: 'Customer (To Pay)', freightPaymentStatus: 'Unpaid', amountPaid: 0,
+    ewayBillNo: '', notes: 'Awaiting vehicle allocation from transporter.',
+  },
+  {
+    id: 'sh5', shipmentNo: 'SHP-2026-0040', orderNo: '', invoiceNo: '', company: 'Greenleaf Organics',
+    origin: 'Mumbai (Bhiwandi)', destination: 'Pune, Maharashtra', transporter: 'Delhivery',
+    vehicleNo: 'MH12EF7788', driverName: 'Vikas Patil', driverPhone: '+91 98220 55667', mode: 'Road',
+    lrNumber: 'LR-88190', dispatchDate: '2026-06-12', expectedDelivery: '2026-06-13', actualDelivery: '2026-06-14',
+    status: 'Delayed', distanceKm: 150, freightCost: 3200, freightPaidBy: 'Us (Prepaid)', freightPaymentStatus: 'Paid', amountPaid: 3200,
+    ewayBillNo: '', notes: 'Delayed a day due to vehicle breakdown, delivered fine.',
+  },
 ]

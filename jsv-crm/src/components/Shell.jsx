@@ -5,7 +5,7 @@ import {
   IconGrid, IconUsers, IconClock, IconUserCheck, IconFlask,
   IconFile, IconCart, IconBox, IconChart, IconLogout, IconPanel, IconShield,
   IconCheckSquare, IconCalendar, IconFolder, IconReceipt, IconCreditCard, IconSearch,
-  IconLayers, IconTrend, IconChevronLeft, IconChevronRight,
+  IconLayers, IconTrend, IconChevronLeft, IconChevronRight, IconTruck,
 } from './Icons.jsx'
 import { api } from '../lib/api.js'
 import { availableQty } from '../lib/stockStatus.js'
@@ -21,6 +21,7 @@ const NAV = [
   { to: '/samples', label: 'Samples', icon: IconFlask, key: 'samples' },
   { to: '/quotations', label: 'Quotations', icon: IconFile, key: 'quotations' },
   { to: '/orders', label: 'Orders', icon: IconCart, key: 'orders' },
+  { to: '/logistics', label: 'Logistics', icon: IconTruck, key: 'logistics' },
   { to: '/inventory', label: 'Inventory', icon: IconLayers, key: 'inventory' },
   { to: '/products', label: 'Products', icon: IconBox, key: 'products' },
   { to: '/reports', label: 'Reports', icon: IconChart, key: 'reports' },
@@ -255,6 +256,7 @@ export default function Shell({ children }) {
     { table: 'products', label: 'Product', path: '/products', match: (r) => [r.name, r.category, r.supplier] },
     { table: 'stock', label: 'Stock', path: '/inventory', match: (r) => [r.product, r.warehouse] },
     { table: 'samples', label: 'Sample', path: '/samples', match: (r) => [r.code, r.company, r.tracking] },
+    { table: 'shipments', label: 'Shipment', path: '/logistics', match: (r) => [r.shipmentNo, r.company, r.vehicleNo, r.lrNumber, r.transporter] },
   ]
 
   useEffect(() => {

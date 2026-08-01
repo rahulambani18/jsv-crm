@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { api } from '../lib/api.js'
 import { useAuth } from '../lib/AuthContext.jsx'
 import PageHeader from '../components/PageHeader.jsx'
@@ -18,7 +18,7 @@ import EInvoiceModal from '../components/EInvoiceModal.jsx'
 import EWayBillModal from '../components/EWayBillModal.jsx'
 import PaymentLinkModal from '../components/PaymentLinkModal.jsx'
 import CreditDebitNoteModal from '../components/CreditDebitNoteModal.jsx'
-import { IconPlus, IconSearch, IconEdit, IconTrash, IconReceipt, IconDollarSign, IconFlame, IconClock } from '../components/Icons.jsx'
+import { IconPlus, IconSearch, IconEdit, IconTrash, IconReceipt, IconDollarSign, IconFlame, IconClock, IconTruck } from '../components/Icons.jsx'
 import StatCard from '../components/StatCard.jsx'
 import Dropdown from '../components/Dropdown.jsx'
 import { isInvoiceOverdue } from '../lib/overdue.js'
@@ -358,6 +358,7 @@ export default function Invoices() {
   const [loading, setLoading] = useState(true)
   const [visibleCols, setVisibleCols] = useState(INVOICE_COLUMNS.map((c) => c.key))
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
   const [search, setSearch, searchMeta] = usePersistedFilter('jsv_filter_invoices_search', searchParams.get('q'), '')
   const [statusFilter, setStatusFilter, statusMeta] = usePersistedFilter('jsv_filter_invoices_status', undefined, 'All')
   const [overdueOnly, setOverdueOnly, overdueMeta] = usePersistedFilter('jsv_filter_invoices_overdueOnly', searchParams.get('overdue') === '1' ? true : undefined, false)
@@ -783,6 +784,13 @@ export default function Invoices() {
                       'divider',
                       { label: 'E-Invoice', icon: '🧾', onClick: () => setEInvoiceTarget(inv) },
                       { label: 'E-Way Bill', icon: '🚚', onClick: () => setEwayBillTarget(inv) },
+                      {
+                        label: 'Track Shipment', icon: <IconTruck width={13} height={13} />,
+                        onClick: () => {
+                          const order = orders.find((o) => o.id === inv.orderId)
+                          navigate(`/logistics?invoice=${encodeURIComponent(inv.invoiceNo)}${order ? `&order=${encodeURIComponent(order.orderNo)}` : ''}&q=${encodeURIComponent(inv.invoiceNo)}`)
+                        },
+                      },
                       'divider',
                       canEdit && { label: 'Credit Note', icon: '➖', onClick: () => setNoteModal({ type: 'Credit', invoice: inv }) },
                       canEdit && { label: 'Debit Note', icon: '➕', onClick: () => setNoteModal({ type: 'Debit', invoice: inv }) },

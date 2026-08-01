@@ -17,6 +17,7 @@ database with two environment variables when you're ready.
 - **Samples** — sample dispatch tracking with courier tracking numbers
 - **Quotations** — quote list with totals and validity
 - **Orders** — orders by warehouse, delivery, payment status
+- **Logistics** — shipment/trip tracking (vehicle, transporter, LR no., freight cost) and a per-transporter freight ledger, linked to Orders and Invoices
 - **Inventory** — stock on hand by warehouse, reorder levels, expiry tracking
 - **Products** — master catalogue (category, supplier, origin, MOQ, docs)
 - **Reports** — conversion funnel, revenue trend, industry split, orders by warehouse

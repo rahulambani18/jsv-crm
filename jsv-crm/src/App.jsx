@@ -19,6 +19,7 @@ import Documents from './pages/Documents.jsx'
 import Invoices from './pages/Invoices.jsx'
 import Payments from './pages/Payments.jsx'
 import Reconciliation from './pages/Reconciliation.jsx'
+import Logistics from './pages/Logistics.jsx'
 import ToastStack from './components/ToastStack.jsx'
 import './styles/components.css'
 
@@ -56,6 +57,7 @@ function AppRoutes() {
       <Route path="/invoices" element={<Protected><Invoices /></Protected>} />
       <Route path="/payments" element={<Protected><Payments /></Protected>} />
       <Route path="/reconciliation" element={<Protected><Reconciliation /></Protected>} />
+      <Route path="/logistics" element={<Protected><Logistics /></Protected>} />
       <Route path="/users" element={<Protected><UsersAndRoles /></Protected>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

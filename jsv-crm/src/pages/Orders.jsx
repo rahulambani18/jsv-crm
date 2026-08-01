@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { api } from '../lib/api.js'
 import { WAREHOUSES, calcOrderTotals, GST_RATE } from '../data/seed.js'
 import PageHeader from '../components/PageHeader.jsx'
 import ExportBar from '../components/ExportBar.jsx'
 import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
-import { IconPlus, IconTrash, IconEdit, IconSearch } from '../components/Icons.jsx'
+import { IconPlus, IconTrash, IconEdit, IconSearch, IconTruck } from '../components/Icons.jsx'
 import Dropdown from '../components/Dropdown.jsx'
 import ComboField from '../components/ComboField.jsx'
 import BulkActionsBar from '../components/BulkActionsBar.jsx'
@@ -78,6 +78,7 @@ export default function Orders() {
   const canEdit = can('orders', 'edit')
   const canDelete = can('orders', 'delete')
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
   const [search, setSearch, searchMeta] = usePersistedFilter('jsv_filter_orders_search', searchParams.get('q'), '')
   const [orders, setOrders] = useState([])
   const [customers, setCustomers] = useState([])
@@ -477,14 +478,14 @@ export default function Orders() {
               {visibleCols.map((key) => (
                 <th key={key}>{ORDER_COLUMNS.find((c) => c.key === key)?.label}</th>
               ))}
-              {(canEdit || canDelete) && <th>Actions</th>}
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <TableSkeleton cols={visibleCols.length + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)} rows={6} />
+              <TableSkeleton cols={visibleCols.length + (canEdit ? 1 : 0) + 1} rows={6} />
             ) : filtered.length === 0 ? (
-              <tr className="empty-row"><td colSpan={visibleCols.length + (canEdit ? 1 : 0) + ((canEdit || canDelete) ? 1 : 0)}>
+              <tr className="empty-row"><td colSpan={visibleCols.length + (canEdit ? 1 : 0) + 1}>
                 {orders.length === 0 ? (
                   <EmptyState
                     icon="🛒"
@@ -575,14 +576,19 @@ export default function Orders() {
                   </td>
                 )}
                 {visibleCols.map((key) => cell(key))}
-                {(canEdit || canDelete) && (
-                  <td>
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      {canEdit && <button className="btn btn-ghost btn-sm" onClick={() => openEdit(o)}><IconEdit width={13} height={13} /></button>}
-                      {canDelete && <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(o)}><IconTrash width={13} height={13} /></button>}
-                    </div>
-                  </td>
-                )}
+                <td>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      title="Track / create shipment for this order"
+                      onClick={() => navigate(`/logistics?order=${encodeURIComponent(o.orderNo)}&q=${encodeURIComponent(o.orderNo)}`)}
+                    >
+                      <IconTruck width={13} height={13} />
+                    </button>
+                    {canEdit && <button className="btn btn-ghost btn-sm" onClick={() => openEdit(o)}><IconEdit width={13} height={13} /></button>}
+                    {canDelete && <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(o)}><IconTrash width={13} height={13} /></button>}
+                  </div>
+                </td>
               </tr>
             )})}
           </tbody>
