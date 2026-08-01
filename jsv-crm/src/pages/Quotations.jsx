@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api.js'
+import { WAREHOUSES, GST_RATE, calcOrderTotals } from '../data/seed.js'
 import PageHeader from '../components/PageHeader.jsx'
 import ExportBar from '../components/ExportBar.jsx'
 import Pill from '../components/Pill.jsx'
@@ -10,6 +11,8 @@ import Pagination from '../components/Pagination.jsx'
 import RowActionsMenu from '../components/RowActionsMenu.jsx'
 import BulkActionsBar from '../components/BulkActionsBar.jsx'
 import BulkSendModal from '../components/BulkSendModal.jsx'
+import ComboField from '../components/ComboField.jsx'
+import Dropdown from '../components/Dropdown.jsx'
 import { IconPlus, IconTrash, IconSearch, IconEdit } from '../components/Icons.jsx'
 import { useAuth } from '../lib/AuthContext.jsx'
 import { showToast } from '../lib/toast.js'
@@ -39,6 +42,31 @@ function emptyForm() {
   return { company: '', validUntil: '', status: 'Draft', lineItems: [emptyLineItem()] }
 }
 
+function addDays(dateStr, days) {
+  if (!dateStr || days == null) return ''
+  return new Date(new Date(dateStr).getTime() + days * 86400000).toISOString().slice(0, 10)
+}
+
+// Quotation line items track packingSize (no unit/uom); Orders track
+// unit + lineTotal instead. Carries product/qty/price across and fills
+// in sane order-side defaults for the rest.
+function orderLineItemsFromQuote(lineItems) {
+  return (lineItems || []).map((li) => ({
+    product: li.product, qty: li.qty, unit: 'kg', unitPrice: li.price,
+  }))
+}
+
+function emptyConvertForm(q, customers) {
+  const customer = customers.find((c) => c.company === q.company)
+  const today = new Date().toISOString().slice(0, 10)
+  return {
+    customerId: customer?.id || '', company: q.company, warehouse: WAREHOUSES[0],
+    orderDate: today, delivery: '', paymentTerms: 'Net 30', paymentDueDate: addDays(today, 30),
+    poNumber: '', poDate: today, deliveryCharge: 0,
+    lineItems: orderLineItemsFromQuote(q.lineItems),
+  }
+}
+
 export default function Quotations() {
   const { can } = useAuth()
   const canEdit = can('quotations', 'edit')
@@ -50,6 +78,7 @@ export default function Quotations() {
   const [customers, setCustomers] = useState([])
   const [users, setUsers] = useState([])
   const [invoices, setInvoices] = useState([])
+  const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [visibleCols, setVisibleCols] = useState(QUOTATION_COLUMNS.map((c) => c.key))
   const [showModal, setShowModal] = useState(false)
@@ -58,10 +87,14 @@ export default function Quotations() {
   const [editingId, setEditingId] = useState(null)
   const [selected, setSelected] = useState(new Set())
   const [sendModal, setSendModal] = useState(null) // 'whatsapp' | 'email' | null
+  const [convertQuote, setConvertQuote] = useState(null)
+  const [convertForm, setConvertForm] = useState(null)
+  const [converting, setConverting] = useState(false)
 
   useEffect(() => { refresh() }, [])
   useEffect(() => { api.users.list().then(setUsers).catch(() => {}) }, [])
   useEffect(() => { api.invoices.list().then(setInvoices).catch(() => {}) }, [])
+  useEffect(() => { api.orders.list().then(setOrders).catch(() => {}) }, [])
   useAutoRefresh(() => refresh(true), 60000)
 
   function refresh(silent = false) {
@@ -155,6 +188,70 @@ export default function Quotations() {
       refresh()
     } catch (err) {
       showToast('Could not delete: ' + (err.message || 'Unknown error'), 'error')
+    }
+  }
+
+  // A quotation is "converted" once any order carries its id as
+  // quoteId — set the same way orders already link back to the
+  // invoices generated from them.
+  function convertedOrderFor(q) {
+    return orders.find((o) => o.quoteId === q.id)
+  }
+
+  function openConvert(q) {
+    setConvertQuote(q)
+    setConvertForm(emptyConvertForm(q, customers))
+    setConverting(false)
+  }
+
+  function updateConvertLineItem(i, patch) {
+    setConvertForm((f) => {
+      const items = [...f.lineItems]
+      items[i] = { ...items[i], ...patch }
+      return { ...f, lineItems: items }
+    })
+  }
+  function addConvertLineItem() {
+    setConvertForm((f) => ({ ...f, lineItems: [...f.lineItems, { product: '', qty: '', unit: 'kg', unitPrice: '' }] }))
+  }
+  function removeConvertLineItem(i) {
+    setConvertForm((f) => ({ ...f, lineItems: f.lineItems.filter((_, idx) => idx !== i) }))
+  }
+
+  const convertTotals = useMemo(
+    () => (convertForm ? calcOrderTotals(convertForm.lineItems, GST_RATE, convertForm.deliveryCharge) : null),
+    [convertForm]
+  )
+
+  async function handleConvertSubmit(e) {
+    e.preventDefault()
+    setConverting(true)
+    const lineItems = convertForm.lineItems
+      .filter((li) => li.product && Number(li.qty) > 0)
+      .map((li) => ({ ...li, lineTotal: Math.round((Number(li.qty) || 0) * (Number(li.unitPrice) || 0) * 100) / 100 }))
+    const { subtotal, gstAmount, deliveryCharge, total } = calcOrderTotals(lineItems, GST_RATE, convertForm.deliveryCharge)
+    const record = {
+      customerId: convertForm.customerId, company: convertForm.company, warehouse: convertForm.warehouse,
+      orderDate: convertForm.orderDate, delivery: convertForm.delivery, lineItems,
+      subtotal, gstRate: GST_RATE, gstAmount, deliveryCharge, total,
+      status: 'Processing', payment: 'Pending',
+      paymentTerms: convertForm.paymentTerms, paymentDueDate: convertForm.paymentDueDate,
+      poNumber: convertForm.poNumber, poDate: convertForm.poDate || convertForm.orderDate,
+      quoteId: convertQuote.id,
+      orderNo: `ORD-2026-${String(300 + orders.length + 1).padStart(4, '0')}`,
+    }
+    if (!record.poNumber) record.poNumber = record.orderNo.replace('ORD-', 'PO-')
+    try {
+      await api.orders.insert(record)
+      showToast(`Order created from quotation ${convertQuote.quoteNo}`)
+      setConvertQuote(null)
+      setConvertForm(null)
+      const o = await api.orders.list()
+      setOrders(o)
+    } catch (err) {
+      showToast('Could not create order: ' + (err.message || 'Unknown error'), 'error')
+    } finally {
+      setConverting(false)
     }
   }
 
@@ -381,9 +478,16 @@ export default function Quotations() {
                   <RowActionsMenu
                     items={[
                       { label: 'Edit', icon: <IconEdit width={13} height={13} />, onClick: () => openEdit(q) },
+                      can('orders', 'edit') && {
+                        label: convertedOrderFor(q) ? 'Already converted' : 'Convert to Order',
+                        icon: '🛒',
+                        disabled: !!convertedOrderFor(q),
+                        disabledReason: convertedOrderFor(q) ? `Already converted to order ${convertedOrderFor(q).orderNo}` : undefined,
+                        onClick: () => openConvert(q),
+                      },
                       'divider',
                       { label: 'Delete', icon: <IconTrash width={13} height={13} />, danger: true, onClick: () => handleDelete(q) },
-                    ]}
+                    ].filter(Boolean)}
                   />
                 </td>
               </tr>
@@ -505,6 +609,165 @@ export default function Quotations() {
                 </select>
               </div>
             </div>
+          </form>
+        </Modal>
+      )}
+
+      {convertQuote && convertForm && (
+        <Modal
+          title={`Convert "${convertQuote.quoteNo}" to Order`}
+          onClose={() => { setConvertQuote(null); setConvertForm(null) }}
+          footer={
+            <>
+              <button className="btn btn-secondary" onClick={() => { setConvertQuote(null); setConvertForm(null) }}>Cancel</button>
+              <button className="btn btn-primary" form="convert-quote-form" type="submit" disabled={converting}>
+                {converting ? 'Creating…' : 'Create order'}
+              </button>
+            </>
+          }
+        >
+          <form id="convert-quote-form" onSubmit={handleConvertSubmit}>
+            <div className="field-row">
+              <div className="field">
+                <label>Customer</label>
+                <select
+                  value={convertForm.customerId}
+                  onChange={(e) => {
+                    const customerId = e.target.value
+                    const customer = customers.find((c) => c.id === customerId)
+                    setConvertForm((f) => ({ ...f, customerId, company: customer?.company || f.company }))
+                  }}
+                >
+                  <option value="">No matching customer — link later</option>
+                  {customers.map((c) => <option key={c.id} value={c.id}>{c.company}</option>)}
+                </select>
+              </div>
+              <div className="field">
+                <label>Company name</label>
+                <input required value={convertForm.company} onChange={(e) => setConvertForm({ ...convertForm, company: e.target.value })} />
+              </div>
+            </div>
+            {!convertForm.customerId && (
+              <div style={{
+                background: 'var(--amber-50, #fff8e6)', border: '1px solid var(--amber-600)', borderRadius: 'var(--radius-sm)',
+                padding: '8px 10px', fontSize: 12.5, color: 'var(--amber-700, #92400e)', marginBottom: 14,
+              }}>
+                ⚠ No customer record matches "{convertForm.company}" yet. You can still create the order, or convert this company to a customer first.
+              </div>
+            )}
+            <div className="field">
+              <label>Warehouse</label>
+              <ComboField
+                options={WAREHOUSES}
+                value={convertForm.warehouse}
+                onChange={(v) => setConvertForm({ ...convertForm, warehouse: v })}
+                placeholder="Select warehouse…"
+              />
+            </div>
+            <div className="field-row">
+              <div className="field">
+                <label>Order date</label>
+                <input type="date" value={convertForm.orderDate} onChange={(e) => setConvertForm({ ...convertForm, orderDate: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>Expected delivery</label>
+                <input type="date" value={convertForm.delivery} onChange={(e) => setConvertForm({ ...convertForm, delivery: e.target.value })} />
+              </div>
+            </div>
+            <div className="field-row">
+              <div className="field">
+                <label>Payment terms</label>
+                <Dropdown
+                  options={['Due on Receipt', 'Net 15', 'Net 30', 'Net 45', 'Net 60', 'Custom']}
+                  value={convertForm.paymentTerms}
+                  onChange={(v) => setConvertForm({ ...convertForm, paymentTerms: v })}
+                />
+              </div>
+              <div className="field">
+                <label>Purchase order number</label>
+                <input value={convertForm.poNumber} onChange={(e) => setConvertForm({ ...convertForm, poNumber: e.target.value })} placeholder="Leave blank to auto-generate" />
+              </div>
+            </div>
+
+            <div className="field">
+              <label>Line items</label>
+              <div style={{ border: '1px solid var(--paper-200)', borderRadius: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                <table style={{ width: '100%', minWidth: 480, fontSize: 12.5, borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--paper-0)' }}>
+                      <th style={{ textAlign: 'left', padding: '8px 8px', fontWeight: 600, fontSize: 11 }}>Product</th>
+                      <th style={{ textAlign: 'left', padding: '8px 6px', fontWeight: 600, fontSize: 11, width: 64 }}>Qty</th>
+                      <th style={{ textAlign: 'left', padding: '8px 6px', fontWeight: 600, fontSize: 11, width: 64 }}>Unit</th>
+                      <th style={{ textAlign: 'left', padding: '8px 6px', fontWeight: 600, fontSize: 11, width: 90 }}>Unit Price</th>
+                      <th style={{ textAlign: 'right', padding: '8px 8px', fontWeight: 600, fontSize: 11, width: 90 }}>Total</th>
+                      <th style={{ width: 30 }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {convertForm.lineItems.map((li, i) => (
+                      <tr key={i} style={{ borderTop: '1px solid var(--paper-100)' }}>
+                        <td style={{ padding: 6 }}>
+                          <select value={li.product} onChange={(e) => updateConvertLineItem(i, { product: e.target.value })} style={{ width: '100%', fontSize: 12.5, padding: '6px 8px' }}>
+                            <option value="">Select product…</option>
+                            {products.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}
+                          </select>
+                        </td>
+                        <td style={{ padding: 6 }}>
+                          <input type="number" min="0" value={li.qty} onChange={(e) => updateConvertLineItem(i, { qty: e.target.value })} style={{ width: '100%', fontSize: 12.5, padding: '6px 8px' }} />
+                        </td>
+                        <td style={{ padding: 6 }}>
+                          <select value={li.unit} onChange={(e) => updateConvertLineItem(i, { unit: e.target.value })} style={{ width: '100%', fontSize: 12.5, padding: '6px 8px' }}>
+                            <option value="kg">kg</option>
+                            <option value="g">g</option>
+                            <option value="MT">MT</option>
+                            <option value="L">L</option>
+                          </select>
+                        </td>
+                        <td style={{ padding: 6 }}>
+                          <input type="number" min="0" value={li.unitPrice} onChange={(e) => updateConvertLineItem(i, { unitPrice: e.target.value })} style={{ width: '100%', fontSize: 12.5, padding: '6px 8px' }} />
+                        </td>
+                        <td className="cell-mono" style={{ padding: '6px 8px', textAlign: 'right' }}>
+                          {fmt((Number(li.qty) || 0) * (Number(li.unitPrice) || 0))}
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <button type="button" className="btn btn-ghost btn-sm" onClick={() => removeConvertLineItem(i)} disabled={convertForm.lineItems.length === 1}>
+                            <IconTrash width={13} height={13} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={addConvertLineItem} style={{ marginTop: 8 }}>
+                <IconPlus width={13} height={13} /> Add line item
+              </button>
+            </div>
+
+            {convertTotals && (
+              <div style={{ marginTop: 14, padding: '12px 14px', background: 'var(--paper-0)', borderRadius: 8, fontSize: 13 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span style={{ color: 'var(--ink-500)' }}>Subtotal</span>
+                  <span className="cell-mono">{fmt(convertTotals.subtotal)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <span style={{ color: 'var(--ink-500)' }}>Delivery charges</span>
+                  <input
+                    type="number" min="0" value={convertForm.deliveryCharge}
+                    onChange={(e) => setConvertForm({ ...convertForm, deliveryCharge: e.target.value })}
+                    style={{ width: 110, textAlign: 'right', fontSize: 12.5, padding: '4px 8px' }}
+                  />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span style={{ color: 'var(--ink-500)' }}>GST ({GST_RATE}%) on subtotal + delivery</span>
+                  <span className="cell-mono">{fmt(convertTotals.gstAmount)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 14.5, paddingTop: 6, borderTop: '1px solid var(--paper-200)' }}>
+                  <span>Total (incl. GST + delivery)</span>
+                  <span className="cell-mono">{fmt(convertTotals.total)}</span>
+                </div>
+              </div>
+            )}
           </form>
         </Modal>
       )}

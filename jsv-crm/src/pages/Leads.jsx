@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api.js'
-import { PIPELINE_STAGES, INDUSTRY_OPTIONS } from '../data/seed.js'
+import { PIPELINE_STAGES, INDUSTRY_OPTIONS, INDIAN_STATES } from '../data/seed.js'
 import PageHeader from '../components/PageHeader.jsx'
 import ExportBar from '../components/ExportBar.jsx'
 import Pill from '../components/Pill.jsx'
 import Modal from '../components/Modal.jsx'
 import ComboField from '../components/ComboField.jsx'
 import MultiComboField from '../components/MultiComboField.jsx'
+import Dropdown from '../components/Dropdown.jsx'
 import BulkActionsBar from '../components/BulkActionsBar.jsx'
+import RowActionsMenu from '../components/RowActionsMenu.jsx'
 import SendButtons from '../components/SendButtons.jsx'
 import Pagination from '../components/Pagination.jsx'
 import { IconPlus, IconSearch, IconTrash } from '../components/Icons.jsx'
@@ -42,6 +44,17 @@ function emptyForm() {
   return { company: '', contact: '', phone: '', city: '', priority: 'Medium', status: 'New Lead', estValue: '', nextFollowUp: '', industry: '', products: [] }
 }
 
+// Maps a lead's fields onto the Customer shape — anything Customers
+// tracks that Leads don't (GST, business type, state, addresses) is
+// left blank for the rep to fill in on the conversion modal.
+function customerFormFromLead(lead) {
+  return {
+    company: lead.company || '', contact: lead.contact || '', mobile: lead.phone || '',
+    email: lead.email || '', gst: '', businessType: '', industry: lead.industry || '',
+    application: '', city: lead.city || '', state: '', billingAddress: '', shippingAddress: '',
+  }
+}
+
 export default function Leads() {
   const { can } = useAuth()
   const canEdit = can('leads', 'edit')
@@ -60,6 +73,10 @@ export default function Leads() {
   const [saving, setSaving] = useState(false)
   const [selected, setSelected] = useState(new Set())
   const [users, setUsers] = useState([])
+  const [convertLead, setConvertLead] = useState(null)
+  const [convertForm, setConvertForm] = useState(null)
+  const [convertSameAsBilling, setConvertSameAsBilling] = useState(true)
+  const [converting, setConverting] = useState(false)
 
   useEffect(() => { refresh() }, [])
   useEffect(() => { api.users.list().then(setUsers).catch(() => {}) }, [])
@@ -133,6 +150,57 @@ export default function Leads() {
     setSelected((prev) =>
       prev.size === filtered.length ? new Set() : new Set(filtered.map((l) => l.id))
     )
+  }
+
+  function openConvert(lead) {
+    setConvertLead(lead)
+    setConvertForm(customerFormFromLead(lead))
+    setConvertSameAsBilling(true)
+    setConverting(false)
+  }
+
+  // The company name is what actually links a lead to a customer here
+  // (there's no separate customerId column) — a lead whose company
+  // already matches an existing customer is treated as converted, in
+  // addition to whatever came back from an in-app conversion. This
+  // catches customers created some other way too (import, manual entry).
+  const convertedCompanies = useMemo(
+    () => new Set(customers.map((c) => (c.company || '').trim().toLowerCase())),
+    [customers]
+  )
+  function isConverted(lead) {
+    return lead.status === 'Converted Customer' || convertedCompanies.has((lead.company || '').trim().toLowerCase())
+  }
+
+  const convertDuplicate = useMemo(
+    () => (convertForm ? findDuplicate(convertForm, [{ records: customers, label: 'customer' }], null) : null),
+    [convertForm, customers]
+  )
+
+  async function handleConvertSubmit(e) {
+    e.preventDefault()
+    if (convertDuplicate && !confirm(`${duplicateMessage(convertDuplicate)} Save anyway?`)) return
+    setConverting(true)
+    const record = {
+      ...convertForm,
+      shippingAddress: convertSameAsBilling ? convertForm.billingAddress : convertForm.shippingAddress,
+      code: `CUST-${String(customers.length + 1).padStart(4, '0')}`,
+      added: new Date().toISOString().slice(0, 10),
+    }
+    try {
+      await api.customers.insert(record)
+      await api.leads.update(convertLead.id, { status: 'Converted Customer' })
+      showToast(`${convertLead.company} converted to a customer`)
+      setConvertLead(null)
+      setConvertForm(null)
+      const [c] = await Promise.all([api.customers.list()])
+      setCustomers(c)
+      refresh()
+    } catch (err) {
+      showToast('Could not convert lead: ' + (err.message || 'Unknown error'), 'error')
+    } finally {
+      setConverting(false)
+    }
   }
 
   async function handleBulkDelete() {
@@ -328,7 +396,19 @@ export default function Leads() {
                         mailSubject={`Following up — ${l.company}`}
                         mailBody={`Dear ${l.contact || l.company},\n\nFollowing up on your enquiry with JSV Ingredient.\n\nRegards,\nJSV Ingredient`}
                       />
-                      {canDelete && <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDelete(l)}><IconTrash width={13} height={13} /></button>}
+                      <RowActionsMenu
+                        items={[
+                          canEdit && can('customers', 'edit') && {
+                            label: isConverted(l) ? 'Already a customer' : 'Convert to Customer',
+                            icon: '🤝',
+                            disabled: isConverted(l),
+                            disabledReason: 'This company is already a customer',
+                            onClick: () => openConvert(l),
+                          },
+                          canDelete && 'divider',
+                          canDelete && { label: 'Delete', icon: <IconTrash width={13} height={13} />, danger: true, onClick: () => handleDelete(l) },
+                        ].filter(Boolean)}
+                      />
                     </div>
                   </td>
                 )}
@@ -424,6 +504,110 @@ export default function Leads() {
                 placeholder="Select a product…"
               />
             </div>
+          </form>
+        </Modal>
+      )}
+
+      {convertLead && convertForm && (
+        <Modal
+          title={`Convert "${convertLead.company}" to Customer`}
+          onClose={() => { setConvertLead(null); setConvertForm(null) }}
+          footer={
+            <>
+              <button className="btn btn-secondary" onClick={() => { setConvertLead(null); setConvertForm(null) }}>Cancel</button>
+              <button className="btn btn-primary" form="convert-lead-form" type="submit" disabled={converting}>
+                {converting ? 'Converting…' : 'Create customer'}
+              </button>
+            </>
+          }
+        >
+          <form id="convert-lead-form" onSubmit={handleConvertSubmit}>
+            <p style={{ fontSize: 12.5, color: 'var(--ink-500)', marginTop: 0, marginBottom: 14 }}>
+              This creates a new customer record from this lead's details and marks the lead as "Converted Customer".
+              Fill in anything Customers tracks that this lead doesn't have yet.
+            </p>
+            <div className="field">
+              <label>Company name</label>
+              <input required value={convertForm.company} onChange={(e) => setConvertForm({ ...convertForm, company: e.target.value })} />
+            </div>
+            {convertDuplicate && (
+              <div style={{
+                background: 'var(--amber-50, #fff8e6)', border: '1px solid var(--amber-600)', borderRadius: 'var(--radius-sm)',
+                padding: '8px 10px', fontSize: 12.5, color: 'var(--amber-700, #92400e)', marginBottom: 12,
+              }}>
+                ⚠ {duplicateMessage(convertDuplicate)}
+              </div>
+            )}
+            <div className="field-row">
+              <div className="field">
+                <label>Contact person</label>
+                <input required value={convertForm.contact} onChange={(e) => setConvertForm({ ...convertForm, contact: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>Mobile</label>
+                <input value={convertForm.mobile} onChange={(e) => setConvertForm({ ...convertForm, mobile: e.target.value })} placeholder="+91 90000 00000" />
+              </div>
+            </div>
+            <div className="field-row">
+              <div className="field">
+                <label>Email</label>
+                <input type="email" value={convertForm.email} onChange={(e) => setConvertForm({ ...convertForm, email: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>GST number</label>
+                <input value={convertForm.gst} onChange={(e) => setConvertForm({ ...convertForm, gst: e.target.value })} />
+              </div>
+            </div>
+            <div className="field-row">
+              <div className="field">
+                <label>Business type</label>
+                <Dropdown
+                  options={['Trader', 'Manufacturer', 'Both']}
+                  value={convertForm.businessType}
+                  onChange={(v) => setConvertForm({ ...convertForm, businessType: v })}
+                  placeholder="Select type…"
+                />
+              </div>
+              <div className="field">
+                <label>Industry</label>
+                <ComboField options={INDUSTRY_OPTIONS} value={convertForm.industry} onChange={(v) => setConvertForm({ ...convertForm, industry: v })} placeholder="Select industry…" />
+              </div>
+            </div>
+            <div className="field">
+              <label>Application</label>
+              <input value={convertForm.application} onChange={(e) => setConvertForm({ ...convertForm, application: e.target.value })} placeholder="e.g. Flavoured Milk" />
+            </div>
+            <div className="field-row">
+              <div className="field">
+                <label>City</label>
+                <input value={convertForm.city} onChange={(e) => setConvertForm({ ...convertForm, city: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>State</label>
+                <Dropdown
+                  options={INDIAN_STATES}
+                  value={convertForm.state}
+                  onChange={(v) => setConvertForm({ ...convertForm, state: v })}
+                  placeholder="Select state…"
+                />
+              </div>
+            </div>
+            <div className="field">
+              <label>Billing address</label>
+              <textarea rows={2} value={convertForm.billingAddress} onChange={(e) => setConvertForm({ ...convertForm, billingAddress: e.target.value })} />
+            </div>
+            <div className="field">
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input type="checkbox" checked={convertSameAsBilling} onChange={(e) => setConvertSameAsBilling(e.target.checked)} style={{ width: 'auto' }} />
+                Shipping address same as billing
+              </label>
+            </div>
+            {!convertSameAsBilling && (
+              <div className="field">
+                <label>Shipping address</label>
+                <textarea rows={2} value={convertForm.shippingAddress} onChange={(e) => setConvertForm({ ...convertForm, shippingAddress: e.target.value })} />
+              </div>
+            )}
           </form>
         </Modal>
       )}
