@@ -513,7 +513,7 @@ export default function Shell({ children }) {
                 </span>
               </button>
               {showSearch && (
-                <div className="search-dropdown" style={{ position: 'absolute', top: 38, right: 0, width: 360, background: '#fff', border: '1px solid var(--paper-200)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-pop)', zIndex: 200, overflow: 'hidden' }}>
+                <div className="search-dropdown" style={{ position: 'absolute', top: 38, right: 0, width: 360, background: 'var(--paper-50)', border: '1px solid var(--paper-200)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-pop)', zIndex: 200, overflow: 'hidden' }}>
                   <div style={{ padding: 10, borderBottom: '1px solid var(--paper-100)' }}>
                     <input
                       autoFocus
@@ -558,7 +558,7 @@ export default function Shell({ children }) {
                 ☰
               </button>
               {showDensity && (
-                <div className="search-dropdown" style={{ position: 'absolute', top: 38, right: 0, width: 170, background: '#fff', border: '1px solid var(--paper-200)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-pop)', zIndex: 200, overflow: 'hidden' }}>
+                <div className="search-dropdown" style={{ position: 'absolute', top: 38, right: 0, width: 170, background: 'var(--paper-50)', border: '1px solid var(--paper-200)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-pop)', zIndex: 200, overflow: 'hidden' }}>
                   <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--paper-100)', fontWeight: 700, fontSize: 12 }}>Table density</div>
                   {DENSITIES.map((d) => (
                     <div
@@ -594,7 +594,7 @@ export default function Shell({ children }) {
                 )}
               </button>
               {showNotifs && (
-                <div className="notif-dropdown" style={{ position: 'absolute', top: 38, right: 0, width: 340, background: '#fff', border: '1px solid var(--paper-200)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-pop)', zIndex: 200, overflow: 'hidden' }}>
+                <div className="notif-dropdown" style={{ position: 'absolute', top: 38, right: 0, width: 340, background: 'var(--paper-50)', border: '1px solid var(--paper-200)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-pop)', zIndex: 200, overflow: 'hidden' }}>
                   <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--paper-100)', fontWeight: 700, fontSize: 13 }}>
                     Notifications {notifications.length > 0 && <span style={{ color: 'var(--ink-400)', fontWeight: 400 }}>({notifications.length})</span>}
                   </div>
@@ -639,7 +639,7 @@ export default function Shell({ children }) {
                 ❓
               </button>
               {showHelp && (
-                <div className="search-dropdown" style={{ position: 'absolute', top: 38, right: 0, width: 260, background: '#fff', border: '1px solid var(--paper-200)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-pop)', zIndex: 200, overflow: 'hidden' }}>
+                <div className="search-dropdown" style={{ position: 'absolute', top: 38, right: 0, width: 260, background: 'var(--paper-50)', border: '1px solid var(--paper-200)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-pop)', zIndex: 200, overflow: 'hidden' }}>
                   <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--paper-100)', fontWeight: 700, fontSize: 13 }}>Help</div>
                   <a href="mailto:smit.vora@jsvingredient.net?subject=JSV%20CRM%20support" style={{ display: 'block', padding: '10px 14px', fontSize: 13, color: 'var(--ink-800)', textDecoration: 'none', borderBottom: '1px solid var(--paper-100)' }}>✉️ Contact support</a>
                   <div
@@ -681,7 +681,7 @@ export default function Shell({ children }) {
                 {initials}
               </button>
               {showProfile && (
-                <div className="search-dropdown" style={{ position: 'absolute', top: 40, right: 0, width: 220, background: '#fff', border: '1px solid var(--paper-200)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-pop)', zIndex: 200, overflow: 'hidden' }}>
+                <div className="search-dropdown" style={{ position: 'absolute', top: 40, right: 0, width: 220, background: 'var(--paper-50)', border: '1px solid var(--paper-200)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-pop)', zIndex: 200, overflow: 'hidden' }}>
                   <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--paper-100)' }}>
                     <div style={{ fontWeight: 700, fontSize: 13.5 }}>{user?.name || 'User'}</div>
                     <div style={{ fontSize: 11.5, color: 'var(--ink-400)' }}>{user?.role ? user.role : ''}</div>
