@@ -9,6 +9,7 @@ import {
 } from './Icons.jsx'
 import { api } from '../lib/api.js'
 import { availableQty } from '../lib/stockStatus.js'
+import { getExpiringStock, isExpired, daysToExpiry } from '../lib/expiry.js'
 import jsvMark from '../assets/jsv-mark.png'
 import Modal from './Modal.jsx'
 import '../styles/shell.css'
@@ -112,6 +113,8 @@ export default function Shell({ children }) {
     'Overdue Follow-ups',
     'Out of Stock',
     'Low Stock',
+    'Expired Stock',
+    'Expiring Stock',
     'Reminder: Sample Follow-up',
     'Reminder: Payment Due',
     'Reminder: Quote Expiry',
@@ -126,6 +129,8 @@ export default function Shell({ children }) {
     'Overdue Follow-ups': '⏰',
     'Out of Stock': '📦',
     'Low Stock': '📉',
+    'Expired Stock': '☠️',
+    'Expiring Stock': '⌛',
     'Reminder: Sample Follow-up': '🧪',
     'Reminder: Payment Due': '💸',
     'Reminder: Quote Expiry': '⏳',
@@ -230,6 +235,20 @@ export default function Shell({ children }) {
           notifs.push({ id: `stk-out-${s.id}`, group: 'Out of Stock', text: `${s.product}${batchTag} — ${s.warehouse}`, sub: `0 ${s.unit || ''} available`, color: 'var(--red-600)', route: '/inventory' })
         } else if (reorder > 0 && available <= reorder) {
           notifs.push({ id: `stk-low-${s.id}`, group: 'Low Stock', text: `${s.product}${batchTag} — ${s.warehouse}`, sub: `${available} ${s.unit || ''} available · reorder at ${reorder}`, color: 'var(--amber-600)', route: '/inventory' })
+        }
+      })
+
+      // 7) Expiry alerts — reuses the same isExpired/isExpiringSoon
+      // logic as the Inventory page's Expiry column, so the bell
+      // always agrees with what that page shows. Expired batches are
+      // red; batches expiring within EXPIRY_WARNING_DAYS are amber.
+      getExpiringStock(stock, today).forEach((s) => {
+        const batchTag = s.batchNumber ? ` (${s.batchNumber})` : ''
+        if (isExpired(s, today)) {
+          notifs.push({ id: `exp-expired-${s.id}`, group: 'Expired Stock', text: `${s.product}${batchTag} — ${s.warehouse}`, sub: `Expired ${s.expiryDate}`, color: 'var(--red-600)', route: '/inventory' })
+        } else {
+          const d = daysToExpiry(s.expiryDate, today)
+          notifs.push({ id: `exp-soon-${s.id}`, group: 'Expiring Stock', text: `${s.product}${batchTag} — ${s.warehouse}`, sub: `Expires in ${d} day${d === 1 ? '' : 's'} · ${s.expiryDate}`, color: 'var(--amber-600)', route: '/inventory' })
         }
       })
 
