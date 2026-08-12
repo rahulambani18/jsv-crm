@@ -51,7 +51,7 @@ function emptyForm() {
   return {
     customerId: '', company: '', warehouse: WAREHOUSES[0], orderDate: '', delivery: '',
     paymentTerms: 'Net 30', paymentDueDate: '',
-    poNumber: '', poDate: '', dispatchDate: '',
+    poNumber: '', poDate: '', dispatchDate: '', assignedTo: '',
     lineItems: [emptyLineItem()], deliveryCharge: 0, status: 'Processing', payment: 'Pending',
   }
 }
@@ -67,6 +67,7 @@ const ORDER_COLUMNS = [
   { key: 'orderDate', label: 'Order Date' },
   { key: 'delivery', label: 'Expected Delivery' },
   { key: 'dispatchDate', label: 'Dispatch Date' },
+  { key: 'assignedTo', label: 'Assigned To' },
   { key: 'total', label: 'Total (incl. GST)' },
   { key: 'status', label: 'Status' },
   { key: 'payment', label: 'Payment' },
@@ -253,8 +254,8 @@ export default function Orders() {
     const rows = filtered.filter((o) => selected.has(o.id))
     exportCSV(
       'Orders',
-      ['PO Number', 'Order #', 'Company', 'Warehouse', 'Order Date', 'Expected Delivery', 'Dispatch Date', 'Total', 'Status', 'Payment', 'Shipping Docs'],
-      rows.map((o) => [o.poNumber, o.orderNo, o.company, o.warehouse, o.orderDate, o.delivery, o.dispatchDate, `₹${Number(o.total).toLocaleString('en-IN')}`, o.status, o.payment, DOCS_ELIGIBLE_STATUSES.includes(o.status) ? `${docsCollectedCount(o.shippingDocs)}/${SHIPPING_DOC_FIELDS.length}` : '—'])
+      ['PO Number', 'Order #', 'Company', 'Warehouse', 'Order Date', 'Expected Delivery', 'Dispatch Date', 'Assigned To', 'Total', 'Status', 'Payment', 'Shipping Docs'],
+      rows.map((o) => [o.poNumber, o.orderNo, o.company, o.warehouse, o.orderDate, o.delivery, o.dispatchDate, o.assignedTo || 'Unassigned', `₹${Number(o.total).toLocaleString('en-IN')}`, o.status, o.payment, DOCS_ELIGIBLE_STATUSES.includes(o.status) ? `${docsCollectedCount(o.shippingDocs)}/${SHIPPING_DOC_FIELDS.length}` : '—'])
     )
   }
 
@@ -368,7 +369,7 @@ export default function Orders() {
       subtotal, gstRate: GST_RATE, gstAmount, deliveryCharge, total,
       status: form.status, payment: form.payment,
       paymentTerms: form.paymentTerms, paymentDueDate: form.paymentDueDate,
-      poNumber: form.poNumber, poDate: form.poDate, dispatchDate: form.dispatchDate,
+      poNumber: form.poNumber, poDate: form.poDate, dispatchDate: form.dispatchDate, assignedTo: form.assignedTo,
     }
     try {
       if (editingId) {
@@ -512,6 +513,7 @@ export default function Orders() {
                   case 'orderDate': return <td key={key} className="cell-mono">{o.orderDate}</td>
                   case 'delivery': return <td key={key} className="cell-mono">{o.delivery}</td>
                   case 'dispatchDate': return <td key={key} className="cell-mono">{o.dispatchDate || <span className="cell-muted">—</span>}</td>
+                  case 'assignedTo': return <td key={key}>{o.assignedTo || <span className="cell-muted">Unassigned</span>}</td>
                   case 'total': return (
                     <td key={key} className="cell-mono cell-strong">
                       {formatINR(o.total)}
@@ -686,6 +688,13 @@ export default function Orders() {
             <div className="field">
               <label>Dispatch date</label>
               <input type="date" value={form.dispatchDate} onChange={(e) => setForm({ ...form, dispatchDate: e.target.value })} />
+            </div>
+            <div className="field">
+              <label>Assigned to</label>
+              <select value={form.assignedTo} onChange={(e) => setForm({ ...form, assignedTo: e.target.value })}>
+                <option value="">Unassigned</option>
+                {users.map((u) => <option key={u.id} value={u.name}>{u.name}</option>)}
+              </select>
             </div>
 
             <div className="field">

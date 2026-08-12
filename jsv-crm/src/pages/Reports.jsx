@@ -31,6 +31,7 @@ function formatINR(n) {
 export default function Reports() {
   const [leads, setLeads] = useState([])
   const [orders, setOrders] = useState([])
+  const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchParams, setSearchParams] = useSearchParams()
   const [period, setPeriod, periodMeta] = usePersistedFilter(
@@ -44,8 +45,8 @@ export default function Reports() {
 
   function loadData(silent = false) {
     if (!silent) setLoading(true)
-    return Promise.all([api.leads.list(), api.orders.list()]).then(([l, o]) => {
-      setLeads(l); setOrders(o); setLoading(false)
+    return Promise.all([api.leads.list(), api.orders.list(), api.users.list().catch(() => [])]).then(([l, o, u]) => {
+      setLeads(l); setOrders(o); setUsers(u); setLoading(false)
     })
   }
 
@@ -102,6 +103,21 @@ export default function Reports() {
     return Object.entries(counts).map(([name, count]) => ({ name, count }))
   }, [filteredOrders])
 
+  // Sales revenue split by the rep each order is assigned to (Orders'
+  // "Assign to…" bulk action). Orders with no rep set yet are grouped
+  // under "Unassigned" rather than dropped, so the total still ties
+  // back to Total Revenue above.
+  const revenueByRep = useMemo(() => {
+    const totals = {}
+    filteredOrders.forEach((o) => {
+      const rep = o.assignedTo || 'Unassigned'
+      totals[rep] = (totals[rep] || 0) + Number(o.total || 0)
+    })
+    return Object.entries(totals)
+      .map(([rep, revenue]) => ({ rep, revenue }))
+      .sort((a, b) => b.revenue - a.revenue)
+  }, [filteredOrders])
+
   // Flat metric list reused by Download PDF / Download Excel (via
   // ExportBar) so the exported file matches what's on screen for the
   // selected period, not just the raw table data.
@@ -113,7 +129,8 @@ export default function Reports() {
     ...funnelData.map((f) => [`Pipeline — ${f.stage}`, f.count]),
     ...industryData.map((i) => [`Industry — ${i.name}`, i.value]),
     ...warehouseData.map((w) => [`Warehouse — ${w.name}`, w.count]),
-  ], [totalLeads, conversionRate, filteredOrders.length, totalRevenue, funnelData, industryData, warehouseData])
+    ...revenueByRep.map((r) => [`Revenue — ${r.rep}`, formatINR(r.revenue)]),
+  ], [totalLeads, conversionRate, filteredOrders.length, totalRevenue, funnelData, industryData, warehouseData, revenueByRep])
 
   const shareSubject = `JSV Ingredient — Sales Report (${periodLabel(period)})`
   const shareMessage = useMemo(() => [
@@ -277,6 +294,24 @@ export default function Reports() {
                 <YAxis type="category" dataKey="name" tick={{ fontSize: 11.5, fill: 'var(--ink-700)' }} axisLine={false} tickLine={false} width={140} />
                 <Tooltip />
                 <Bar dataKey="count" fill="#0f1e3d" radius={[0, 4, 4, 0]} barSize={22} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
+
+      <div className="panel-row">
+        <div className="panel" style={{ flex: '1 1 100%' }}>
+          <p className="panel-title">Sales Revenue by Salesperson</p>
+          {revenueByRep.length === 0 ? (
+            <p style={{ color: 'var(--ink-300)', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>No orders yet.</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={Math.max(180, revenueByRep.length * 42)}>
+              <BarChart data={revenueByRep} layout="vertical" margin={{ left: 24 }}>
+                <XAxis type="number" tickFormatter={(v) => `₹${v / 1000}k`} tick={{ fontSize: 11, fill: 'var(--ink-500)' }} axisLine={false} tickLine={false} />
+                <YAxis type="category" dataKey="rep" tick={{ fontSize: 11.5, fill: 'var(--ink-700)' }} axisLine={false} tickLine={false} width={140} />
+                <Tooltip formatter={(v) => formatINR(v)} />
+                <Bar dataKey="revenue" fill="#0d9488" radius={[0, 4, 4, 0]} barSize={22} />
               </BarChart>
             </ResponsiveContainer>
           )}
