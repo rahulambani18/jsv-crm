@@ -5,7 +5,7 @@ import {
   IconGrid, IconUsers, IconClock, IconUserCheck, IconFlask,
   IconFile, IconCart, IconBox, IconChart, IconLogout, IconPanel, IconShield,
   IconCheckSquare, IconCalendar, IconFolder, IconReceipt, IconCreditCard, IconSearch,
-  IconLayers, IconTrend, IconChevronLeft, IconChevronRight, IconTruck,
+  IconLayers, IconTrend, IconChevronLeft, IconChevronRight, IconTruck, IconTransfer,
 } from './Icons.jsx'
 import { api } from '../lib/api.js'
 import { availableQty } from '../lib/stockStatus.js'
@@ -22,6 +22,7 @@ const NAV = [
   { to: '/samples', label: 'Samples', icon: IconFlask, key: 'samples' },
   { to: '/quotations', label: 'Quotations', icon: IconFile, key: 'quotations' },
   { to: '/orders', label: 'Orders', icon: IconCart, key: 'orders' },
+  { to: '/purchases', label: 'Purchases', icon: IconTransfer, key: 'purchases' },
   { to: '/logistics', label: 'Logistics', icon: IconTruck, key: 'logistics' },
   { to: '/inventory', label: 'Inventory', icon: IconLayers, key: 'inventory' },
   { to: '/products', label: 'Products', icon: IconBox, key: 'products' },
@@ -344,6 +345,7 @@ export default function Shell({ children }) {
     l: { path: '/leads', label: 'Leads' },
     c: { path: '/customers', label: 'Customers' },
     o: { path: '/orders', label: 'Orders' },
+    u: { path: '/purchases', label: 'Purchases' },
     q: { path: '/quotations', label: 'Quotations' },
     i: { path: '/invoices', label: 'Invoices' },
     p: { path: '/payments', label: 'Payments' },

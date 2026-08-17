@@ -210,6 +210,7 @@ export const MODULES = [
   { key: 'samples', label: 'Samples' },
   { key: 'quotations', label: 'Quotations' },
   { key: 'orders', label: 'Orders' },
+  { key: 'purchases', label: 'Purchases' },
   { key: 'invoices', label: 'Invoices' },
   { key: 'payments', label: 'Payments' },
   { key: 'inventory', label: 'Inventory' },
@@ -266,6 +267,7 @@ export const seedRoles = [
       samples: { view: true, edit: true },
       quotations: { view: true, edit: true },
       orders: { view: true, edit: true },
+      purchases: { view: true, edit: false },
       invoices: { view: true, edit: true },
       payments: { view: true, edit: true },
       inventory: { view: true, edit: false },
@@ -300,6 +302,56 @@ export const seedPayments = [
 // orderNo, but don't require one (e.g. a sample courier run or a direct
 // pickup). freightPaidBy/freightPaymentStatus drive the Transporters
 // ledger tab (amounts owed to each transporter for "To Pay"/prepaid trips).
+// ---------- Purchase / Procurement ----------
+export const seedSuppliers = [
+  { id: 'sup1', code: 'SUPP-0001', name: 'RZBC', contact: 'Wei Chen', phone: '+86 512 6688 1122', email: 'wei.chen@rzbc.com', city: 'Suzhou', state: '', gst: '', category: 'Acidity Regulators / Anti Oxidants', paymentTerms: 'Net 45', notes: 'Primary Citric Acid supplier, LC payment preferred', status: 'Active', added: '2025-11-02' },
+  { id: 'sup2', code: 'SUPP-0002', name: 'Emerald Kalama', contact: 'Mark Reynolds', phone: '+1 253 872 8200', email: 'mark.reynolds@emeraldkalama.com', city: 'Tacoma', state: '', gst: '', category: 'Preservatives', paymentTerms: 'Net 30', notes: '', status: 'Active', added: '2025-11-10' },
+  { id: 'sup3', code: 'SUPP-0003', name: 'CP Kelco', contact: 'Anna Suwanto', phone: '+63 2 8845 2200', email: 'anna.suwanto@cpkelco.com', city: 'Manila', state: '', gst: '', category: 'Thickener and Stabilizer', paymentTerms: 'Net 30', notes: 'Carrageenan + Xanthan Gum', status: 'Active', added: '2025-12-01' },
+  { id: 'sup4', code: 'SUPP-0004', name: 'Jungbunzlauer', contact: 'Peter Hoffmann', phone: '+43 1 89 100 0', email: 'peter.hoffmann@jungbunzlauer.com', city: 'Vienna', state: '', gst: '', category: 'Lactic Acid & Lactates', paymentTerms: 'Net 60', notes: 'Annual contract renewed March', status: 'Active', added: '2026-01-15' },
+  { id: 'sup5', code: 'SUPP-0005', name: 'Harihar Organics', contact: 'Vishal Rao', phone: '+91 79 2630 1122', email: 'vishal@hariharorganics.in', city: 'Ahmedabad', state: 'Gujarat', gst: '24AABCH2345K1Z8', category: 'Other Food Additives', paymentTerms: 'Net 15', notes: 'Domestic supplier, GST invoicing', status: 'Active', added: '2026-02-04' },
+]
+
+function poLineItems(items) {
+  return items.map((li) => ({ ...li, lineTotal: Math.round(li.qty * li.unitPrice * 100) / 100, qtyReceived: li.qtyReceived || 0 }))
+}
+
+export const seedPurchaseOrders = [
+  {
+    id: 'po1', poNo: 'PUR-2026-0001', supplierId: 'sup1', supplier: 'RZBC', warehouse: 'Mumbai (Bhiwandi)',
+    orderDate: '2026-06-01', expectedDelivery: '2026-07-02',
+    lineItems: poLineItems([{ product: 'Citric Acid', qty: 1000, unit: 'kg', unitPrice: 195, qtyReceived: 1000 }]),
+    subtotal: 195000, gstRate: 18, gstAmount: 35100, total: 230100,
+    status: 'Received', assignedTo: 'Rahul', notes: '',
+    receipts: [{ id: 'grn1', date: '2026-07-02', items: [{ product: 'Citric Acid', qty: 1000 }], notes: 'Full quantity received, quality OK', receivedBy: 'Rahul' }],
+  },
+  {
+    id: 'po2', poNo: 'PUR-2026-0002', supplierId: 'sup2', supplier: 'Emerald Kalama', warehouse: 'Mumbai (Bhiwandi)',
+    orderDate: '2026-06-20', expectedDelivery: '2026-07-20',
+    lineItems: poLineItems([{ product: 'Sodium Benzoate', qty: 300, unit: 'kg', unitPrice: 560, qtyReceived: 150 }]),
+    subtotal: 168000, gstRate: 18, gstAmount: 30240, total: 198240,
+    status: 'Partially Received', assignedTo: 'Priya Shah', notes: 'Split shipment, second half awaited',
+    receipts: [{ id: 'grn2', date: '2026-07-10', items: [{ product: 'Sodium Benzoate', qty: 150 }], notes: 'First half received', receivedBy: 'Priya Shah' }],
+  },
+  {
+    id: 'po3', poNo: 'PUR-2026-0003', supplierId: 'sup3', supplier: 'CP Kelco', warehouse: 'Delhi (Siraspur)',
+    orderDate: '2026-07-05', expectedDelivery: '2026-08-01',
+    lineItems: poLineItems([{ product: 'Carrageenan', qty: 200, unit: 'kg', unitPrice: 900 }, { product: 'Xanthan Gum', qty: 100, unit: 'kg', unitPrice: 840 }]),
+    subtotal: 264000, gstRate: 18, gstAmount: 47520, total: 311520,
+    status: 'Sent', assignedTo: 'Rahul', notes: '',
+    receipts: [],
+  },
+]
+
+export const seedSupplierBills = [
+  { id: 'sb1', billNo: 'SBILL-2026-0001', supplierId: 'sup1', supplier: 'RZBC', poId: 'po1', poNo: 'PUR-2026-0001', supplierInvoiceNo: 'RZBC-INV-88213', billDate: '2026-07-02', dueDate: '2026-08-16', subtotal: 195000, gstAmount: 35100, total: 230100, amountPaid: 230100, status: 'Paid', notes: '' },
+  { id: 'sb2', billNo: 'SBILL-2026-0002', supplierId: 'sup2', supplier: 'Emerald Kalama', poId: 'po2', poNo: 'PUR-2026-0002', supplierInvoiceNo: 'EK-2026-4471', billDate: '2026-07-10', dueDate: '2026-08-09', subtotal: 84000, gstAmount: 15120, total: 99120, amountPaid: 40000, status: 'Partial', notes: 'Billed for the received half only' },
+]
+
+export const seedSupplierPayments = [
+  { id: 'spay1', paymentNo: 'SPAY-2026-0001', billId: 'sb1', supplier: 'RZBC', amount: 230100, date: '2026-07-08', mode: 'Wire Transfer', reference: 'WT2026070800321', notes: 'Full settlement', status: 'Completed' },
+  { id: 'spay2', paymentNo: 'SPAY-2026-0002', billId: 'sb2', supplier: 'Emerald Kalama', amount: 40000, date: '2026-07-14', mode: 'NEFT', reference: 'NEFT2026071400456', notes: 'Part payment', status: 'Completed' },
+]
+
 export const seedShipments = [
   {
     id: 'sh1', shipmentNo: 'SHP-2026-0041', orderNo: 'ORD-2026-0301', invoiceNo: 'INV-2026-0041', company: 'Patel Agro Industries',

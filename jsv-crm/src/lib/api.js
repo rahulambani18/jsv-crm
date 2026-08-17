@@ -5,7 +5,7 @@
 import { supabase, isMock, db as mock } from './supabaseClient.js'
 import { mockAuth, mockAuditLog } from './mockDb.js'
 
-const TABLES = ['products', 'leads', 'customers', 'samples', 'quotations', 'orders', 'followUps', 'roles', 'users', 'tasks', 'meetings', 'documents', 'invoices', 'payments', 'stock', 'stockMovements', 'creditNotes', 'debitNotes', 'shipments']
+const TABLES = ['products', 'leads', 'customers', 'samples', 'quotations', 'orders', 'followUps', 'roles', 'users', 'tasks', 'meetings', 'documents', 'invoices', 'payments', 'stock', 'stockMovements', 'creditNotes', 'debitNotes', 'shipments', 'suppliers', 'purchaseOrders', 'supplierBills', 'supplierPayments']
 const SQL_TABLE_NAME = {
   products: 'products',
   leads: 'leads',
@@ -26,6 +26,10 @@ const SQL_TABLE_NAME = {
   creditNotes: 'credit_notes',
   debitNotes: 'debit_notes',
   shipments: 'shipments',
+  suppliers: 'suppliers',
+  purchaseOrders: 'purchase_orders',
+  supplierBills: 'supplier_bills',
+  supplierPayments: 'supplier_payments',
 }
 
 // Pages write/read plain camelCase fields (estValue, nextFollowUp,
@@ -64,11 +68,13 @@ const MODULE_LABEL = {
   stock: 'Stock', stockMovements: 'Stock Movement',
   creditNotes: 'Credit Note', debitNotes: 'Debit Note',
   shipments: 'Shipment',
+  suppliers: 'Supplier', purchaseOrders: 'Purchase Order',
+  supplierBills: 'Supplier Bill', supplierPayments: 'Supplier Payment',
 }
 
 function pickLabel(record) {
   if (!record) return ''
-  const candidates = [record.company, record.name, record.title, record.orderNo, record.invoiceNo, record.quoteNo, record.paymentNo, record.noteNo, record.shipmentNo, record.code, record.fullName]
+  const candidates = [record.company, record.name, record.title, record.orderNo, record.invoiceNo, record.quoteNo, record.paymentNo, record.noteNo, record.shipmentNo, record.poNo, record.billNo, record.supplier, record.code, record.fullName]
   return String(candidates.find((v) => v) || record.id || '').slice(0, 200)
 }
 
@@ -401,7 +407,7 @@ async function buildUserObject(authUser, profile) {
   })
 
   // Admin always gets full access regardless of permission rows
-  const ALL_MODULES = ['dashboard','leads','follow_ups','customers','samples','quotations','orders','inventory','products','reports','users','tasks','meetings','documents','invoices','payments','logistics']
+  const ALL_MODULES = ['dashboard','leads','follow_ups','customers','samples','quotations','orders','purchases','inventory','products','reports','users','tasks','meetings','documents','invoices','payments','logistics']
   if (roleName === 'Admin') {
     ALL_MODULES.forEach((m) => { permissions[m] = { view: true, edit: true, delete: true } })
   }

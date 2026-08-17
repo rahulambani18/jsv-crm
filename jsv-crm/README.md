@@ -17,6 +17,7 @@ database with two environment variables when you're ready.
 - **Samples** — sample dispatch tracking with courier tracking numbers
 - **Quotations** — quote list with totals and validity
 - **Orders** — orders by warehouse, delivery, payment status
+- **Purchases** — supplier master, purchase orders with line items, goods receipt tracking, supplier bills, and supplier payments (full procure-to-pay cycle)
 - **Logistics** — shipment/trip tracking (vehicle, transporter, LR no., freight cost) and a per-transporter freight ledger, linked to Orders and Invoices
 - **Inventory** — stock on hand by warehouse, reorder levels, expiry tracking
 - **Products** — master catalogue (category, supplier, origin, MOQ, docs)
@@ -48,7 +49,11 @@ This takes about 5 minutes and doesn't require touching any page component.
 1. Create a free project at [supabase.com](https://supabase.com).
 2. Open the **SQL Editor** in your project and run the contents of
    `supabase/schema.sql`. This creates all 7 tables plus row-level
-   security policies.
+   security policies. Then also run `supabase/add_purchase_module.sql`
+   to add the Purchases tables (suppliers, purchase orders, supplier
+   bills, supplier payments) — this and the other `add_*.sql` files in
+   that folder are incremental migrations layered on top of the base
+   schema.
 3. In your Supabase project, go to **Settings → API** and copy:
    - Project URL
    - `anon` public key

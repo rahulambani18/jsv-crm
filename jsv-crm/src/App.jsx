@@ -9,6 +9,7 @@ import Customers from './pages/Customers.jsx'
 import Samples from './pages/Samples.jsx'
 import Quotations from './pages/Quotations.jsx'
 import Orders from './pages/Orders.jsx'
+import Purchases from './pages/Purchases.jsx'
 import Inventory from './pages/Inventory.jsx'
 import Products from './pages/Products.jsx'
 import Reports from './pages/Reports.jsx'
@@ -48,6 +49,7 @@ function AppRoutes() {
       <Route path="/samples" element={<Protected><Samples /></Protected>} />
       <Route path="/quotations" element={<Protected><Quotations /></Protected>} />
       <Route path="/orders" element={<Protected><Orders /></Protected>} />
+      <Route path="/purchases" element={<Protected><Purchases /></Protected>} />
       <Route path="/inventory" element={<Protected><Inventory /></Protected>} />
       <Route path="/products" element={<Protected><Products /></Protected>} />
       <Route path="/reports" element={<Protected><Reports /></Protected>} />
