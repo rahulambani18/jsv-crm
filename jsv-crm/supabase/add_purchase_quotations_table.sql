@@ -22,6 +22,8 @@ create table if not exists purchase_quotations (
   payment_terms text,
   status text default 'Received', -- Received | Selected | Rejected | Expired
   notes text,
+  attachment_url text,
+  attachment_name text,
   created_at timestamptz default now()
 );
 

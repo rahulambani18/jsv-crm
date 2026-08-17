@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { api } from '../lib/api.js'
+import { api, storage } from '../lib/api.js'
 import { WAREHOUSES, GST_RATE, calcOrderTotals } from '../data/seed.js'
 import { useAuth } from '../lib/AuthContext.jsx'
 import { showToast } from '../lib/toast.js'
@@ -67,6 +67,7 @@ function emptyPQForm() {
   return {
     rfqRef: '', supplierId: '', supplier: '', quoteDate: todayStr(), validUntil: '',
     lineItems: [emptyLineItem()], moq: '', leadTimeDays: '', paymentTerms: 'Net 30', status: 'Received', notes: '',
+    attachmentUrl: '', attachmentName: '',
   }
 }
 function emptyBillForm() {
@@ -128,6 +129,8 @@ export default function Purchases() {
   const [receiveNotes, setReceiveNotes] = useState('')
   const [selectedPQ, setSelectedPQ] = useState(new Set())
   const [compareList, setCompareList] = useState([])
+  const [pqUploading, setPQUploading] = useState(false)
+  const [pqUploadError, setPQUploadError] = useState('')
 
   function closeModal() { setShowModal(false); setModalKind(null); setEditingId(null) }
 
@@ -304,8 +307,23 @@ export default function Purchases() {
     setPQForm((f) => ({ ...f, supplierId, supplier: sup?.name || f.supplier }))
   }
 
-  function openCreatePQ() { setEditingId(null); setPQForm(emptyPQForm()); setModalKind('pq'); setShowModal(true) }
-  function openEditPQ(q) { setEditingId(q.id); setPQForm({ ...emptyPQForm(), ...q }); setModalKind('pq'); setShowModal(true) }
+  function openCreatePQ() { setEditingId(null); setPQForm(emptyPQForm()); setPQUploadError(''); setModalKind('pq'); setShowModal(true) }
+  function openEditPQ(q) { setEditingId(q.id); setPQForm({ ...emptyPQForm(), ...q }); setPQUploadError(''); setModalKind('pq'); setShowModal(true) }
+
+  async function handlePQFileSelect(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setPQUploadError('')
+    setPQUploading(true)
+    try {
+      const { url } = await storage.uploadFile(file, 'purchase-quotations')
+      setPQForm((f) => ({ ...f, attachmentUrl: url, attachmentName: file.name }))
+    } catch (err) {
+      setPQUploadError(err.message || 'Upload failed. Make sure the "attachments" storage bucket exists in Supabase.')
+    } finally {
+      setPQUploading(false)
+    }
+  }
 
   async function handleSavePQ(e) {
     e.preventDefault()
@@ -319,6 +337,7 @@ export default function Purchases() {
       subtotal, gstRate: GST_RATE, gstAmount, total,
       moq: pqForm.moq === '' ? null : Number(pqForm.moq), leadTimeDays: pqForm.leadTimeDays === '' ? null : Number(pqForm.leadTimeDays),
       paymentTerms: pqForm.paymentTerms, status: pqForm.status, notes: pqForm.notes,
+      attachmentUrl: pqForm.attachmentUrl, attachmentName: pqForm.attachmentName,
     }
     try {
       if (editingId) {
@@ -508,19 +527,34 @@ export default function Purchases() {
         }
         actions={
           canEdit && (
-            <button
-              className="btn btn-primary"
-              onClick={() => {
-                if (tab === 'Suppliers') openCreateSupplier()
-                else if (tab === 'Quotations') openCreatePQ()
-                else if (tab === 'Purchase Orders') openCreatePO()
-                else if (tab === 'Bills') openCreateBill()
-                else openCreatePayment(null)
-              }}
-            >
-              <IconPlus width={15} height={15} />
-              {tab === 'Suppliers' ? ' New Supplier' : tab === 'Quotations' ? ' New Quotation' : tab === 'Purchase Orders' ? ' New Purchase Order' : tab === 'Bills' ? ' New Bill' : ' Record Payment'}
-            </button>
+            <div style={{ display: 'flex', gap: 10 }}>
+              {tab === 'Quotations' && (
+                <ExportBar
+                  title="Purchase Quotations"
+                  headers={['RFQ Ref', 'PQ No.', 'Supplier', 'Product(s)', 'Total', 'MOQ', 'Lead Time (days)', 'Payment Terms', 'Valid Until', 'Status']}
+                  rows={filteredPQs.map((q) => [
+                    q.rfqRef, q.pqNo, q.supplier,
+                    (q.lineItems || []).map((li) => li.product).filter(Boolean).join(', '),
+                    `₹${Number(pqTotal(q)).toLocaleString('en-IN')}`,
+                    q.moq ?? '', q.leadTimeDays ?? '', q.paymentTerms || '', q.validUntil || '', q.status,
+                  ])}
+                  count={filteredPQs.length}
+                />
+              )}
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  if (tab === 'Suppliers') openCreateSupplier()
+                  else if (tab === 'Quotations') openCreatePQ()
+                  else if (tab === 'Purchase Orders') openCreatePO()
+                  else if (tab === 'Bills') openCreateBill()
+                  else openCreatePayment(null)
+                }}
+              >
+                <IconPlus width={15} height={15} />
+                {tab === 'Suppliers' ? ' New Supplier' : tab === 'Quotations' ? ' New Quotation' : tab === 'Purchase Orders' ? ' New Purchase Order' : tab === 'Bills' ? ' New Bill' : ' Record Payment'}
+              </button>
+            </div>
           )
         }
       />
@@ -577,7 +611,12 @@ export default function Purchases() {
                     <input type="checkbox" checked={selectedPQ.has(q.id)} onChange={() => togglePQSelected(q.id)} />
                   </td>
                   <td className="cell-mono">{q.rfqRef}</td>
-                  <td className="cell-mono cell-strong">{q.pqNo}</td>
+                  <td className="cell-mono cell-strong">
+                    {q.pqNo}
+                    {q.attachmentUrl && (
+                      <a href={q.attachmentUrl} target="_blank" rel="noopener noreferrer" title={q.attachmentName || 'View attached quote'} style={{ marginLeft: 6 }}>📎</a>
+                    )}
+                  </td>
                   <td>{q.supplier}</td>
                   <td>{(q.lineItems || []).map((li) => li.product).filter(Boolean).join(', ') || <span className="cell-muted">—</span>}</td>
                   <td className="cell-mono cell-strong">{formatINR(pqTotal(q))}</td>
@@ -905,6 +944,25 @@ export default function Purchases() {
 
             <div className="field" style={{ marginTop: 14 }}><label>Notes</label>
               <textarea rows={2} value={pqForm.notes} onChange={(e) => setPQForm({ ...pqForm, notes: e.target.value })} /></div>
+
+            <div className="field" style={{ marginTop: 14 }}>
+              <label>Attach supplier's quote (PDF, Excel, Image, email)</label>
+              <input
+                type="file"
+                accept=".pdf,.xls,.xlsx,.csv,.png,.jpg,.jpeg,.eml,.msg,.doc,.docx"
+                onChange={handlePQFileSelect}
+                disabled={pqUploading}
+              />
+              {pqUploading && <p style={{ fontSize: 11.5, color: 'var(--ink-400)', margin: '4px 0 0' }}>Uploading…</p>}
+              {pqUploadError && <p style={{ fontSize: 11.5, color: 'var(--red-600)', margin: '4px 0 0' }}>{pqUploadError}</p>}
+              {pqForm.attachmentUrl && !pqUploading && (
+                <p style={{ fontSize: 11.5, color: 'var(--teal-700)', margin: '4px 0 0' }}>
+                  ✓ {pqForm.attachmentName || 'File attached'} — <a href={pqForm.attachmentUrl} target="_blank" rel="noopener noreferrer">preview</a>
+                  {' · '}
+                  <button type="button" className="btn btn-ghost btn-sm" style={{ padding: '0 4px', height: 'auto' }} onClick={() => setPQForm((f) => ({ ...f, attachmentUrl: '', attachmentName: '' }))}>remove</button>
+                </p>
+              )}
+            </div>
           </form>
         </Modal>
       )}
@@ -930,6 +988,9 @@ export default function Purchases() {
                     {compareList.map((q) => (
                       <th key={q.id} style={{ textAlign: 'left', padding: 8, fontWeight: 700, fontSize: 12.5, minWidth: 150 }}>
                         {q.supplier}<br /><span className="cell-muted" style={{ fontWeight: 400, fontSize: 11 }}>{q.pqNo}</span>
+                        {q.attachmentUrl && (
+                          <><br /><a href={q.attachmentUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11 }}>📎 {q.attachmentName || 'View file'}</a></>
+                        )}
                       </th>
                     ))}
                   </tr>
