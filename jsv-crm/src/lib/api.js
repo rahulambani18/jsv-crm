@@ -5,7 +5,7 @@
 import { supabase, isMock, db as mock } from './supabaseClient.js'
 import { mockAuth, mockAuditLog } from './mockDb.js'
 
-const TABLES = ['products', 'leads', 'customers', 'samples', 'quotations', 'orders', 'followUps', 'roles', 'users', 'tasks', 'meetings', 'documents', 'invoices', 'payments', 'stock', 'stockMovements', 'creditNotes', 'debitNotes', 'shipments', 'suppliers', 'purchaseOrders', 'supplierBills', 'supplierPayments']
+const TABLES = ['products', 'leads', 'customers', 'samples', 'quotations', 'orders', 'followUps', 'roles', 'users', 'tasks', 'meetings', 'documents', 'invoices', 'payments', 'stock', 'stockMovements', 'creditNotes', 'debitNotes', 'shipments', 'suppliers', 'purchaseOrders', 'purchaseQuotations', 'supplierBills', 'supplierPayments']
 const SQL_TABLE_NAME = {
   products: 'products',
   leads: 'leads',
@@ -28,6 +28,7 @@ const SQL_TABLE_NAME = {
   shipments: 'shipments',
   suppliers: 'suppliers',
   purchaseOrders: 'purchase_orders',
+  purchaseQuotations: 'purchase_quotations',
   supplierBills: 'supplier_bills',
   supplierPayments: 'supplier_payments',
 }
@@ -68,13 +69,13 @@ const MODULE_LABEL = {
   stock: 'Stock', stockMovements: 'Stock Movement',
   creditNotes: 'Credit Note', debitNotes: 'Debit Note',
   shipments: 'Shipment',
-  suppliers: 'Supplier', purchaseOrders: 'Purchase Order',
+  suppliers: 'Supplier', purchaseOrders: 'Purchase Order', purchaseQuotations: 'Purchase Quotation',
   supplierBills: 'Supplier Bill', supplierPayments: 'Supplier Payment',
 }
 
 function pickLabel(record) {
   if (!record) return ''
-  const candidates = [record.company, record.name, record.title, record.orderNo, record.invoiceNo, record.quoteNo, record.paymentNo, record.noteNo, record.shipmentNo, record.poNo, record.billNo, record.supplier, record.code, record.fullName]
+  const candidates = [record.company, record.name, record.title, record.orderNo, record.invoiceNo, record.quoteNo, record.paymentNo, record.noteNo, record.shipmentNo, record.poNo, record.billNo, record.pqNo, record.supplier, record.code, record.fullName]
   return String(candidates.find((v) => v) || record.id || '').slice(0, 200)
 }
 

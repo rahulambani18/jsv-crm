@@ -17,7 +17,7 @@ import TableSkeleton from '../components/TableSkeleton.jsx'
 import { IconPlus, IconSearch, IconEdit, IconTrash, IconRupee, IconTransfer, IconAlertTriangle } from '../components/Icons.jsx'
 import '../styles/components.css'
 
-const TABS = ['Suppliers', 'Purchase Orders', 'Bills', 'Payments']
+const TABS = ['Suppliers', 'Quotations', 'Purchase Orders', 'Bills', 'Payments']
 
 const PO_STATUSES = ['Draft', 'Sent', 'Partially Received', 'Received', 'Cancelled']
 const PO_STATUS_TONE = { Draft: 'gray', Sent: 'navy', 'Partially Received': 'amber', Received: 'teal', Cancelled: 'red' }
@@ -25,6 +25,8 @@ const BILL_STATUSES = ['Unpaid', 'Partial', 'Paid', 'Overdue']
 const BILL_STATUS_TONE = { Unpaid: 'red', Partial: 'amber', Paid: 'teal', Overdue: 'red' }
 const SUPPLIER_STATUSES = ['Active', 'Inactive']
 const PAYMENT_MODES = ['NEFT', 'RTGS', 'Wire Transfer', 'UPI', 'Cheque', 'Cash', 'Letter of Credit']
+const PQ_STATUSES = ['Received', 'Selected', 'Rejected', 'Expired']
+const PQ_STATUS_TONE = { Received: 'navy', Selected: 'teal', Rejected: 'red', Expired: 'gray' }
 
 function formatINR(n) { return '₹' + Number(n || 0).toLocaleString('en-IN') }
 function todayStr() { return new Date().toISOString().slice(0, 10) }
@@ -61,6 +63,12 @@ function emptyPOForm() {
     lineItems: [emptyLineItem()], status: 'Draft', assignedTo: '', notes: '',
   }
 }
+function emptyPQForm() {
+  return {
+    rfqRef: '', supplierId: '', supplier: '', quoteDate: todayStr(), validUntil: '',
+    lineItems: [emptyLineItem()], moq: '', leadTimeDays: '', paymentTerms: 'Net 30', status: 'Received', notes: '',
+  }
+}
 function emptyBillForm() {
   return { supplierId: '', supplier: '', poId: '', poNo: '', supplierInvoiceNo: '', billDate: todayStr(), dueDate: '', subtotal: 0, gstAmount: 0, notes: '', status: 'Unpaid' }
 }
@@ -79,6 +87,7 @@ export default function Purchases() {
 
   const [suppliers, setSuppliers] = useState([])
   const [purchaseOrders, setPurchaseOrders] = useState([])
+  const [purchaseQuotations, setPurchaseQuotations] = useState([])
   const [supplierBills, setSupplierBills] = useState([])
   const [supplierPayments, setSupplierPayments] = useState([])
   const [products, setProducts] = useState([])
@@ -86,13 +95,13 @@ export default function Purchases() {
 
   useEffect(() => { refresh() }, [])
   useAutoRefresh(() => refresh(true), 60000)
-  useEffect(() => { setSearch('') }, [tab])
+  useEffect(() => { setSearch(''); setSelectedPQ(new Set()) }, [tab])
 
   function refresh(silent = false) {
     if (!silent) setLoading(true)
-    Promise.all([api.suppliers.list(), api.purchaseOrders.list(), api.supplierBills.list(), api.supplierPayments.list(), api.products.list()])
-      .then(([sup, po, bill, pay, prod]) => {
-        setSuppliers(sup); setPurchaseOrders(po); setSupplierBills(bill); setSupplierPayments(pay); setProducts(prod)
+    Promise.all([api.suppliers.list(), api.purchaseOrders.list(), api.purchaseQuotations.list(), api.supplierBills.list(), api.supplierPayments.list(), api.products.list()])
+      .then(([sup, po, pq, bill, pay, prod]) => {
+        setSuppliers(sup); setPurchaseOrders(po); setPurchaseQuotations(pq); setSupplierBills(bill); setSupplierPayments(pay); setProducts(prod)
         setLoading(false)
       })
       .catch(() => setLoading(false))
@@ -106,16 +115,19 @@ export default function Purchases() {
 
   // ---------- shared modal state ----------
   const [showModal, setShowModal] = useState(false)
-  const [modalKind, setModalKind] = useState(null) // 'supplier' | 'po' | 'bill' | 'payment' | 'receive'
+  const [modalKind, setModalKind] = useState(null) // 'supplier' | 'po' | 'pq' | 'pq-compare' | 'bill' | 'payment' | 'receive'
   const [editingId, setEditingId] = useState(null)
   const [saving, setSaving] = useState(false)
   const [supplierForm, setSupplierForm] = useState(emptySupplierForm())
   const [poForm, setPOForm] = useState(emptyPOForm())
+  const [pqForm, setPQForm] = useState(emptyPQForm())
   const [billForm, setBillForm] = useState(emptyBillForm())
   const [paymentForm, setPaymentForm] = useState(emptyPaymentForm())
   const [receivingPO, setReceivingPO] = useState(null)
   const [receiveQtys, setReceiveQtys] = useState({})
   const [receiveNotes, setReceiveNotes] = useState('')
+  const [selectedPQ, setSelectedPQ] = useState(new Set())
+  const [compareList, setCompareList] = useState([])
 
   function closeModal() { setShowModal(false); setModalKind(null); setEditingId(null) }
 
@@ -263,6 +275,129 @@ export default function Purchases() {
     }
   }
 
+  // ---------- Purchase Quotations (RFQ responses) ----------
+  const filteredPQs = useMemo(() => purchaseQuotations.filter((q) =>
+    !search || [q.pqNo, q.rfqRef, q.supplier, ...(q.lineItems || []).map((li) => li.product)].some((v) => (v || '').toLowerCase().includes(search.toLowerCase()))
+  ), [purchaseQuotations, search])
+
+  const rfqRefOptions = useMemo(() => [...new Set(purchaseQuotations.map((q) => q.rfqRef).filter(Boolean))], [purchaseQuotations])
+
+  const pqTotals = useMemo(() => calcOrderTotals(pqForm.lineItems, GST_RATE, 0), [pqForm.lineItems])
+
+  function pqTotal(q) { return calcOrderTotals(q.lineItems || [], q.gstRate || GST_RATE, 0).total }
+
+  function updatePQLineItem(index, patch) {
+    setPQForm((f) => {
+      const items = [...f.lineItems]
+      items[index] = { ...items[index], ...patch }
+      if (patch.product) {
+        const prod = products.find((p) => p.name === patch.product)
+        if (prod?.unitPrice) items[index].unitPrice = prod.unitPrice
+      }
+      return { ...f, lineItems: items }
+    })
+  }
+  function addPQLineItem() { setPQForm((f) => ({ ...f, lineItems: [...f.lineItems, emptyLineItem()] })) }
+  function removePQLineItem(i) { setPQForm((f) => ({ ...f, lineItems: f.lineItems.filter((_, idx) => idx !== i) })) }
+  function handlePQSupplierChange(supplierId) {
+    const sup = suppliers.find((s) => s.id === supplierId)
+    setPQForm((f) => ({ ...f, supplierId, supplier: sup?.name || f.supplier }))
+  }
+
+  function openCreatePQ() { setEditingId(null); setPQForm(emptyPQForm()); setModalKind('pq'); setShowModal(true) }
+  function openEditPQ(q) { setEditingId(q.id); setPQForm({ ...emptyPQForm(), ...q }); setModalKind('pq'); setShowModal(true) }
+
+  async function handleSavePQ(e) {
+    e.preventDefault()
+    setSaving(true)
+    const lineItems = pqForm.lineItems.filter((li) => li.product && Number(li.qty) > 0)
+      .map((li) => ({ ...li, lineTotal: Math.round((Number(li.qty) || 0) * (Number(li.unitPrice) || 0) * 100) / 100 }))
+    const { subtotal, gstAmount, total } = calcOrderTotals(lineItems, GST_RATE, 0)
+    const record = {
+      rfqRef: pqForm.rfqRef || `RFQ-${Date.now()}`, supplierId: pqForm.supplierId, supplier: pqForm.supplier,
+      quoteDate: pqForm.quoteDate, validUntil: pqForm.validUntil, lineItems,
+      subtotal, gstRate: GST_RATE, gstAmount, total,
+      moq: pqForm.moq === '' ? null : Number(pqForm.moq), leadTimeDays: pqForm.leadTimeDays === '' ? null : Number(pqForm.leadTimeDays),
+      paymentTerms: pqForm.paymentTerms, status: pqForm.status, notes: pqForm.notes,
+    }
+    try {
+      if (editingId) {
+        await api.purchaseQuotations.update(editingId, record)
+        showToast('Quotation updated')
+      } else {
+        record.pqNo = `PQ-2026-${String(1000 + purchaseQuotations.length + 1).slice(1)}`
+        await api.purchaseQuotations.insert(record)
+        showToast('Quotation added')
+      }
+      closeModal(); refresh()
+    } catch (err) {
+      showToast('Could not save: ' + (err.message || 'Unknown error'), 'error')
+    } finally { setSaving(false) }
+  }
+
+  async function handleDeletePQ(q) {
+    if (!confirm(`Delete quotation "${q.pqNo}"? This cannot be undone.`)) return
+    try {
+      await api.purchaseQuotations.remove(q.id); refresh()
+      setSelectedPQ((prev) => { const next = new Set(prev); next.delete(q.id); return next })
+      showToast(`${q.pqNo} deleted`)
+    }
+    catch (err) { showToast('Could not delete: ' + (err.message || 'Unknown error'), 'error') }
+  }
+
+  function togglePQSelected(id) {
+    setSelectedPQ((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function openCompare() {
+    const list = purchaseQuotations.filter((q) => selectedPQ.has(q.id))
+    if (list.length < 2) return
+    setCompareList(list)
+    setModalKind('pq-compare')
+    setShowModal(true)
+  }
+
+  // Marks the winning quote as Selected, every other quote currently in
+  // the comparison as Rejected, then offers to spin up a matching PO —
+  // pre-filled from the quote so nothing needs re-typing.
+  async function handleSelectWinner(q) {
+    try {
+      await Promise.all(compareList.map((other) =>
+        api.purchaseQuotations.update(other.id, { status: other.id === q.id ? 'Selected' : 'Rejected' })
+      ))
+      showToast(`${q.pqNo} marked as the winning quote`)
+      closeModal(); setSelectedPQ(new Set()); setCompareList([])
+      refresh()
+      if (confirm(`Create a purchase order from ${q.pqNo} (${q.supplier})?`)) {
+        await handleCreatePOFromPQ(q)
+      }
+    } catch (err) {
+      showToast('Could not update quotations: ' + (err.message || 'Unknown error'), 'error')
+    }
+  }
+
+  async function handleCreatePOFromPQ(q) {
+    try {
+      const record = {
+        supplierId: q.supplierId, supplier: q.supplier, warehouse: WAREHOUSES[0],
+        orderDate: todayStr(), expectedDelivery: q.leadTimeDays ? addDays(todayStr(), Number(q.leadTimeDays)) : '',
+        lineItems: (q.lineItems || []).map((li) => ({ ...li })),
+        subtotal: q.subtotal, gstRate: q.gstRate || GST_RATE, gstAmount: q.gstAmount, total: q.total,
+        status: 'Draft', assignedTo: '', notes: `Created from quotation ${q.pqNo} (${q.rfqRef})`,
+        poNo: `PUR-2026-${String(1000 + purchaseOrders.length + 1).slice(1)}`, receipts: [],
+      }
+      await api.purchaseOrders.insert(record)
+      showToast(`Purchase order created from ${q.pqNo}`)
+      refresh()
+    } catch (err) {
+      showToast('Could not create purchase order: ' + (err.message || 'Unknown error'), 'error')
+    }
+  }
+
   // ---------- Supplier Bills ----------
   const filteredBills = useMemo(() => supplierBills.filter((b) =>
     !search || [b.billNo, b.supplier, b.poNo, b.supplierInvoiceNo].some((v) => (v || '').toLowerCase().includes(search.toLowerCase()))
@@ -366,6 +501,7 @@ export default function Purchases() {
         title="Purchases"
         subtitle={
           tab === 'Suppliers' ? `${suppliers.length} supplier${suppliers.length === 1 ? '' : 's'}` :
+          tab === 'Quotations' ? `${purchaseQuotations.length} quote${purchaseQuotations.length === 1 ? '' : 's'} across ${rfqRefOptions.length} RFQ${rfqRefOptions.length === 1 ? '' : 's'}` :
           tab === 'Purchase Orders' ? `${purchaseOrders.length} purchase order${purchaseOrders.length === 1 ? '' : 's'} · ${formatINR(openPOValue)} open` :
           tab === 'Bills' ? `${supplierBills.length} bill${supplierBills.length === 1 ? '' : 's'} · ${formatINR(unpaidBillValue)} outstanding` :
           `${supplierPayments.length} payment${supplierPayments.length === 1 ? '' : 's'}`
@@ -376,13 +512,14 @@ export default function Purchases() {
               className="btn btn-primary"
               onClick={() => {
                 if (tab === 'Suppliers') openCreateSupplier()
+                else if (tab === 'Quotations') openCreatePQ()
                 else if (tab === 'Purchase Orders') openCreatePO()
                 else if (tab === 'Bills') openCreateBill()
                 else openCreatePayment(null)
               }}
             >
               <IconPlus width={15} height={15} />
-              {tab === 'Suppliers' ? ' New Supplier' : tab === 'Purchase Orders' ? ' New Purchase Order' : tab === 'Bills' ? ' New Bill' : ' Record Payment'}
+              {tab === 'Suppliers' ? ' New Supplier' : tab === 'Quotations' ? ' New Quotation' : tab === 'Purchase Orders' ? ' New Purchase Order' : tab === 'Bills' ? ' New Bill' : ' Record Payment'}
             </button>
           )
         }
@@ -406,7 +543,61 @@ export default function Purchases() {
           <IconSearch width={15} height={15} />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Search ${tab.toLowerCase()}…`} />
         </div>
+        {tab === 'Quotations' && (
+          <button
+            className="btn btn-secondary btn-sm"
+            disabled={selectedPQ.size < 2}
+            onClick={openCompare}
+            title={selectedPQ.size < 2 ? 'Select 2 or more quotations to compare' : 'Compare selected quotations side by side'}
+          >
+            ⚖️ Compare Selected {selectedPQ.size > 0 ? `(${selectedPQ.size})` : ''}
+          </button>
+        )}
       </div>
+
+      {tab === 'Quotations' && (
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead><tr>
+              <th style={{ width: 30 }}></th>
+              <th>RFQ Ref</th><th>PQ No.</th><th>Supplier</th><th>Product(s)</th><th>Total</th>
+              <th>MOQ</th><th>Lead Time</th><th>Payment Terms</th><th>Valid Until</th><th>Status</th><th>Actions</th>
+            </tr></thead>
+            <tbody>
+              {loading ? <TableSkeleton cols={11} rows={5} /> : filteredPQs.length === 0 ? (
+                <tr className="empty-row"><td colSpan={11}>
+                  <EmptyState icon="📋" title="No purchase quotations yet" subtitle="Log supplier quotes against an RFQ, then select two or more to compare them side by side."
+                    actionLabel={canEdit ? 'New Quotation' : undefined} onAction={canEdit ? openCreatePQ : undefined} />
+                </td></tr>
+              ) : filteredPQs.map((q) => {
+                const expired = q.status === 'Received' && q.validUntil && q.validUntil < todayStr()
+                return (
+                <tr key={q.id}>
+                  <td>
+                    <input type="checkbox" checked={selectedPQ.has(q.id)} onChange={() => togglePQSelected(q.id)} />
+                  </td>
+                  <td className="cell-mono">{q.rfqRef}</td>
+                  <td className="cell-mono cell-strong">{q.pqNo}</td>
+                  <td>{q.supplier}</td>
+                  <td>{(q.lineItems || []).map((li) => li.product).filter(Boolean).join(', ') || <span className="cell-muted">—</span>}</td>
+                  <td className="cell-mono cell-strong">{formatINR(pqTotal(q))}</td>
+                  <td className="cell-mono">{q.moq ?? <span className="cell-muted">—</span>}</td>
+                  <td className="cell-mono">{q.leadTimeDays != null ? `${q.leadTimeDays}d` : <span className="cell-muted">—</span>}</td>
+                  <td>{q.paymentTerms || <span className="cell-muted">—</span>}</td>
+                  <td className="cell-mono">{q.validUntil || <span className="cell-muted">—</span>}</td>
+                  <td><Pill tone={expired ? 'gray' : PQ_STATUS_TONE[q.status] || 'gray'}>{expired ? 'Expired' : q.status}</Pill></td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {canEdit && <button className="btn btn-ghost btn-sm" onClick={() => openEditPQ(q)}><IconEdit width={13} height={13} /></button>}
+                      {canDelete && <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDeletePQ(q)}><IconTrash width={13} height={13} /></button>}
+                    </div>
+                  </td>
+                </tr>
+              )})}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {tab === 'Suppliers' && (
         <div className="table-wrap">
@@ -610,6 +801,210 @@ export default function Purchases() {
           </form>
         </Modal>
       )}
+
+      {/* ---------- Purchase Quotation modal ---------- */}
+      {showModal && modalKind === 'pq' && (
+        <Modal
+          title={editingId ? 'Edit Quotation' : 'New Purchase Quotation'}
+          size="lg"
+          onClose={closeModal}
+          footer={<>
+            <button className="btn btn-secondary" onClick={closeModal}>Cancel</button>
+            <button className="btn btn-primary" form="pq-form" type="submit" disabled={saving}>{saving ? 'Saving…' : editingId ? 'Save changes' : 'Save quotation'}</button>
+          </>}
+        >
+          <form id="pq-form" onSubmit={handleSavePQ}>
+            <div className="field-row">
+              <div className="field"><label>RFQ reference</label>
+                <ComboField
+                  options={rfqRefOptions}
+                  value={pqForm.rfqRef}
+                  onChange={(v) => setPQForm({ ...pqForm, rfqRef: v })}
+                  placeholder="e.g. RFQ-2026-0009 — reuse to group quotes for comparison"
+                /></div>
+              <div className="field"><label>Supplier</label>
+                <select required value={pqForm.supplierId} onChange={(e) => handlePQSupplierChange(e.target.value)}>
+                  <option value="" disabled>Select supplier…</option>
+                  {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select></div>
+            </div>
+            <div className="field-row">
+              <div className="field"><label>Quote date</label>
+                <input type="date" required value={pqForm.quoteDate} onChange={(e) => setPQForm({ ...pqForm, quoteDate: e.target.value })} /></div>
+              <div className="field"><label>Valid until</label>
+                <input type="date" value={pqForm.validUntil} onChange={(e) => setPQForm({ ...pqForm, validUntil: e.target.value })} /></div>
+            </div>
+            <div className="field-row">
+              <div className="field"><label>MOQ</label>
+                <input type="number" min="0" value={pqForm.moq} onChange={(e) => setPQForm({ ...pqForm, moq: e.target.value })} placeholder="Minimum order quantity" /></div>
+              <div className="field"><label>Lead time (days)</label>
+                <input type="number" min="0" value={pqForm.leadTimeDays} onChange={(e) => setPQForm({ ...pqForm, leadTimeDays: e.target.value })} /></div>
+            </div>
+            <div className="field-row">
+              <div className="field"><label>Payment terms</label>
+                <select value={pqForm.paymentTerms} onChange={(e) => setPQForm({ ...pqForm, paymentTerms: e.target.value })}>
+                  <option>Due on Receipt</option><option>Net 15</option><option>Net 30</option><option>Net 45</option><option>Net 60</option><option>Letter of Credit</option>
+                </select></div>
+              <div className="field"><label>Status</label>
+                <select value={pqForm.status} onChange={(e) => setPQForm({ ...pqForm, status: e.target.value })}>
+                  {PQ_STATUSES.map((s) => <option key={s}>{s}</option>)}
+                </select></div>
+            </div>
+
+            <div className="field">
+              <label>Line items</label>
+              <div style={{ border: '1px solid var(--paper-200)', borderRadius: 8, overflowX: 'auto' }}>
+                <table style={{ width: '100%', minWidth: 480, fontSize: 12.5, borderCollapse: 'collapse' }}>
+                  <thead><tr style={{ background: 'var(--paper-0)' }}>
+                    <th style={{ textAlign: 'left', padding: 8, fontWeight: 600, fontSize: 11 }}>Product</th>
+                    <th style={{ textAlign: 'left', padding: '8px 6px', fontWeight: 600, fontSize: 11, width: 64 }}>Qty</th>
+                    <th style={{ textAlign: 'left', padding: '8px 6px', fontWeight: 600, fontSize: 11, width: 64 }}>Unit</th>
+                    <th style={{ textAlign: 'left', padding: '8px 6px', fontWeight: 600, fontSize: 11, width: 90 }}>Unit Price</th>
+                    <th style={{ textAlign: 'right', padding: 8, fontWeight: 600, fontSize: 11, width: 90 }}>Total</th>
+                    <th style={{ width: 30 }}></th>
+                  </tr></thead>
+                  <tbody>
+                    {pqForm.lineItems.map((li, i) => (
+                      <tr key={i} style={{ borderTop: '1px solid var(--paper-100)' }}>
+                        <td style={{ padding: 6 }}>
+                          <select value={li.product} onChange={(e) => updatePQLineItem(i, { product: e.target.value })} style={{ width: '100%', fontSize: 12.5, padding: '6px 8px' }}>
+                            <option value="">Select product…</option>
+                            {products.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}
+                          </select>
+                        </td>
+                        <td style={{ padding: 6 }}><input type="number" min="0" value={li.qty} onChange={(e) => updatePQLineItem(i, { qty: e.target.value })} style={{ width: '100%', fontSize: 12.5, padding: '6px 8px' }} /></td>
+                        <td style={{ padding: 6 }}>
+                          <select value={li.unit} onChange={(e) => updatePQLineItem(i, { unit: e.target.value })} style={{ width: '100%', fontSize: 12.5, padding: '6px 8px' }}>
+                            <option value="kg">kg</option><option value="g">g</option><option value="MT">MT</option><option value="L">L</option>
+                          </select>
+                        </td>
+                        <td style={{ padding: 6 }}><input type="number" min="0" value={li.unitPrice} onChange={(e) => updatePQLineItem(i, { unitPrice: e.target.value })} style={{ width: '100%', fontSize: 12.5, padding: '6px 8px' }} /></td>
+                        <td className="cell-mono" style={{ padding: '6px 8px', textAlign: 'right' }}>{formatINR((Number(li.qty) || 0) * (Number(li.unitPrice) || 0))}</td>
+                        <td style={{ textAlign: 'center' }}>
+                          <button type="button" className="btn btn-ghost btn-sm" onClick={() => removePQLineItem(i)} disabled={pqForm.lineItems.length === 1}><IconTrash width={13} height={13} /></button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={addPQLineItem} style={{ marginTop: 8 }}><IconPlus width={13} height={13} /> Add line item</button>
+            </div>
+
+            <div style={{ marginTop: 14, padding: '12px 14px', background: 'var(--paper-0)', borderRadius: 8, fontSize: 13 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ color: 'var(--ink-500)' }}>Subtotal</span><span className="cell-mono">{formatINR(pqTotals.subtotal)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ color: 'var(--ink-500)' }}>GST ({GST_RATE}%)</span><span className="cell-mono">{formatINR(pqTotals.gstAmount)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 14.5, paddingTop: 6, borderTop: '1px solid var(--paper-200)' }}>
+                <span>Total</span><span className="cell-mono">{formatINR(pqTotals.total)}</span>
+              </div>
+            </div>
+
+            <div className="field" style={{ marginTop: 14 }}><label>Notes</label>
+              <textarea rows={2} value={pqForm.notes} onChange={(e) => setPQForm({ ...pqForm, notes: e.target.value })} /></div>
+          </form>
+        </Modal>
+      )}
+
+      {/* ---------- Compare Quotations modal ---------- */}
+      {showModal && modalKind === 'pq-compare' && compareList.length > 0 && (() => {
+        const allProducts = [...new Set(compareList.flatMap((q) => (q.lineItems || []).map((li) => li.product)))]
+        const totals = compareList.map((q) => pqTotal(q))
+        const minTotal = Math.min(...totals)
+        const minLeadTime = Math.min(...compareList.filter((q) => q.leadTimeDays != null).map((q) => Number(q.leadTimeDays)))
+        return (
+          <Modal
+            title={`Compare Quotations${compareList[0]?.rfqRef ? ` — ${compareList[0].rfqRef}` : ''}`}
+            size="lg"
+            onClose={closeModal}
+            footer={<button className="btn btn-secondary" onClick={closeModal}>Close</button>}
+          >
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', minWidth: 480 + compareList.length * 160, fontSize: 12.5, borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: 'var(--paper-0)' }}>
+                    <th style={{ textAlign: 'left', padding: 8, fontWeight: 600, fontSize: 11, width: 130 }}></th>
+                    {compareList.map((q) => (
+                      <th key={q.id} style={{ textAlign: 'left', padding: 8, fontWeight: 700, fontSize: 12.5, minWidth: 150 }}>
+                        {q.supplier}<br /><span className="cell-muted" style={{ fontWeight: 400, fontSize: 11 }}>{q.pqNo}</span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {allProducts.map((prod) => (
+                    <tr key={prod} style={{ borderTop: '1px solid var(--paper-100)' }}>
+                      <td style={{ padding: 8, fontWeight: 600, fontSize: 11 }}>{prod}</td>
+                      {compareList.map((q) => {
+                        const li = (q.lineItems || []).find((l) => l.product === prod)
+                        if (!li) return <td key={q.id} className="cell-muted" style={{ padding: 8 }}>— not quoted</td>
+                        const cheapest = compareList.every((other) => {
+                          const oli = (other.lineItems || []).find((l) => l.product === prod)
+                          return !oli || Number(oli.unitPrice) >= Number(li.unitPrice)
+                        })
+                        return (
+                          <td key={q.id} className="cell-mono" style={{ padding: 8, background: cheapest ? 'var(--teal-50, #ecfdf5)' : undefined, fontWeight: cheapest ? 700 : 400 }}>
+                            {li.qty} {li.unit} @ {formatINR(li.unitPrice)}
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  ))}
+                  <tr style={{ borderTop: '1px solid var(--paper-200)' }}>
+                    <td style={{ padding: 8, fontWeight: 600, fontSize: 11 }}>MOQ</td>
+                    {compareList.map((q) => <td key={q.id} className="cell-mono" style={{ padding: 8 }}>{q.moq ?? <span className="cell-muted">—</span>}</td>)}
+                  </tr>
+                  <tr>
+                    <td style={{ padding: 8, fontWeight: 600, fontSize: 11 }}>Lead time</td>
+                    {compareList.map((q) => (
+                      <td key={q.id} className="cell-mono" style={{ padding: 8, background: Number(q.leadTimeDays) === minLeadTime ? 'var(--teal-50, #ecfdf5)' : undefined, fontWeight: Number(q.leadTimeDays) === minLeadTime ? 700 : 400 }}>
+                        {q.leadTimeDays != null ? `${q.leadTimeDays}d` : <span className="cell-muted">—</span>}
+                      </td>
+                    ))}
+                  </tr>
+                  <tr>
+                    <td style={{ padding: 8, fontWeight: 600, fontSize: 11 }}>Payment terms</td>
+                    {compareList.map((q) => <td key={q.id} style={{ padding: 8 }}>{q.paymentTerms || <span className="cell-muted">—</span>}</td>)}
+                  </tr>
+                  <tr>
+                    <td style={{ padding: 8, fontWeight: 600, fontSize: 11 }}>Valid until</td>
+                    {compareList.map((q) => <td key={q.id} className="cell-mono" style={{ padding: 8 }}>{q.validUntil || <span className="cell-muted">—</span>}</td>)}
+                  </tr>
+                  <tr style={{ borderTop: '1px solid var(--paper-200)' }}>
+                    <td style={{ padding: 8, fontWeight: 700, fontSize: 12.5 }}>Total</td>
+                    {compareList.map((q) => {
+                      const t = pqTotal(q)
+                      return (
+                        <td key={q.id} className="cell-mono" style={{ padding: 8, fontWeight: 700, fontSize: 13.5, background: t === minTotal ? 'var(--teal-50, #ecfdf5)' : undefined, color: t === minTotal ? 'var(--teal-700, #0f766e)' : undefined }}>
+                          {formatINR(t)}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                  {canEdit && (
+                    <tr>
+                      <td style={{ padding: 8 }}></td>
+                      {compareList.map((q) => (
+                        <td key={q.id} style={{ padding: 8 }}>
+                          <button type="button" className="btn btn-primary btn-sm" onClick={() => handleSelectWinner(q)}>
+                            ✅ Select winner
+                          </button>
+                        </td>
+                      ))}
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <p style={{ fontSize: 11.5, color: 'var(--ink-500)', marginTop: 12, marginBottom: 0 }}>
+              Lowest price and shortest lead time are highlighted. Selecting a winner marks the other compared quotations as Rejected and offers to create a purchase order from the winner.
+            </p>
+          </Modal>
+        )
+      })()}
 
       {/* ---------- Purchase Order modal ---------- */}
       {showModal && modalKind === 'po' && (

@@ -7,7 +7,7 @@ import {
   seedQuotations, seedOrders, seedFollowUps, seedRoles, seedUsers,
   seedTasks, seedMeetings, seedDocuments,
   seedInvoices, seedPayments, seedStock, seedStockMovements,
-  seedShipments, seedSuppliers, seedPurchaseOrders, seedSupplierBills, seedSupplierPayments,
+  seedShipments, seedSuppliers, seedPurchaseOrders, seedPurchaseQuotations, seedSupplierBills, seedSupplierPayments,
 } from '../data/seed.js'
 
 const store = {
@@ -32,6 +32,7 @@ const store = {
   shipments: [...seedShipments],
   suppliers: [...seedSuppliers],
   purchaseOrders: [...seedPurchaseOrders],
+  purchaseQuotations: [...seedPurchaseQuotations],
   supplierBills: [...seedSupplierBills],
   supplierPayments: [...seedSupplierPayments],
   userPermissions: {}, // { [userId]: { [moduleKey]: { view, edit, delete } } }
@@ -113,6 +114,7 @@ export const mockDb = {
   shipments: table('shipments'),
   suppliers: table('suppliers'),
   purchaseOrders: table('purchaseOrders'),
+  purchaseQuotations: table('purchaseQuotations'),
   supplierBills: table('supplierBills'),
   supplierPayments: table('supplierPayments'),
   userPermissions: {

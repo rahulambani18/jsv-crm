@@ -342,6 +342,51 @@ export const seedPurchaseOrders = [
   },
 ]
 
+// Purchase Quotations (a.k.a. RFQ responses) — one row per supplier's
+// quote against a requirement. Multiple quotes sharing the same rfqRef
+// represent responses to the same RFQ and are what the "Compare" view
+// in Purchases -> Quotations lines up side by side.
+function pqLineItems(items) {
+  return items.map((li) => ({ ...li, lineTotal: Math.round(li.qty * li.unitPrice * 100) / 100 }))
+}
+export const seedPurchaseQuotations = [
+  {
+    id: 'pq1', pqNo: 'PQ-2026-0001', rfqRef: 'RFQ-2026-0007', supplierId: 'sup1', supplier: 'RZBC',
+    quoteDate: '2026-07-18', validUntil: '2026-08-20',
+    lineItems: pqLineItems([{ product: 'Citric Acid', qty: 1000, unit: 'kg', unitPrice: 192 }]),
+    subtotal: 192000, gstRate: 18, gstAmount: 34560, total: 226560,
+    moq: 500, leadTimeDays: 21, paymentTerms: 'Net 45', status: 'Received', notes: 'LC payment preferred',
+  },
+  {
+    id: 'pq2', pqNo: 'PQ-2026-0002', rfqRef: 'RFQ-2026-0007', supplierId: 'sup4', supplier: 'Jungbunzlauer',
+    quoteDate: '2026-07-19', validUntil: '2026-08-15',
+    lineItems: pqLineItems([{ product: 'Citric Acid', qty: 1000, unit: 'kg', unitPrice: 205 }]),
+    subtotal: 205000, gstRate: 18, gstAmount: 36900, total: 241900,
+    moq: 1000, leadTimeDays: 35, paymentTerms: 'Net 60', status: 'Received', notes: 'Premium EU-grade',
+  },
+  {
+    id: 'pq3', pqNo: 'PQ-2026-0003', rfqRef: 'RFQ-2026-0007', supplierId: 'sup5', supplier: 'Harihar Organics',
+    quoteDate: '2026-07-20', validUntil: '2026-08-10',
+    lineItems: pqLineItems([{ product: 'Citric Acid', qty: 1000, unit: 'kg', unitPrice: 198 }]),
+    subtotal: 198000, gstRate: 18, gstAmount: 35640, total: 233640,
+    moq: 250, leadTimeDays: 10, paymentTerms: 'Net 15', status: 'Received', notes: 'Domestic, fastest lead time',
+  },
+  {
+    id: 'pq4', pqNo: 'PQ-2026-0004', rfqRef: 'RFQ-2026-0008', supplierId: 'sup2', supplier: 'Emerald Kalama',
+    quoteDate: '2026-07-22', validUntil: '2026-08-22',
+    lineItems: pqLineItems([{ product: 'Sodium Benzoate', qty: 300, unit: 'kg', unitPrice: 560 }]),
+    subtotal: 168000, gstRate: 18, gstAmount: 30240, total: 198240,
+    moq: 200, leadTimeDays: 14, paymentTerms: 'Net 30', status: 'Received', notes: '',
+  },
+  {
+    id: 'pq5', pqNo: 'PQ-2026-0005', rfqRef: 'RFQ-2026-0008', supplierId: 'sup3', supplier: 'CP Kelco',
+    quoteDate: '2026-07-23', validUntil: '2026-08-23',
+    lineItems: pqLineItems([{ product: 'Sodium Benzoate', qty: 300, unit: 'kg', unitPrice: 585 }]),
+    subtotal: 175500, gstRate: 18, gstAmount: 31590, total: 207090,
+    moq: 100, leadTimeDays: 20, paymentTerms: 'Net 30', status: 'Received', notes: '',
+  },
+]
+
 export const seedSupplierBills = [
   { id: 'sb1', billNo: 'SBILL-2026-0001', supplierId: 'sup1', supplier: 'RZBC', poId: 'po1', poNo: 'PUR-2026-0001', supplierInvoiceNo: 'RZBC-INV-88213', billDate: '2026-07-02', dueDate: '2026-08-16', subtotal: 195000, gstAmount: 35100, total: 230100, amountPaid: 230100, status: 'Paid', notes: '' },
   { id: 'sb2', billNo: 'SBILL-2026-0002', supplierId: 'sup2', supplier: 'Emerald Kalama', poId: 'po2', poNo: 'PUR-2026-0002', supplierInvoiceNo: 'EK-2026-4471', billDate: '2026-07-10', dueDate: '2026-08-09', subtotal: 84000, gstAmount: 15120, total: 99120, amountPaid: 40000, status: 'Partial', notes: 'Billed for the received half only' },
