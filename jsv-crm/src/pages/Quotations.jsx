@@ -67,6 +67,166 @@ function emptyConvertForm(q, customers) {
   }
 }
 
+function fmtINR(n) {
+  return '₹' + Number(n || 0).toLocaleString('en-IN')
+}
+
+function buildQuotationHTML(q, customer) {
+  const lineItems = q.lineItems || []
+  const subtotal = lineItems.reduce((s, li) => s + (Number(li.qty) || 0) * (Number(li.price) || 0), 0) || Number(q.total || 0) / 1.18
+  const gst = Math.round(subtotal * 0.18 * 100) / 100
+  const total = q.total != null ? Number(q.total) : Math.round((subtotal + gst) * 100) / 100
+  const billAddress = customer?.billingAddress || ''
+  const cityState = [customer?.city, customer?.state].filter(Boolean).join(', ')
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Quotation - ${q.quoteNo || ''}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; font-size: 11px; color: #000; background: #fff; }
+  .page { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 8mm; border: 1px solid #000; }
+  .top-bar { text-align: center; background: #0f1e3d; color: #fff; padding: 4px 0; font-size: 10px; font-weight: bold; letter-spacing: 0.08em; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; border: 1px solid #000; border-top: none; padding: 8px 10px; }
+  .company-block { flex: 1; }
+  .company-name { font-size: 18px; font-weight: 900; color: #0f1e3d; }
+  .company-sub { font-size: 9px; color: #444; margin: 1px 0; }
+  .company-address { font-size: 9.5px; margin-top: 5px; line-height: 1.5; }
+  .quote-title-block { text-align: right; flex: 0 0 160px; border-left: 1px solid #ccc; padding-left: 10px; }
+  .quote-title { font-size: 14px; font-weight: 900; color: #0f1e3d; border-bottom: 1px solid #000; padding-bottom: 4px; margin-bottom: 6px; }
+  .quote-title-block table { width: 100%; font-size: 10px; }
+  .quote-title-block td { padding: 2px 0; }
+  .quote-title-block td:last-child { font-weight: bold; }
+  .party-box { border: 1px solid #000; border-top: none; padding: 6px 8px; }
+  .party-label { font-size: 9px; font-weight: bold; text-transform: uppercase; color: #666; margin-bottom: 3px; }
+  .party-name { font-size: 12px; font-weight: bold; }
+  .party-detail { font-size: 10px; line-height: 1.6; margin-top: 2px; }
+  .items-table { width: 100%; border-collapse: collapse; }
+  .items-table th { background: #0f1e3d; color: #fff; padding: 5px 6px; font-size: 9.5px; text-align: center; border: 1px solid #000; font-weight: bold; }
+  .items-table th.left { text-align: left; }
+  .items-table td { padding: 5px 6px; font-size: 10px; border: 1px solid #ccc; vertical-align: top; }
+  .items-table td.center { text-align: center; }
+  .items-table td.right { text-align: right; }
+  .totals-section { display: flex; justify-content: flex-end; border: 1px solid #000; border-top: none; }
+  .totals-box { width: 260px; padding: 6px 8px; }
+  .totals-box table { width: 100%; font-size: 10.5px; }
+  .totals-box td { padding: 3px 4px; }
+  .totals-box td:last-child { text-align: right; font-weight: 600; }
+  .totals-box tr.grand td { font-size: 13px; font-weight: 900; border-top: 2px solid #000; padding-top: 5px; color: #0f1e3d; }
+  .footer-section { display: flex; border: 1px solid #000; border-top: none; }
+  .terms-block { flex: 1; padding: 6px 8px; font-size: 9.5px; line-height: 1.7; border-right: 1px solid #000; }
+  .terms-block strong { display: block; margin-bottom: 3px; font-size: 10px; }
+  .sign-block { width: 180px; padding: 6px 8px; text-align: center; }
+  .sign-block .company-sign { font-size: 10px; font-weight: bold; margin-bottom: 40px; }
+  .sign-block .sign-line { border-top: 1px solid #000; padding-top: 4px; font-size: 9.5px; }
+  @media print { body { margin: 0; } .page { border: none; padding: 5mm; width: 100%; } @page { size: A4; margin: 8mm; } }
+</style></head>
+<body><div class="page">
+
+<div class="top-bar">QUOTATION</div>
+
+<div class="header">
+  <div class="company-block">
+    <div class="company-name">JSV INGREDIENT</div>
+    <div class="company-sub">Formerly known as Sanjay Chemicals - P.M. Vora &amp; Co.</div>
+    <div class="company-sub">Importers &amp; Stockists of Food Additives &amp; Chemicals</div>
+    <div class="company-address">
+      301, Sterling Estate, Inside Spectra Motor Compound, Ramchandra Lane Extn.,<br>
+      Kachpada, Malad (West), Mumbai – 400 064.<br>
+      Tel: 022 3511 4041/5999/6000/6001 &nbsp;|&nbsp; Mobile: +91 9820155312<br>
+      E-mail: smit.vora@jsvingredient.net &nbsp;|&nbsp; Website: www.jsvingredient.com
+    </div>
+    <div style="margin-top:6px;font-size:10px;">
+      <strong>GSTIN: 27AABCJ1234P1ZV</strong> &nbsp;|&nbsp; State: Maharashtra (27)
+    </div>
+  </div>
+  <div class="quote-title-block">
+    <div class="quote-title">QUOTATION</div>
+    <table>
+      <tr><td>Quote No.</td><td>${q.quoteNo || '—'}</td></tr>
+      <tr><td>Quote Date</td><td>${q.issueDate || '—'}</td></tr>
+      <tr><td>Valid Until</td><td>${q.validUntil || '—'}</td></tr>
+      <tr><td>Status</td><td>${q.status || '—'}</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="party-box">
+  <div class="party-label">To</div>
+  <div class="party-name">${q.company || ''}</div>
+  <div class="party-detail">
+    Address: ${billAddress || '___________________________________'}<br>
+    City / State: ${cityState || '________________________________'}<br>
+    GSTIN / UIN: ${customer?.gst || '________________________________'}<br>
+    Contact: ${customer?.contact || '—'} ${customer?.mobile ? '· ' + customer.mobile : ''}
+  </div>
+</div>
+
+<table class="items-table">
+  <thead>
+    <tr>
+      <th style="width:28px">Sr.</th>
+      <th class="left">Description of Goods</th>
+      <th style="width:70px">Packing</th>
+      <th style="width:55px">Qty</th>
+      <th style="width:80px">Rate (₹)</th>
+      <th style="width:90px">Amount (₹)</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${lineItems.length > 0 ? lineItems.map((li, i) => {
+      const amt = Number(li.qty || 0) * Number(li.price || 0)
+      return `<tr>
+        <td class="center">${i + 1}</td>
+        <td>${li.product || ''}</td>
+        <td class="center">${li.packingSize || '—'}</td>
+        <td class="center">${li.qty || ''}</td>
+        <td class="right">${Number(li.price || 0).toLocaleString('en-IN')}</td>
+        <td class="right">${amt.toLocaleString('en-IN')}</td>
+      </tr>`
+    }).join('') : `<tr>
+      <td class="center">1</td>
+      <td colspan="4">${q.items || 1} item(s) as quoted</td>
+      <td class="right">${fmtINR(subtotal)}</td>
+    </tr>`}
+  </tbody>
+</table>
+
+<div class="totals-section">
+  <div class="totals-box">
+    <table>
+      <tr><td>Subtotal</td><td>${fmtINR(subtotal)}</td></tr>
+      <tr><td>GST @ 18%</td><td>${fmtINR(gst)}</td></tr>
+      <tr class="grand"><td>TOTAL</td><td>${fmtINR(total)}</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="footer-section">
+  <div class="terms-block">
+    <strong>Terms &amp; Conditions:</strong>
+    1. This quotation is valid until ${q.validUntil || 'the date mentioned above'}, subject to change without prior notice thereafter.<br>
+    2. Prices are exclusive of GST unless stated otherwise; GST as applicable will be charged extra.<br>
+    3. Delivery lead time and payment terms to be confirmed at the time of order confirmation.<br>
+    4. Subject to Mumbai jurisdiction only. E. &amp; O.E. (Errors &amp; Omissions Excepted)
+  </div>
+  <div class="sign-block">
+    <div class="company-sign">For JSV INGREDIENT</div>
+    <div class="sign-line">Authorised Signatory</div>
+  </div>
+</div>
+
+</div></body></html>`
+  return html
+}
+
+function printQuotation(q, customer) {
+  const html = buildQuotationHTML(q, customer)
+  const w = window.open('', '_blank')
+  w.document.write(html)
+  w.document.close()
+  w.focus()
+  setTimeout(() => { w.print() }, 600)
+}
+
 export default function Quotations() {
   const { can } = useAuth()
   const canEdit = can('quotations', 'edit')
@@ -478,6 +638,7 @@ export default function Quotations() {
                   <RowActionsMenu
                     items={[
                       { label: 'Edit', icon: <IconEdit width={13} height={13} />, onClick: () => openEdit(q) },
+                      { label: 'Print / Save as PDF', icon: '🖨', onClick: () => printQuotation(q, customer) },
                       can('orders', 'edit') && {
                         label: convertedOrderFor(q) ? 'Already converted' : 'Convert to Order',
                         icon: '🛒',
