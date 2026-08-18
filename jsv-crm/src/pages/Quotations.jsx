@@ -261,6 +261,10 @@ export default function Quotations() {
     if (!silent) setLoading(true)
     Promise.all([api.quotations.list(), api.products.list(), api.customers.list()]).then(([q, p, c]) => {
       setQuotations(q); setProducts(p); setCustomers(c); setLoading(false)
+    }).catch((err) => {
+      console.error('Failed to load quotations/products/customers:', err)
+      showToast(`Failed to load data: ${err.message || err}`, 'error')
+      setLoading(false)
     })
   }
 

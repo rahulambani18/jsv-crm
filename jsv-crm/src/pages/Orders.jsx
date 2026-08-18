@@ -122,6 +122,10 @@ export default function Orders() {
     if (!silent) setLoading(true)
     Promise.all([api.orders.list(), api.customers.list(), api.products.list()]).then(([o, c, p]) => {
       setOrders(o); setCustomers(c); setProducts(p); setLoading(false)
+    }).catch((err) => {
+      console.error('Failed to load orders/customers/products:', err)
+      showToast(`Failed to load data: ${err.message || err}`, 'error')
+      setLoading(false)
     })
   }
 

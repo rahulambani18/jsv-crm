@@ -105,7 +105,11 @@ export default function Purchases() {
         setSuppliers(sup); setPurchaseOrders(po); setPurchaseQuotations(pq); setSupplierBills(bill); setSupplierPayments(pay); setProducts(prod)
         setLoading(false)
       })
-      .catch(() => setLoading(false))
+      .catch((err) => {
+        console.error('Failed to load purchases data:', err)
+        showToast(`Failed to load data: ${err.message || err}`, 'error')
+        setLoading(false)
+      })
   }
 
   // ---------- top-line stats across the whole module ----------

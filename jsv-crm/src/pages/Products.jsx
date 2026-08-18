@@ -69,7 +69,11 @@ export default function Products() {
 
   function refresh(silent = false) {
     if (!silent) setLoading(true)
-    api.products.list().then((data) => { setProducts(data); setLoading(false) })
+    api.products.list().then((data) => { setProducts(data); setLoading(false) }).catch((err) => {
+      console.error('Failed to load products:', err)
+      showToast(`Failed to load products: ${err.message || err}`, 'error')
+      setLoading(false)
+    })
   }
 
   const categories = useMemo(() => ['All categories', ...new Set(products.map((p) => p.category).filter(Boolean))], [products])
