@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { api } from '../lib/api.js'
+import { api, storage } from '../lib/api.js'
 import { WAREHOUSES, calcOrderTotals, GST_RATE } from '../data/seed.js'
 import PageHeader from '../components/PageHeader.jsx'
 import ExportBar from '../components/ExportBar.jsx'
@@ -75,7 +75,7 @@ const ORDER_COLUMNS = [
 ]
 
 export default function Orders() {
-  const { can } = useAuth()
+  const { can, user } = useAuth()
   const canEdit = can('orders', 'edit')
   const canDelete = can('orders', 'delete')
   const [searchParams] = useSearchParams()
@@ -95,6 +95,11 @@ export default function Orders() {
   const [form, setForm] = useState(emptyForm())
   const [saving, setSaving] = useState(false)
   const [selected, setSelected] = useState(new Set())
+  const [showCoaModal, setShowCoaModal] = useState(false)
+  const [coaForm, setCoaForm] = useState({ type: 'COA', url: '', fileName: '', date: new Date().toISOString().slice(0, 10) })
+  const [coaUploading, setCoaUploading] = useState(false)
+  const [coaSaving, setCoaSaving] = useState(false)
+  const [coaError, setCoaError] = useState('')
   const [users, setUsers] = useState([])
   const [invoices, setInvoices] = useState([])
   const [payments, setPayments] = useState([])
@@ -261,6 +266,53 @@ export default function Orders() {
       ['PO Number', 'Order #', 'Company', 'Warehouse', 'Order Date', 'Expected Delivery', 'Dispatch Date', 'Assigned To', 'Total', 'Status', 'Payment', 'Shipping Docs'],
       rows.map((o) => [o.poNumber, o.orderNo, o.company, o.warehouse, o.orderDate, o.delivery, o.dispatchDate, o.assignedTo || 'Unassigned', `₹${Number(o.total).toLocaleString('en-IN')}`, o.status, o.payment, DOCS_ELIGIBLE_STATUSES.includes(o.status) ? `${docsCollectedCount(o.shippingDocs)}/${SHIPPING_DOC_FIELDS.length}` : '—'])
     )
+  }
+
+  async function handleCoaFileChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setCoaError('')
+    setCoaUploading(true)
+    try {
+      const uploaded = await storage.uploadFile(file, 'documents')
+      setCoaForm((f) => ({ ...f, url: uploaded.url, fileName: uploaded.name }))
+    } catch (err) {
+      setCoaError('Upload failed: ' + (err.message || 'Unknown error'))
+    } finally {
+      setCoaUploading(false)
+    }
+  }
+
+  // Bulk COA/MSDS attach for a dispatch run: one upload, linked to every
+  // selected order at once via a single Document record tagged with all
+  // the order numbers and their products.
+  async function handleBulkAttachCoa(e) {
+    e.preventDefault()
+    if (!coaForm.url) { setCoaError('Choose a file or the certificate has nothing to link.'); return }
+    setCoaSaving(true)
+    const rows = filtered.filter((o) => selected.has(o.id))
+    const codes = rows.map((o) => o.orderNo).filter(Boolean)
+    const distinctProducts = [...new Set(rows.flatMap((o) => (o.lineItems || []).map((li) => li.product)))].filter(Boolean)
+    const record = {
+      name: `${coaForm.type} — ${codes.join(', ')}`,
+      type: coaForm.type,
+      relatedProduct: distinctProducts.join(', '),
+      url: coaForm.url,
+      date: coaForm.date,
+      uploadedBy: user?.name || '',
+      tags: [coaForm.type, ...codes],
+    }
+    try {
+      await api.documents.insert(record)
+      setShowCoaModal(false)
+      setCoaForm({ type: 'COA', url: '', fileName: '', date: new Date().toISOString().slice(0, 10) })
+      setSelected(new Set())
+      showToast(`${coaForm.type} attached to ${rows.length} order${rows.length === 1 ? '' : 's'}`)
+    } catch (err) {
+      setCoaError('Could not save: ' + (err.message || 'Unknown error'))
+    } finally {
+      setCoaSaving(false)
+    }
   }
 
   async function handleBulkAssign(repName) {
@@ -464,7 +516,51 @@ export default function Orders() {
           <button type="button" className="btn btn-ghost-light" onClick={handleBulkGenerateInvoice}>
             🧾 Generate Invoice
           </button>
+          <button type="button" className="btn btn-ghost-light" onClick={() => { setCoaForm({ type: 'COA', url: '', fileName: '', date: new Date().toISOString().slice(0, 10) }); setCoaError(''); setShowCoaModal(true) }}>
+            📎 Attach COA
+          </button>
         </BulkActionsBar>
+      )}
+
+      {showCoaModal && (
+        <Modal title={`Attach certificate to ${selected.size} order${selected.size === 1 ? '' : 's'}`} onClose={() => setShowCoaModal(false)}
+          footer={
+            <>
+              <button className="btn btn-secondary" onClick={() => setShowCoaModal(false)}>Cancel</button>
+              <button className="btn btn-primary" form="order-coa-form" type="submit" disabled={coaSaving || coaUploading}>
+                {coaSaving ? 'Attaching…' : 'Attach to selected'}
+              </button>
+            </>
+          }
+        >
+          <form id="order-coa-form" onSubmit={handleBulkAttachCoa}>
+            <p style={{ fontSize: 12.5, color: 'var(--ink-500)', marginTop: 0 }}>
+              Upload once — it's saved to Documents and tagged with every order number selected, so the whole dispatch is covered by one certificate.
+            </p>
+            <div className="field-row">
+              <div className="field">
+                <label>Document type</label>
+                <select className="select-input" value={coaForm.type} onChange={(e) => setCoaForm((f) => ({ ...f, type: e.target.value }))}>
+                  <option>COA</option>
+                  <option>MSDS</option>
+                  <option>TDS</option>
+                  <option>Certificate</option>
+                </select>
+              </div>
+              <div className="field">
+                <label>Date</label>
+                <input type="date" value={coaForm.date} onChange={(e) => setCoaForm((f) => ({ ...f, date: e.target.value }))} />
+              </div>
+            </div>
+            <div className="field">
+              <label>File</label>
+              <input type="file" onChange={handleCoaFileChange} disabled={coaUploading} />
+              {coaUploading && <span style={{ fontSize: 12, color: 'var(--ink-500)' }}>Uploading…</span>}
+              {coaForm.fileName && !coaUploading && <span style={{ fontSize: 12, color: 'var(--ink-500)' }}>Attached: {coaForm.fileName}</span>}
+            </div>
+            {coaError && <p style={{ color: 'var(--red-600)', fontSize: 12.5 }}>{coaError}</p>}
+          </form>
+        </Modal>
       )}
 
       <div className="table-wrap sticky-first-col">

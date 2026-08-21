@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { api } from '../lib/api.js'
+import { api, storage } from '../lib/api.js'
 import { COURIERS } from '../data/seed.js'
 import PageHeader from '../components/PageHeader.jsx'
 import ExportBar from '../components/ExportBar.jsx'
@@ -42,8 +42,14 @@ function emptyForm() {
   return { company: '', contact: '', phone: '', email: '', products: [], qty: '', sent: '', courier: '', tracking: '', status: 'Preparing' }
 }
 
+const DOC_TYPES = ['COA', 'MSDS', 'TDS', 'Certificate']
+
+function emptyCoaForm() {
+  return { type: 'COA', url: '', fileName: '', date: new Date().toISOString().slice(0, 10) }
+}
+
 export default function Samples() {
-  const { can } = useAuth()
+  const { can, user } = useAuth()
   const canEdit = can('samples', 'edit')
   const canDelete = can('samples', 'delete')
   const [samples, setSamples] = useState([])
@@ -58,6 +64,11 @@ export default function Samples() {
   const [saving, setSaving] = useState(false)
   const [selected, setSelected] = useState(new Set())
   const [users, setUsers] = useState([])
+  const [showCoaModal, setShowCoaModal] = useState(false)
+  const [coaForm, setCoaForm] = useState(emptyCoaForm())
+  const [coaUploading, setCoaUploading] = useState(false)
+  const [coaSaving, setCoaSaving] = useState(false)
+  const [coaError, setCoaError] = useState('')
   const [sendModal, setSendModal] = useState(null) // 'whatsapp' | 'email' | null
 
   useEffect(() => { refresh() }, [])
@@ -169,6 +180,54 @@ export default function Samples() {
     }
   }
 
+  async function handleCoaFileChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setCoaError('')
+    setCoaUploading(true)
+    try {
+      const uploaded = await storage.uploadFile(file, 'documents')
+      setCoaForm((f) => ({ ...f, url: uploaded.url, fileName: uploaded.name }))
+    } catch (err) {
+      setCoaError('Upload failed: ' + (err.message || 'Unknown error'))
+    } finally {
+      setCoaUploading(false)
+    }
+  }
+
+  // Bulk COA/MSDS attach: one upload, linked to every selected sample at
+  // once — creates a single Document record tagged with all the sample
+  // codes and their products, rather than making the user attach the
+  // same certificate one sample at a time.
+  async function handleBulkAttachCoa(e) {
+    e.preventDefault()
+    if (!coaForm.url) { setCoaError('Choose a file or the certificate has nothing to link.'); return }
+    setCoaSaving(true)
+    const rows = filtered.filter((s) => selected.has(s.id))
+    const codes = rows.map((s) => s.code).filter(Boolean)
+    const distinctProducts = [...new Set(rows.flatMap((s) => s.products || []))]
+    const record = {
+      name: `${coaForm.type} — ${codes.join(', ')}`,
+      type: coaForm.type,
+      relatedProduct: distinctProducts.join(', '),
+      url: coaForm.url,
+      date: coaForm.date,
+      uploadedBy: user?.name || '',
+      tags: [coaForm.type, ...codes],
+    }
+    try {
+      await api.documents.insert(record)
+      setShowCoaModal(false)
+      setCoaForm(emptyCoaForm())
+      setSelected(new Set())
+      showToast(`${coaForm.type} attached to ${rows.length} sample${rows.length === 1 ? '' : 's'}`)
+    } catch (err) {
+      setCoaError('Could not save: ' + (err.message || 'Unknown error'))
+    } finally {
+      setCoaSaving(false)
+    }
+  }
+
   const sendRows = useMemo(() => filtered.filter((s) => selected.has(s.id)).map((s) => ({
     key: s.id,
     title: s.company,
@@ -225,7 +284,46 @@ export default function Samples() {
           </select>
           <button type="button" className="btn btn-ghost-light" onClick={() => setSendModal('email')}>✉️ Send Email</button>
           <button type="button" className="btn btn-ghost-light" onClick={() => setSendModal('whatsapp')}>💬 Send WhatsApp</button>
+          <button type="button" className="btn btn-ghost-light" onClick={() => { setCoaForm(emptyCoaForm()); setCoaError(''); setShowCoaModal(true) }}>📎 Attach COA</button>
         </BulkActionsBar>
+      )}
+
+      {showCoaModal && (
+        <Modal title={`Attach certificate to ${selected.size} sample${selected.size === 1 ? '' : 's'}`} onClose={() => setShowCoaModal(false)}
+          footer={
+            <>
+              <button className="btn btn-secondary" onClick={() => setShowCoaModal(false)}>Cancel</button>
+              <button className="btn btn-primary" form="coa-form" type="submit" disabled={coaSaving || coaUploading}>
+                {coaSaving ? 'Attaching…' : 'Attach to selected'}
+              </button>
+            </>
+          }
+        >
+          <form id="coa-form" onSubmit={handleBulkAttachCoa}>
+            <p style={{ fontSize: 12.5, color: 'var(--ink-500)', marginTop: 0 }}>
+              Upload once — it's saved to Documents and tagged with every sample code selected, so the whole batch is covered by one certificate.
+            </p>
+            <div className="field-row">
+              <div className="field">
+                <label>Document type</label>
+                <select className="select-input" value={coaForm.type} onChange={(e) => setCoaForm((f) => ({ ...f, type: e.target.value }))}>
+                  {DOC_TYPES.map((t) => <option key={t}>{t}</option>)}
+                </select>
+              </div>
+              <div className="field">
+                <label>Date</label>
+                <input type="date" value={coaForm.date} onChange={(e) => setCoaForm((f) => ({ ...f, date: e.target.value }))} />
+              </div>
+            </div>
+            <div className="field">
+              <label>File</label>
+              <input type="file" onChange={handleCoaFileChange} disabled={coaUploading} />
+              {coaUploading && <span style={{ fontSize: 12, color: 'var(--ink-500)' }}>Uploading…</span>}
+              {coaForm.fileName && !coaUploading && <span style={{ fontSize: 12, color: 'var(--ink-500)' }}>Attached: {coaForm.fileName}</span>}
+            </div>
+            {coaError && <p style={{ color: 'var(--red-600)', fontSize: 12.5 }}>{coaError}</p>}
+          </form>
+        </Modal>
       )}
 
       <BulkSendModal

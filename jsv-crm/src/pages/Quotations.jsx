@@ -344,6 +344,22 @@ export default function Quotations() {
     setShowModal(true)
   }
 
+  // Duplicate: opens the "New Quotation" form pre-filled from an existing
+  // quote (same company/items/pricing), but with a blank validity date and
+  // status reset to Draft — since a clone is a fresh quote, not the old one.
+  function openDuplicate(q) {
+    setEditingId(null)
+    setForm({
+      company: q.company || '',
+      validUntil: '',
+      status: 'Draft',
+      lineItems: q.lineItems && q.lineItems.length
+        ? q.lineItems.map((li) => ({ ...li }))
+        : [emptyLineItem()],
+    })
+    setShowModal(true)
+  }
+
   async function handleDelete(q) {
     if (!confirm(`Delete quotation "${q.quoteNo}" for "${q.company}"? This cannot be undone.`)) return
     try {
@@ -642,6 +658,7 @@ export default function Quotations() {
                   <RowActionsMenu
                     items={[
                       { label: 'Edit', icon: <IconEdit width={13} height={13} />, onClick: () => openEdit(q) },
+                      { label: 'Duplicate', icon: '⧉', onClick: () => openDuplicate(q) },
                       { label: 'Print / Save as PDF', icon: '🖨', onClick: () => printQuotation(q, customer) },
                       can('orders', 'edit') && {
                         label: convertedOrderFor(q) ? 'Already converted' : 'Convert to Order',

@@ -198,6 +198,24 @@ export default function Purchases() {
   function openCreatePO() { setEditingId(null); setPOForm(emptyPOForm()); setModalKind('po'); setShowModal(true) }
   function openEditPO(po) { setEditingId(po.id); setPOForm({ ...emptyPOForm(), ...po }); setModalKind('po'); setShowModal(true) }
 
+  // Duplicate: same supplier + line items, but dates reset to today and
+  // status back to Draft, with no receipts/PO number carried over — this
+  // is a new order, not a copy of the old one's fulfillment history.
+  function openDuplicatePO(po) {
+    setEditingId(null)
+    setPOForm({
+      ...emptyPOForm(),
+      supplierId: po.supplierId || '',
+      supplier: po.supplier || '',
+      warehouse: po.warehouse || WAREHOUSES[0],
+      lineItems: po.lineItems && po.lineItems.length ? po.lineItems.map((li) => ({ ...li })) : [emptyLineItem()],
+      assignedTo: po.assignedTo || '',
+      notes: po.notes || '',
+    })
+    setModalKind('po')
+    setShowModal(true)
+  }
+
   async function handleSavePO(e) {
     e.preventDefault()
     setSaving(true)
@@ -709,6 +727,7 @@ export default function Purchases() {
                         <button className="btn btn-ghost btn-sm" title="Generate a supplier bill from this PO" onClick={() => handleGenerateBill(po)}>🧾 Bill</button>
                       )}
                       {canEdit && <button className="btn btn-ghost btn-sm" onClick={() => openEditPO(po)}><IconEdit width={13} height={13} /></button>}
+                      {canEdit && <button className="btn btn-ghost btn-sm" title="Duplicate this purchase order" onClick={() => openDuplicatePO(po)}>⧉</button>}
                       {canDelete && <button className="btn btn-ghost btn-sm btn-danger" onClick={() => handleDeletePO(po)}><IconTrash width={13} height={13} /></button>}
                     </div>
                   </td>

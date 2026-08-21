@@ -144,6 +144,7 @@ export default function Inventory() {
   const [importError, setImportError] = useState('')
   const [importBusy, setImportBusy] = useState(false)
   const fileInputRef = useRef(null)
+  const scanInputRef = useRef(null)
 
   const [showTransferModal, setShowTransferModal] = useState(false)
   const [transferForm, setTransferForm] = useState(emptyTransferForm())
@@ -287,7 +288,7 @@ export default function Inventory() {
 
   const filtered = useMemo(() => {
     return stock.filter((s) => {
-      const matchesSearch = !search || [s.product, s.warehouse, s.batchNumber, s.lotNumber].some((v) => (v || '').toLowerCase().includes(search.toLowerCase()))
+      const matchesSearch = !search || [s.product, s.warehouse, s.batchNumber, s.lotNumber, s.barcode].some((v) => (v || '').toLowerCase().includes(search.toLowerCase()))
       const matchesWarehouse = warehouseFilter === 'All' || s.warehouse === warehouseFilter
       const matchesStatus = statusFilter === 'All' || stockStatus(s) === statusFilter
       const matchesArchived = showArchived ? !!s.archived : !s.archived
@@ -557,6 +558,23 @@ export default function Inventory() {
     }
   }
 
+  // Scan-to-lookup: a USB/handheld barcode scanner behaves like fast
+  // keyboard input followed by Enter. On Enter, if the typed text is an
+  // exact barcode match, jump straight into that batch's details instead
+  // of just leaving the list filtered — this is what makes it feel like a
+  // real scan rather than a manual search.
+  function handleScanKeyDown(e) {
+    if (e.key !== 'Enter') return
+    const code = search.trim()
+    if (!code) return
+    const match = stock.find((s) => (s.barcode || '').toLowerCase() === code.toLowerCase())
+    if (match) {
+      e.preventDefault()
+      openBatchDetails(match)
+      showToast(`Scanned: ${match.product} — ${match.warehouse}`)
+    }
+  }
+
   function openBatchDetails(row) {
     setBatchRow(row)
     setBatchForm({
@@ -757,8 +775,23 @@ export default function Inventory() {
       <div className="filters-bar">
         <div className="search-input">
           <IconSearch width={16} height={16} />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search product, warehouse, batch, lot…" />
+          <input
+            ref={scanInputRef}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={handleScanKeyDown}
+            placeholder="Search or scan barcode…"
+          />
         </div>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          title="Click, then scan a barcode — it'll jump straight to that batch"
+          onClick={() => scanInputRef.current?.focus()}
+        >
+          <IconBarcode width={13} height={13} />
+          Scan
+        </button>
         <Dropdown
           options={['All', ...warehouseNames]}
           value={warehouseFilter}
