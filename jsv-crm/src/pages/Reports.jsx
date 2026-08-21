@@ -12,7 +12,9 @@ import PageHeader from '../components/PageHeader.jsx'
 import StatCard from '../components/StatCard.jsx'
 import ExportBar from '../components/ExportBar.jsx'
 import ReportShareModal from '../components/ReportShareModal.jsx'
-import { IconUsers, IconTrend, IconCart, IconRupee } from '../components/Icons.jsx'
+import Pill from '../components/Pill.jsx'
+import SendButtons from '../components/SendButtons.jsx'
+import { IconUsers, IconTrend, IconCart, IconRupee, IconAlertTriangle, IconClock } from '../components/Icons.jsx'
 import { REPORT_PERIODS, periodRange, isWithinRange, periodLabel } from '../lib/reportPeriods.js'
 import { showToast } from '../lib/toast.js'
 import CardSkeleton from '../components/CardSkeleton.jsx'
@@ -32,6 +34,8 @@ export default function Reports() {
   const [leads, setLeads] = useState([])
   const [orders, setOrders] = useState([])
   const [users, setUsers] = useState([])
+  const [stock, setStock] = useState([])
+  const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchParams, setSearchParams] = useSearchParams()
   const [period, setPeriod, periodMeta] = usePersistedFilter(
@@ -45,8 +49,11 @@ export default function Reports() {
 
   function loadData(silent = false) {
     if (!silent) setLoading(true)
-    return Promise.all([api.leads.list(), api.orders.list(), api.users.list().catch(() => [])]).then(([l, o, u]) => {
-      setLeads(l); setOrders(o); setUsers(u); setLoading(false)
+    return Promise.all([
+      api.leads.list(), api.orders.list(), api.users.list().catch(() => []),
+      api.stock.list().catch(() => []), api.customers.list().catch(() => []),
+    ]).then(([l, o, u, st, c]) => {
+      setLeads(l); setOrders(o); setUsers(u); setStock(st); setCustomers(c); setLoading(false)
     })
   }
 
@@ -118,6 +125,86 @@ export default function Reports() {
       .sort((a, b) => b.revenue - a.revenue)
   }, [filteredOrders])
 
+  // ---------- Reorder suggestions (demand forecasting) ----------
+  // Looks at the last 90 days of dispatched quantity per product across
+  // all orders (not just the selected report period — a reorder call
+  // needs the real consumption trend, not a filtered slice of it),
+  // turns that into an average daily consumption rate, then compares it
+  // against total stock on hand right now. A product is flagged once
+  // its current stock would run out inside the lead-time buffer below.
+  const REORDER_LEAD_DAYS = 30 // how much cover we want left when reordering
+  const reorderSuggestions = useMemo(() => {
+    const now = new Date()
+    const since = new Date(now.getTime() - 90 * 86400000)
+    const consumed = {}
+    orders.forEach((o) => {
+      const d = new Date(o.orderDate)
+      if (isNaN(d) || d < since) return
+      ;(o.lineItems || []).forEach((li) => {
+        if (!li.product) return
+        consumed[li.product] = (consumed[li.product] || 0) + (Number(li.qty) || 0)
+      })
+    })
+    const stockByProduct = {}
+    stock.forEach((s) => {
+      stockByProduct[s.product] = (stockByProduct[s.product] || 0) + (Number(s.qtyOnHand) || 0)
+    })
+    const allProducts = new Set([...Object.keys(consumed), ...Object.keys(stockByProduct)])
+    const rows = [...allProducts].map((product) => {
+      const totalConsumed = consumed[product] || 0
+      const avgDaily = totalConsumed / 90
+      const onHand = stockByProduct[product] || 0
+      const daysCover = avgDaily > 0 ? onHand / avgDaily : (onHand > 0 ? Infinity : 0)
+      const targetStock = Math.ceil(avgDaily * REORDER_LEAD_DAYS * 1.5)
+      const suggestedQty = avgDaily > 0 ? Math.max(0, targetStock - onHand) : 0
+      return { product, onHand, avgMonthly: Math.round(avgDaily * 30), daysCover, suggestedQty }
+    })
+    return rows
+      .filter((r) => r.avgMonthly > 0 && r.daysCover < REORDER_LEAD_DAYS)
+      .sort((a, b) => a.daysCover - b.daysCover)
+      .slice(0, 8)
+  }, [orders, stock])
+
+  // ---------- At-risk / churn-risk customers ----------
+  // For each company with at least 2 past orders, works out their usual
+  // ordering cadence (average gap between consecutive orders) and flags
+  // them once the silence since their last order has run well past that
+  // — e.g. a customer who ordered roughly monthly and hasn't shown up
+  // in ~10 weeks. Single-order customers are skipped: there's no cadence
+  // yet to judge them against, so "gone quiet" doesn't apply.
+  const atRiskCustomers = useMemo(() => {
+    const now = new Date()
+    const byCompany = {}
+    orders.forEach((o) => {
+      const d = new Date(o.orderDate)
+      if (isNaN(d) || !o.company) return
+      ;(byCompany[o.company] ||= []).push(d)
+    })
+    const rows = Object.entries(byCompany)
+      .filter(([, dates]) => dates.length >= 2)
+      .map(([company, dates]) => {
+        dates.sort((a, b) => a - b)
+        const gaps = []
+        for (let i = 1; i < dates.length; i++) gaps.push((dates[i] - dates[i - 1]) / 86400000)
+        const avgGapDays = gaps.reduce((s, g) => s + g, 0) / gaps.length
+        const lastOrder = dates[dates.length - 1]
+        const daysSince = (now - lastOrder) / 86400000
+        const riskRatio = avgGapDays > 0 ? daysSince / avgGapDays : 0
+        return { company, avgGapDays, daysSince, riskRatio, lastOrder }
+      })
+      // Flag once silence is ~1.8x their normal gap, capped so a
+      // customer with a huge natural gap (e.g. seasonal, every 6
+      // months) doesn't get flagged after one slightly-late order.
+      .filter((r) => r.riskRatio >= 1.8 && r.avgGapDays <= 90)
+      .sort((a, b) => b.riskRatio - a.riskRatio)
+      .slice(0, 8)
+      .map((r) => {
+        const customer = customers.find((c) => c.company === r.company)
+        return { ...r, customer }
+      })
+    return rows
+  }, [orders, customers])
+
   // Flat metric list reused by Download PDF / Download Excel (via
   // ExportBar) so the exported file matches what's on screen for the
   // selected period, not just the raw table data.
@@ -130,7 +217,9 @@ export default function Reports() {
     ...industryData.map((i) => [`Industry — ${i.name}`, i.value]),
     ...warehouseData.map((w) => [`Warehouse — ${w.name}`, w.count]),
     ...revenueByRep.map((r) => [`Revenue — ${r.rep}`, formatINR(r.revenue)]),
-  ], [totalLeads, conversionRate, filteredOrders.length, totalRevenue, funnelData, industryData, warehouseData, revenueByRep])
+    ...reorderSuggestions.map((r) => [`Reorder — ${r.product}`, `${r.suggestedQty} kg (${Math.floor(r.daysCover)}d cover left)`]),
+    ...atRiskCustomers.map((r) => [`At-risk — ${r.company}`, `${Math.floor(r.daysSince)}d since last order (usual ~${Math.round(r.avgGapDays)}d)`]),
+  ], [totalLeads, conversionRate, filteredOrders.length, totalRevenue, funnelData, industryData, warehouseData, revenueByRep, reorderSuggestions, atRiskCustomers])
 
   const shareSubject = `JSV Ingredient — Sales Report (${periodLabel(period)})`
   const shareMessage = useMemo(() => [
@@ -314,6 +403,84 @@ export default function Reports() {
                 <Bar dataKey="revenue" fill="#0d9488" radius={[0, 4, 4, 0]} barSize={22} />
               </BarChart>
             </ResponsiveContainer>
+          )}
+        </div>
+      </div>
+
+      <div className="panel-row">
+        <div className="panel">
+          <p className="panel-title">
+            <IconAlertTriangle width={14} height={14} style={{ verticalAlign: -2, marginRight: 4 }} />
+            Reorder Suggestions
+          </p>
+          <p style={{ fontSize: 12, color: 'var(--ink-500)', marginTop: -8, marginBottom: 12 }}>
+            Based on the last 90 days of order demand vs. stock on hand — flags products that'll run out inside a {REORDER_LEAD_DAYS}-day reorder window.
+          </p>
+          {reorderSuggestions.length === 0 ? (
+            <p style={{ color: 'var(--ink-300)', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>Nothing needs reordering right now.</p>
+          ) : (
+            <table className="data-table" style={{ fontSize: 12.5 }}>
+              <thead>
+                <tr>
+                  <th>Product</th><th>On Hand</th><th>Avg / mo</th><th>Cover Left</th><th>Suggested Reorder</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reorderSuggestions.map((r) => (
+                  <tr key={r.product}>
+                    <td className="cell-strong">{r.product}</td>
+                    <td className="cell-mono">{r.onHand}</td>
+                    <td className="cell-mono">{r.avgMonthly}</td>
+                    <td>
+                      <Pill tone={r.daysCover <= 7 ? 'red' : r.daysCover <= 15 ? 'amber' : 'gray'}>
+                        {Number.isFinite(r.daysCover) ? `${Math.floor(r.daysCover)}d` : '—'}
+                      </Pill>
+                    </td>
+                    <td className="cell-mono cell-strong">{r.suggestedQty}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <div className="panel">
+          <p className="panel-title">
+            <IconClock width={14} height={14} style={{ verticalAlign: -2, marginRight: 4 }} />
+            At-Risk Customers
+          </p>
+          <p style={{ fontSize: 12, color: 'var(--ink-500)', marginTop: -8, marginBottom: 12 }}>
+            Repeat customers who've gone quiet well past their usual ordering rhythm.
+          </p>
+          {atRiskCustomers.length === 0 ? (
+            <p style={{ color: 'var(--ink-300)', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>No customers look at risk right now.</p>
+          ) : (
+            <table className="data-table" style={{ fontSize: 12.5 }}>
+              <thead>
+                <tr>
+                  <th>Company</th><th>Usual gap</th><th>Since last order</th><th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {atRiskCustomers.map((r) => (
+                  <tr key={r.company}>
+                    <td className="cell-strong">{r.company}</td>
+                    <td className="cell-mono">~{Math.round(r.avgGapDays)}d</td>
+                    <td>
+                      <Pill tone={r.riskRatio >= 3 ? 'red' : 'amber'}>{Math.floor(r.daysSince)}d</Pill>
+                    </td>
+                    <td>
+                      <SendButtons
+                        phone={r.customer?.mobile}
+                        email={r.customer?.email}
+                        category="followUp"
+                        vars={{ contact: r.customer?.contact, lead: r.company, notes: `Hasn't ordered in ${Math.floor(r.daysSince)} days (usual ~${Math.round(r.avgGapDays)}d) — quick check-in.` }}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
         </div>
       </div>
